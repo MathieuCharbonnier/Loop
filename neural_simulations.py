@@ -154,7 +154,22 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt, T, w=500*uS
     # Running the simulation
     net.run(T)
 
+    spikes_Ia=binary_spike_train(mon_Ia.spike_trains())
+    spikes_II=binary_spike_train(mon_II.spike_trains())
+    spikes_motor=binary_spike_train(mon_motor.spike_trains())
 
     # Return the spike trains
-    return mon_Ia.spike_trains()/second, mon_II.spike_trains()/second, mon_motor.spike_trains()/second
+    return spikes_Ia, spikes_II,spikes_motor
+
+def binary_spike_train(dt,T, spike_times):
+
+  n_neuron=len(spike_times)
+  spike_trains = np.zeros((n_neuron, int(T/dt)))  # one row per neuron
+
+  for i in range(n_neuron):
+    # Convert spike times to indices
+    indices = (np.array([value for key, value in spike_times[i].items()]) / dt).astype(int)
+
+    # Set 1s in the spike train at the spike indices
+    spike_trains[i, indices] = 1
 
