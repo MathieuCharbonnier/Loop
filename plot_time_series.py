@@ -61,4 +61,22 @@ def plot_times_series(file):
     plt.savefig('Activation.png')
     plt.show()
 
+def load_sto_file(filepath):
+    """
+    Load a .sto file (OpenSim Storage file) into a pandas DataFrame.
+    Skips header lines starting with 'header' or until it reaches the column names.
+    """
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+    
+    # Find where the actual data starts (usually marked by "endheader")
+    for i, line in enumerate(lines):
+        if 'endheader' in line.lower():
+            data_start_idx = i + 1
+            break
+
+    # Now read the actual data using pandas
+    df = pd.read_csv(filepath, delim_whitespace=True, skiprows=data_start_idx)
+    return df
+
 
