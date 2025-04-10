@@ -14,8 +14,8 @@ def decode_spikes_to_activation(spikes_times, time, f1_l=1.0, f2_l=1.0, f3_l=0.5
 
     def e_t_preprocessed(spikes_times, time, Ve=90, T=1.4e-3):
         e_t_all = np.zeros((len(spikes_times), len(time)))
-        for i, spike_times_moto in enumerate(spikes_times):
-            for spike_time in spike_times_moto:
+        for i in range(len(spikes_times)):
+            for spike_time in spikes_times[i]:
                 t_end = spike_time + T / 2
                 # Precompute sine values for the window
                 t_range = (time >= spike_time) & (time <= t_end)
