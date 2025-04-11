@@ -9,10 +9,10 @@ def plot_times_series(file):
     
     # Plot Muscle properties
     plt.figure(figsize=(10, 5))
-    plt.plot(data['time'], data['stretch'], label='stretch')
-    plt.plot(data['time'], data['velocity'], label='stretch velocity')
-    plt.plot(data['time'], data['fiber_length'], label='fiber_length')
-    plt.plot(data['time'], data['fiber_velocity'], label='fiber_velocity')
+    plt.plot(data['Time'], data['stretch'], label='stretch')
+    plt.plot(data['Time'], data['velocity'], label='stretch velocity')
+    plt.plot(data['Time'], data['fiber_length'], label='fiber_length')
+    plt.plot(data['Time'], data['fiber_velocity'], label='fiber_velocity')
     plt.xlabel('Time (s)')
     plt.ylabel('Muscle properties')
     plt.legend()
@@ -23,26 +23,13 @@ def plot_times_series(file):
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True, gridspec_kw={'height_ratios': [1, 2]})
     
     # Raster Plots for Ia afferent fibers
-    for i in range(n['afferent']):
-        spikes_time = data[f'spikes_times_Ia_{i}']
-        axs[0].plot(spikes_time, np.ones_like(spikes_time == 1) * i, 'k.', markersize=3)  # Raster dots
-    
-    # Raster Plots for II afferent fibers
-    for i in range(n['afferent']):
-        spikes_time = data[f'spikes_times_II_{i}']
-        axs[1].plot(spikes_time, np.ones_like(spikes_time == 1) * i, 'b.', markersize=3)  # Raster dots
-    
-    # Raster Plots for motoneurons
-    for i in range(n['motor']):
-        spikes_time = data[f'spikes_times_motor_{i}']
-        axs[2].plot(spikes_time, np.ones_like(spikes_time) * i, 'r.', markersize=3)  # Raster dots
-
-    axs[0].set(title="Ia Spike Raster Plot", ylabel="Neuron Index")
-    axs[1].set(title="II Spike Raster Plot", ylabel="Neuron Index")
-    axs[2].set(title="Motoneurons Spike Raster Plot", ylabel="Neuron Index")
-    axs[0].grid(True)
-    axs[1].grid(True)
-    axs[2].grid(True)
+    df=df.loc[1,'Time']-df.loc[0, 'Time']
+    for i, type_fiber in enumerate(['Ia', 'II', 'motoneuron']):
+      spike_matrix = data.filter(like=f'spikes_times_{type_fiber}').to_numpy()
+      rows, cols = np.nonzero(spike_matrix)
+      axs[i].plot(cols * dt, rows, 'k.', markersize=3)
+      axs[i].set(title=f"{type_fiber} Spike Raster Plot", ylabel="Neuron Index")
+      axs[i].grid(True)
     
     # Adjust layout and show the plot
     plt.tight_layout()
@@ -50,14 +37,26 @@ def plot_times_series(file):
     plt.show()
 
     # Plot activations
-    fig, axs = plt.subplots(n['motor'] + 1, 1, figsize=(10, 10), sharex=True)
-    for i in range(n['motor']):
-        axs[i].plot(data['time'], data[f'activation_motor_{i}'], label=f'activation of motoneuron number {i}')
-    
-    axs[-1].plot(data['time'], data['mean_activation'], label='mean activation')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Activation')
-    plt.legend()
+    # Automatically find all activation columns for motor neurons
+    activation_cols = [col for col in data.columns if col.startswith('activation_motor_')]
+    n_motors = len(activation_cols)
+
+    # Create subplots: one for each motor neuron + one for mean activation
+    fig, axs = plt.subplots(n_motors + 1, 1, figsize=(10, 2.5 * (n_motors + 1)), sharex=True)
+
+    # Plot individual motor neuron activations
+    for i, col in enumerate(activation_cols):
+        axs[i].plot(data['time'], data[col], label=col.replace('_', ' ').capitalize())
+        axs[i].set_ylabel('Activation')
+        axs[i].legend(loc='upper right')
+
+    # Plot mean activation
+    axs[-1].plot(data['time'], data['mean_activation'], label='Mean activation', color='black')
+    axs[-1].set_xlabel('Time (s)')
+    axs[-1].set_ylabel('Activation')
+    axs[-1].legend(loc='upper right')
+
+    plt.tight_layout()
     plt.savefig('Activation.png')
     plt.show()
 
