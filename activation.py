@@ -40,51 +40,51 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
     t_max=time[-1]
     
     def generate_action_potentials(spike_times, time_points, dt, Ve=params['Ve'], t_ap=params['T']):
-    """
-    Generate action potentials at spike times.
-    
-    Parameters:
-    -----------
-    spike_times : array-like
-        Binary array where 1 indicates a spike at the corresponding time point
-    time_points : array-like
-        Time points corresponding to each entry in spike_times
-    dt : float
-        Time step
-    Ve : float
-        Amplitude of action potential
-    t_ap : float
-        Duration of action potential 
-        
-    Returns:
-    --------
-    e_t : ndarray
-        Action potential values at each time point
-    """
-    e_t = np.zeros_like(time_points, dtype=float)
-    n_ap = int(t_ap/dt)
-    
-    # Find indices where spikes occur
-    spike_indices = np.where(spike_times == 1)[0]
-    
-    # For each spike index, create action potential waveform
-    for idx in spike_indices:
-        # Calculate end index for this action potential (don't exceed array length)
-        end_idx = min(idx + n_ap, len(time_points))
-        
-        # Create time points for this action potential segment
-        ap_duration_indices = np.arange(idx, end_idx)
-        
-        # Calculate time since spike for each point in the action potential
-        time_since_spike = time_points[ap_duration_indices] - time_points[idx]
-        
-        # Add the sine wave action potential to the output
-        e_t[ap_duration_indices] += Ve * np.sin(2 * np.pi / t_ap * time_since_spike)
-    
-    return e_t
+      """
+      Generate action potentials at spike times.
+      
+      Parameters:
+      -----------
+      spike_times : array-like
+          Binary array where 1 indicates a spike at the corresponding time point
+      time_points : array-like
+          Time points corresponding to each entry in spike_times
+      dt : float
+          Time step
+      Ve : float
+          Amplitude of action potential
+      t_ap : float
+          Duration of action potential 
+          
+      Returns:
+      --------
+      e_t : ndarray
+          Action potential values at each time point
+      """
+      e_t = np.zeros_like(time_points, dtype=float)
+      n_ap = int(t_ap/dt)
+      
+      # Find indices where spikes occur
+      spike_indices = np.where(spike_times == 1)[0]
+      
+      # For each spike index, create action potential waveform
+      for idx in spike_indices:
+          # Calculate end index for this action potential (don't exceed array length)
+          end_idx = min(idx + n_ap, len(time_points))
+          
+          # Create time points for this action potential segment
+          ap_duration_indices = np.arange(idx, end_idx)
+          
+          # Calculate time since spike for each point in the action potential
+          time_since_spike = time_points[ap_duration_indices] - time_points[idx]
+          
+          # Add the sine wave action potential to the output
+          e_t[ap_duration_indices] += Ve * np.sin(2 * np.pi / t_ap * time_since_spike)
+      
+      return e_t
     
     # Precompute e(t) for all motoneurons
-    e_t_all = np.array([generate_action_potentials(spikes, time) for spikes in spikes_times])
+    e_t_all = np.array([generate_action_potentials(spikes, time, dt) for spikes in spikes_times])
     
     # Create ODE system functions for each stage
     def fibre_ap_dynamics(t, u, e_t_func, a1=params['a1'], a2=params['a2'], a3=params['a3']):
