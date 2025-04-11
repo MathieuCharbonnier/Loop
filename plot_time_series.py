@@ -75,7 +75,7 @@ def load_sto_file(filepath):
             data_start_idx = i + 1
             break
     # Now read the actual data using pandas
-    df = pd.read_csv(filepath, delim_whitespace=True, skiprows=data_start_idx)
+    df = pd.read_csv(filepath, skiprows=data_start_idx, sep='\t')
         
     rest_length=df.loc[0,'fiber_length']
     df['stretch']=df['fiber_length']/rest_length-1
