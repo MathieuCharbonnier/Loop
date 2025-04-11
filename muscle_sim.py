@@ -3,9 +3,10 @@ import argparse
 import numpy as np
 import opensim as osim
 
-def run_simulation(time_array, activation_array):
+def run_simulation(dt, T, activation_array, output_name):
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     muscle_name = "iliacus_r"
+    time_array=np.arange(0,T, dt)
 
     class ActivationController(osim.PrescribedController):
         def __init__(self, model, muscle_name, time_array, activation_array):
@@ -33,25 +34,29 @@ def run_simulation(time_array, activation_array):
 
     state = model.initSystem()
     manager = osim.Manager(model)
-    state.setTime(time_array[0])
+    state.setTime(0)
     manager.setIntegratorAccuracy(1e-4)
     manager.initialize(state)
-    manager.integrate(time_array[-1])
+    manager.integrate(T)
 
     results_table = reporter.getTable()
-    osim.STOFileAdapter.write(results_table, f"muscle_output.sto")
-    print("Simulation complete. Data saved to 'muscle_output.sto'.")
+    osim.STOFileAdapter.write(results_table, output_name)
+    print(f"Simulation complete. Data saved to {output_name}.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dt", type=float, required=True, help="Time interval")
-    parser.add_argument("--T", type=float, required=True, help="")
+    parser.add_argument("--T", type=float, required=True, help="Final time")
     parser.add_argument("--activation", type=str, required=True, help="Path to activation .npy file")
+    parser.add_argument("--output", type=str, required=True, help="Name of the output file")
     args = parser.parse_args()
 
-    time_array = np.load(args.time)
+  
     activation_array = np.load(args.activation)
+    output_name=args.output
     dt=args.dt
+    T=args.T
 
-    run_simulation(time_array, activation_array, dt)
+
+    run_simulation(dt, T, activation_array, output_name)
