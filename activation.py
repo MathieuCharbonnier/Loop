@@ -2,8 +2,9 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp
 from functools import partial
+from scipy.signal import convolve
 
-def decode_spikes_to_activation(spikes_times, time, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
+def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
     """
     Decode spike times to muscle activation signals using a biophysical model.
     
@@ -33,10 +34,12 @@ def decode_spikes_to_activation(spikes_times, time, f1_l=1.0, f2_l=1.0, f3_l=0.5
         # Eq 18 coefficients (MU activation)
         'd1': 5e4, 'd2': 0.02, 'd3': 200,
         # AP generation parameters
-        'Ve': 90, 'T': 1.4e-3,
+        'Ve': 90, 'T': 14,
     }
+    t_min=time[0]
+    t_max=time[-1]
     
-    def generate_action_potentials(spike_times, time_points, Ve=params['Ve'], T=params['T']):
+    def generate_action_potentials(spike_times, time_points, dt Ve=params['Ve'], t_ap=params['T']):
         """
         Generate action potentials at spike times.
         
@@ -48,8 +51,8 @@ def decode_spikes_to_activation(spikes_times, time, f1_l=1.0, f2_l=1.0, f3_l=0.5
             Time points at which to evaluate e(t)
         Ve : float
             Amplitude of action potential
-        T : float
-            Duration of action potential
+        t_ap : float
+            Duration of action potential 
             
         Returns:
         --------
@@ -57,12 +60,10 @@ def decode_spikes_to_activation(spikes_times, time, f1_l=1.0, f2_l=1.0, f3_l=0.5
             Action potential values at each time point
         """
         e_t = np.zeros_like(time_points, dtype=float)
-        dt=time_points[1]-time_points[0]
-        nb_points= T/(2*dt)
-        kernel = np.ones(nb_point + 1)  # 1 for the spike + n after it
-        extended = convolve(spike_times, kernel, mode='full')[:len(spike_train)]
-        e_t[extended] += Ve * np.sin(2 * np.pi / T * (time_points[extended] - spike_time))
-        
+        n_ap=int(t_ap/dt)
+        kernel = np.ones(n_ap + 1)  # 1 for the spike + n after it
+        extended = convolve(spike_times, kernel, mode='full')[:len(spike_times)]
+        e_t[extended] += Ve * np.sin(2 * np.pi / T * (time_points[extended] - spike_times))
         return e_t
     
     # Precompute e(t) for all motoneurons
