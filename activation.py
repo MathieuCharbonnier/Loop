@@ -34,7 +34,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
         # Eq 18 coefficients (MU activation)
         'd1': 5e4, 'd2': 0.02, 'd3': 200,
         # AP generation parameters
-        'Ve': 90, 'T': 14,
+        'Ve': 90, 'T': 0.0014,
     }
     t_min=time[0]
     t_max=time[-1]
