@@ -4,7 +4,7 @@ import os
 import warnings
 
 
-def run_neural_simulations(stretch, velocity, neuron_population, dt, T, w=500*uS, p=0.4):
+def run_neural_simulations(stretch, velocity, neuron_population, dt_run, T, w_run=500*uS, p_run=0.4):
     """
     Run neural simulations with stretch and velocity inputs.
     
@@ -31,9 +31,9 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt, T, w=500*uS
         Spike trains for Ia, II, and motor neurons
     """
     # Validate inputs
-    if not isinstance(dt, Quantity):
+    if not isinstance(dt_run, Quantity):
         warnings.warn("dt should be a Brian2 Quantity. Converting from seconds.")
-        dt = dt * second
+        dt_run = dt_run * second
     
     if not isinstance(T, Quantity):
         warnings.warn("T should be a Brian2 Quantity. Converting from seconds.")
@@ -46,7 +46,7 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt, T, w=500*uS
             raise ValueError(f"neuron_population missing required key: {key}")
 
     # Setting the simulation time step
-    defaultclock.dt = dt
+    defaultclock.dt = dt_run
 
     # Constants for the model
     El = -70 * mV
@@ -74,8 +74,8 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt, T, w=500*uS
         velocity = np.array(velocity, dtype=float)
 
     # Converting stretch and velocity into TimedArrays
-    stretch_array = TimedArray(stretch, dt=dt)
-    velocity_array = TimedArray(velocity, dt=dt)
+    stretch_array = TimedArray(stretch, dt=dt_run)
+    velocity_array = TimedArray(velocity, dt=dt_run)
 
     # ---- Ia and II Sensory Receptors ----
     # Dynamic response (Ia) depends on stretch and velocity
@@ -127,16 +127,16 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt, T, w=500*uS
 
     # Create and connect synapses
     II_Ex = Synapses(II, Excitatory, model=synapse_eqs_II_Ex, on_pre='x += w', method='exact')
-    II_Ex.connect(p=p)
-    II_Ex.w = w
+    II_Ex.connect(p=p_run)
+    II_Ex.w = w_run
     
     Ia_Motoneuron = Synapses(Ia, Motoneuron, model=synapse_eqs_Ia_Motoneuron, on_pre='y += w', method='exact')
-    Ia_Motoneuron.connect(p=p)
-    Ia_Motoneuron.w = w
+    Ia_Motoneuron.connect(p=p_run)
+    Ia_Motoneuron.w = w_run
     
     Ex_Motoneuron = Synapses(Excitatory, Motoneuron, model=synapse_eqs_Ex_Motoneuron, on_pre='z += w', method='exact')
-    Ex_Motoneuron.connect(p=p)
-    Ex_Motoneuron.w = w
+    Ex_Motoneuron.connect(p=p_run)
+    Ex_Motoneuron.w = w_run
 
     # Set up monitoring
     mon_motor = SpikeMonitor(Motoneuron)
@@ -154,12 +154,13 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt, T, w=500*uS
     # Running the simulation
     net.run(T)
 
-    spikes_Ia=binary_spike_train(dt, T, mon_Ia.spike_trains())
-    spikes_II=binary_spike_train(dt, T, mon_II.spike_trains())
-    spikes_motor=binary_spike_train(dt, T, mon_motor.spike_trains())
+    #spikes_Ia=binary_spike_train(dt_run, T, mon_Ia.spike_trains())
+    #spikes_II=binary_spike_train(dt_run, T, mon_II.spike_trains())
+    #spikes_motor=binary_spike_train(dt_run, T, mon_motor.spike_trains())
 
     # Return the spike trains
-    return spikes_Ia, spikes_II,spikes_motor
+    #return spikes_Ia, spikes_II,spikes_motor
+    return mon_Ia.spike_trains(), mon_II.spike_trains(), mon_motor.spike_trains()
 
 def binary_spike_train(dt,T, spike_times):
 
