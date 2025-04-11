@@ -39,7 +39,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
     t_min=time[0]
     t_max=time[-1]
     
-    def generate_action_potentials(spike_times, time_points, dt Ve=params['Ve'], t_ap=params['T']):
+    def generate_action_potentials(spike_times, time_points, dt, Ve=params['Ve'], t_ap=params['T']):
         """
         Generate action potentials at spike times.
         
