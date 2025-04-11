@@ -20,7 +20,7 @@ def plot_times_series(file):
     plt.show()
 
     # Create a figure with three subplots: Ia, II, Efferent fibers
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True, gridspec_kw={'height_ratios': [1, 2]})
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
     
     # Raster Plots for Ia afferent fibers
     df=df.loc[1,'Time']-df.loc[0, 'Time']
