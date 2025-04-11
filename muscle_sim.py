@@ -25,7 +25,7 @@ def run_simulation(time_array, activation_array):
 
     reporter = osim.TableReporter()
     reporter.setName("MuscleReporter")
-    reporter.set_report_time_interval(0.001)
+    reporter.set_report_time_interval(dt)
     muscle = model.getMuscles().get(muscle_name)
     reporter.addToReport(muscle.getOutput("fiber_length"), "fiber_length")
     reporter.addToReport(muscle.getOutput("fiber_velocity"), "fiber_velocity")
@@ -45,11 +45,13 @@ def run_simulation(time_array, activation_array):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--time", type=str, required=True, help="Path to time .npy file")
+    parser.add_argument("--dt", type=float, required=True, help="Time interval")
+    parser.add_argument("--T", type=float, required=True, help="")
     parser.add_argument("--activation", type=str, required=True, help="Path to activation .npy file")
     args = parser.parse_args()
 
     time_array = np.load(args.time)
     activation_array = np.load(args.activation)
+    dt=args.dt
 
-    run_simulation(time_array, activation_array)
+    run_simulation(time_array, activation_array, dt)
