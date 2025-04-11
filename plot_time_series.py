@@ -74,9 +74,13 @@ def load_sto_file(filepath):
         if 'endheader' in line.lower():
             data_start_idx = i + 1
             break
-
     # Now read the actual data using pandas
     df = pd.read_csv(filepath, delim_whitespace=True, skiprows=data_start_idx)
+        
+    rest_length=df.loc[0,'fiber_length']
+    df['stretch']=df['fiber_length']/rest_length-1
+    df['velocity']=df['fiber_velocity']/rest_length
+
     return df
 
 
