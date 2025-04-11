@@ -4,7 +4,7 @@ from scipy.integrate import solve_ivp
 from functools import partial
 from scipy.signal import convolve
 
-def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
+def decode_spikes_to_activation(spikes_times, dt,T, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
     """
     Decode spike times to muscle activation signals using a biophysical model.
     
@@ -34,12 +34,10 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
         # Eq 18 coefficients (MU activation)
         'd1': 5e4, 'd2': 0.02, 'd3': 200,
         # AP generation parameters
-        'Ve': 90, 'T': 0.0014,
+        'Ve': 90, 't_ap': 0.0014,
     }
-    t_min=time[0]
-    t_max=time[-1]
     
-    def generate_action_potentials(spike_times, time_points, dt, Ve=params['Ve'], t_ap=params['T']):
+    def generate_action_potentials(spike_times, dt, Ve=params['Ve'], t_ap=params['t_ap']):
       """
       Generate action potentials at spike times.
       
@@ -61,7 +59,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
       e_t : ndarray
           Action potential values at each time point
       """
-      e_t = np.zeros_like(time_points, dtype=float)
+      e_t = np.zeros_like(spike_times, dtype=float)
       n_ap = int(t_ap/dt)
       
       # Find indices where spikes occur
@@ -70,13 +68,13 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
       # For each spike index, create action potential waveform
       for idx in spike_indices:
           # Calculate end index for this action potential (don't exceed array length)
-          end_idx = min(idx + n_ap, len(time_points))
+          end_idx = min(idx + n_ap, len(spike_times))
           
           # Create time points for this action potential segment
           ap_duration_indices = np.arange(idx, end_idx)
           
           # Calculate time since spike for each point in the action potential
-          time_since_spike = time_points[ap_duration_indices] - time_points[idx]
+          time_since_spike = ap_duration_indices*dt - idx*dt
           
           # Add the sine wave action potential to the output
           e_t[ap_duration_indices] += Ve * np.sin(2 * np.pi / t_ap * time_since_spike)
@@ -84,7 +82,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
       return e_t
     
     # Precompute e(t) for all motoneurons
-    e_t_all = np.array([generate_action_potentials(spikes, time, dt) for spikes in spikes_times])
+    e_t_all = np.array([generate_action_potentials(spikes, dt, T) for spikes in spikes_times])
     
     # Create ODE system functions for each stage
     def fibre_ap_dynamics(t, u, e_t_func, a1=params['a1'], a2=params['a2'], a3=params['a3']):
@@ -119,9 +117,11 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
     }
     
     # Process each motoneuron
+    time=np.arange(0,T, dt)
     a_all_interp = np.zeros((len(spikes_times), len(time)))
     
     for i, e_t in enumerate(e_t_all):
+    
         # Create interpolation function for e(t)
         e_t_interp = interp1d(time, e_t, kind='linear', bounds_error=False, fill_value=0.0)
      
@@ -129,7 +129,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
         u_init = [0.0, 0.0]
         sol_u = solve_ivp(
             partial(fibre_ap_dynamics, e_t_func=e_t_interp),
-            [t_min, t_max], u_init, **solver_kwargs
+            [0, T], u_init, **solver_kwargs
         )
         u_interp = interp1d(sol_u.t, sol_u.y[0], kind='linear', bounds_error=False, fill_value=0.0)
       
@@ -137,7 +137,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
         c_init = [0.0, 0.0]
         sol_c = solve_ivp(
             partial(calcium_dynamics, u_func=u_interp),
-            [t_min, t_max], c_init, **solver_kwargs
+            [0, T], c_init, **solver_kwargs
         )
         c_interp = interp1d(sol_c.t, sol_c.y[0], kind='linear', bounds_error=False, fill_value=0.0)
    
@@ -145,7 +145,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
         P_init = [0.0]
         sol_P = solve_ivp(
             partial(ca_troponin_dynamics, c_func=c_interp),
-            [t_min, t_max], P_init, **solver_kwargs
+            [0, T], P_init, **solver_kwargs
         )
         P_interp = interp1d(sol_P.t, sol_P.y[0], kind='linear', bounds_error=False, fill_value=0.0)
 
@@ -153,7 +153,7 @@ def decode_spikes_to_activation(spikes_times, time, dt, f1_l=1.0, f2_l=1.0, f3_l
         a_init = [0.0]
         sol_a = solve_ivp(
             partial(activation_dynamics, P_func=P_interp),
-            [t_min, t_max], a_init, **solver_kwargs
+            [0, T], a_init, **solver_kwargs
         )
      
         # Interpolate activation to the original time grid
