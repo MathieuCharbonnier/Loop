@@ -4,7 +4,7 @@ from scipy.integrate import solve_ivp
 from functools import partial
 from scipy.signal import convolve
 
-def decode_spikes_to_activation(spikes_times, dt,T,name_activation, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
+def decode_spikes_to_activation(spikes_times, dt,T, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
     """
     Decode spike times to muscle activation signals using a biophysical model.
     
