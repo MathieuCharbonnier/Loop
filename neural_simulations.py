@@ -44,7 +44,9 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt_run, T, w_ru
     for key in required_keys:
         if key not in neuron_population:
             raise ValueError(f"neuron_population missing required key: {key}")
-
+    np.random.seed(42)  # NumPy random seed
+    seed(42) 
+    
     # Setting the simulation time step
     defaultclock.dt = dt_run
 
