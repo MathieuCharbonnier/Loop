@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import sys
 import opensim as osim
+from opensim import Millard2012EquilibriumMuscle
 
 def run_simulation(dt, T, muscle_name, initial_fiber_length, activation_array):
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
@@ -28,6 +29,7 @@ def run_simulation(dt, T, muscle_name, initial_fiber_length, activation_array):
     reporter.setName("MuscleReporter")
     reporter.set_report_time_interval(dt)
     muscle = model.getMuscles().get(muscle_name)
+    muscle = Millard2012EquilibriumMuscle.safeDownCast(muscle)
     reporter.addToReport(muscle.getOutput("fiber_length"), "fiber_length")
     model.addComponent(reporter)
 
