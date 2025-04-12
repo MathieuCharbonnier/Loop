@@ -40,8 +40,7 @@ def plot_times_series(file):
     # Plot activations
     # Automatically find all activation columns for motor neurons
     activation_cols = [col for col in data.columns if col.startswith('activation_')]
-    print('data columns', data.columns)
-    print('activation_cols', activation_cols)
+  
     # Create subplots: one for each motor neuron + one for mean activation
     fig, axs_ = plt.subplots(len(activation_cols), 1, figsize=(10, 1.5 * (len(activation_cols))), sharex=True)
 
@@ -55,26 +54,5 @@ def plot_times_series(file):
     plt.savefig('Activation.png')
     plt.show()
 
-def load_sto_file(filepath):
-    """
-    Load a .sto file (OpenSim Storage file) into a pandas DataFrame.
-    Skips header lines starting with 'header' or until it reaches the column names.
-    """
-    with open(filepath, 'r') as file:
-        lines = file.readlines()
-    
-    # Find where the actual data starts (usually marked by "endheader")
-    for i, line in enumerate(lines):
-        if 'endheader' in line.lower():
-            data_start_idx = i + 1
-            break
-    # Now read the actual data using pandas
-    df = pd.read_csv(filepath, skiprows=data_start_idx, sep='\t')
-        
-    rest_length=df.loc[0,'fiber_length']
-    df['stretch']=df['fiber_length']/rest_length-1
-    df['velocity']=df['fiber_velocity']/rest_length
-
-    return df
 
 
