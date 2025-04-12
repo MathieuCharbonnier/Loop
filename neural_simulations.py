@@ -162,7 +162,7 @@ def run_neural_simulations(stretch, velocity, neuron_population, dt_run, T, w_ru
 
     # Return the spike trains
     #return spikes_Ia, spikes_II,spikes_motor
-    return mon_Ia.spike_trains(), mon_II.spike_trains(), mon_motor.spike_trains()
+    return {"Ia":mon_Ia.spike_trains(), "II":mon_II.spike_trains(), "MN":mon_motor.spike_trains()}
 
 def binary_spike_train(dt,T, spike_times):
 
