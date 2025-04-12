@@ -4,7 +4,7 @@ from scipy.integrate import solve_ivp
 from functools import partial
 from scipy.signal import convolve
 
-def decode_spikes_to_activation(spikes_times, dt,T, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
+def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
     """
     Decode spike times to muscle activation signals using a biophysical model.
     
@@ -12,15 +12,27 @@ def decode_spikes_to_activation(spikes_times, dt,T, f1_l=1.0, f2_l=1.0, f3_l=0.5
     -----------
     spikes_times : list of arrays
         List containing spike times for each motoneuron
-    time : array-like
-        Time points at which to evaluate the activation
+    dt : float
+        Time step for simulation
+    T : float
+        Total simulation time
+    initial_params : list of dict
+        Initial parameters for each motoneuron containing 'u0', 'c0', 'P0', and 'a0'
     f1_l, f2_l, f3_l, f4_l, f5_l : float
         Scaling parameters for the model
         
     Returns:
     --------
-    a_all_interp : ndarray
-        Activation signals for each motoneuron interpolated to the provided time grid
+    u_all : ndarray
+        Fiber action potential for each motoneuron
+    c_all : ndarray
+        Calcium concentration for each motoneuron
+    P_all : ndarray
+        Calcium-troponin binding for each motoneuron
+    a_all : ndarray
+        Activation signals for each motoneuron
+    final_values : dict
+        Final state values for each motoneuron
     """ 
     # Define parameter values (from Table 1)
     # Model parameters as a dictionary for better maintainability
@@ -36,87 +48,42 @@ def decode_spikes_to_activation(spikes_times, dt,T, f1_l=1.0, f2_l=1.0, f3_l=0.5
         # AP generation parameters
         'Ve': 90, 't_ap': 0.0014,
     }
-    """
-    def generate_action_potentials(spike_times, dt,T, Ve=params['Ve'], t_ap=params['t_ap']):
-      
-      #Generate action potentials at spike times.
-      
-      #Parameters:
-      #-----------
-      #spike_times : array-like
-          #Binary array where 1 indicates a spike at the corresponding time point
-      #time_points : array-like
-          #Time points corresponding to each entry in spike_times
-      #dt : float
-          #Time step
-      #Ve : float
-          #Amplitude of action potential
-      #t_ap : float
-          #Duration of action potential 
-          
-      #Returns:
-      #--------
-      #e_t : ndarray
-          #Action potential values at each time point
-      
-      e_t = np.zeros_like(spike_times, dtype=float)
-      n_ap = int(t_ap/dt)
-      
-      # Find indices where spikes occur
-      spike_indices = np.where(spike_times == 1)[0]
-      
-      # For each spike index, create action potential waveform
-      for idx in spike_indices:
-          # Calculate end index for this action potential (don't exceed array length)
-          end_idx = min(idx + n_ap, len(spike_times))
-          
-          # Create time points for this action potential segment
-          ap_duration_indices = np.arange(idx, end_idx)
-          
-          # Calculate time since spike for each point in the action potential
-          time_since_spike = ap_duration_indices*dt - idx*dt
-          
-          # Add the sine wave action potential to the output
-          e_t[ap_duration_indices] += Ve * np.sin(2 * np.pi / t_ap * time_since_spike)
-      
-      return e_t
-    """
-    def generate_action_potentials(spike_times, dt,T, Ve=params['Ve'], t_ap=params['t_ap']):
-      """
-      Generate action potentials at spike times.
-      
-      Parameters:
-      -----------
-      spike_times : array-like
-          Times at which spikes occur
-      time_points : array-like
-          Time points at which to evaluate e(t)
-      dt : float
-          Time step
-      Ve : float
-          Amplitude of action potential
-      t_ap : float
-          Duration of action potential 
-          
-      Returns:
-      --------
-      e_t : ndarray
-          Action potential values at each time point
-      """
-      time_points=np.arange(0,T,dt)
-      e_t = np.zeros_like(time_points, dtype=float)
-      n_ap = int(t_ap/dt)
-      
-      # For each spike time, create action potential waveform
-      for spike_time in spike_times:
-          # Find indices of time points within action potential duration after spike
-          spike_idx = np.where((time_points >= spike_time) & (time_points < spike_time + t_ap))[0]
-          
-          # Calculate sine wave for action potential
-          if len(spike_idx) > 0:
-              e_t[spike_idx] += Ve * np.sin(2 * np.pi / t_ap * (time_points[spike_idx] - spike_time))
-      
-      return e_t
+
+    def generate_action_potentials(spike_times, dt, T, Ve=params['Ve'], t_ap=params['t_ap']):
+        """
+        Generate action potentials at spike times.
+        
+        Parameters:
+        -----------
+        spike_times : array-like
+            Times at which spikes occur
+        dt : float
+            Time step
+        T : float
+            Total simulation time
+        Ve : float
+            Amplitude of action potential
+        t_ap : float
+            Duration of action potential 
+            
+        Returns:
+        --------
+        e_t : ndarray
+            Action potential values at each time point
+        """
+        time_points = np.arange(0, T, dt)
+        e_t = np.zeros_like(time_points, dtype=float)
+        
+        # For each spike time, create action potential waveform
+        for spike_time in spike_times:
+            # Find indices of time points within action potential duration after spike
+            spike_idx = np.where((time_points >= spike_time) & (time_points < spike_time + t_ap))[0]
+            
+            # Calculate sine wave for action potential
+            if len(spike_idx) > 0:
+                e_t[spike_idx] += Ve * np.sin(2 * np.pi / t_ap * (time_points[spike_idx] - spike_time))
+        
+        return e_t
 
     # Precompute e(t) for all motoneurons
     e_t_all = np.array([generate_action_potentials(spikes, dt, T) for spikes in spikes_times])
@@ -154,47 +121,56 @@ def decode_spikes_to_activation(spikes_times, dt,T, f1_l=1.0, f2_l=1.0, f3_l=0.5
     }
     
     # Process each motoneuron
-    time=np.arange(0,T, dt)
-    a_all_interp = np.zeros((len(spikes_times), len(time)))
+    time = np.arange(0, T, dt)
+    u_all = np.zeros((len(spikes_times), len(time)))
+    c_all = np.zeros((len(spikes_times), len(time)))
+    P_all = np.zeros((len(spikes_times), len(time)))
+    a_all = np.zeros((len(spikes_times), len(time)))
+    final_values = {i: {} for i in range(len(spikes_times))}  # Initialize final_values dictionary
     
     for i, e_t in enumerate(e_t_all):
-    
         # Create interpolation function for e(t)
         e_t_interp = interp1d(time, e_t, kind='linear', bounds_error=False, fill_value=0.0)
      
         # Solve fiber AP dynamics
-        u_init = [0.0, 0.0]
+        u_init = initial_params[i]['u0']
         sol_u = solve_ivp(
             partial(fibre_ap_dynamics, e_t_func=e_t_interp),
-            [0, T], u_init, **solver_kwargs
+            [0, T], u_init, t_eval=time, **solver_kwargs
         )
+        final_values[i]['u0'] = sol_u.y[:, -1]
         u_interp = interp1d(sol_u.t, sol_u.y[0], kind='linear', bounds_error=False, fill_value=0.0)
       
         # Solve calcium dynamics
-        c_init = [0.0, 0.0]
+        c_init = initial_params[i]['c0']
         sol_c = solve_ivp(
             partial(calcium_dynamics, u_func=u_interp),
-            [0, T], c_init, **solver_kwargs
+            [0, T], c_init, t_eval=time, **solver_kwargs
         )
+        final_values[i]['c0'] = sol_c.y[:, -1]  # Fixed key name to cf
         c_interp = interp1d(sol_c.t, sol_c.y[0], kind='linear', bounds_error=False, fill_value=0.0)
    
         # Solve calcium-troponin binding
-        P_init = [0.0]
+        P_init = initial_params[i]['P0'] 
         sol_P = solve_ivp(
             partial(ca_troponin_dynamics, c_func=c_interp),
-            [0, T], P_init, **solver_kwargs
+            [0, T], P_init, t_eval=time, **solver_kwargs
         )
+        final_values[i]['P0'] = sol_P.y[:, -1]  # Fixed key name to Pf
         P_interp = interp1d(sol_P.t, sol_P.y[0], kind='linear', bounds_error=False, fill_value=0.0)
 
         # Solve activation dynamics
-        a_init = [0.0]
+        a_init = initial_params[i]['a0']  
         sol_a = solve_ivp(
             partial(activation_dynamics, P_func=P_interp),
-            [0, T], a_init, **solver_kwargs
+            [0, T], a_init, t_eval=time, **solver_kwargs
         )
-     
-        # Interpolate activation to the original time grid
-        a_all_interp[i, :] = np.interp(time, sol_a.t, sol_a.y[0])
+        final_values[i]['a0'] = sol_a.y[:, -1]  # Fixed key name to af
+        
+        # Store results
+        u_all[i, :] = sol_u.y[0]
+        c_all[i, :] = sol_c.y[0]
+        P_all[i, :] = sol_P.y[0]
+        a_all[i, :] = sol_a.y[0]
 
-    return a_all_interp
- 
+    return u_all, c_all, P_all, a_all, final_values
