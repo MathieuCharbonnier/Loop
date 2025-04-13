@@ -6,13 +6,13 @@ from scipy.stats import gaussian_kde
 import json
 
 def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
-
+    """
     plt.plot(initial_time, initial_stretch)
     plt.xlabel('Time (s)')
     plt.ylabel('Stretch (a.u)')
     plt.title('Initial Profile')
     plt.show()
-
+    """
     #load files
     df = pd.read_csv(file_muscle)
     with open(file_spikes, "r") as f:
@@ -45,7 +45,7 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
         all_spike_times = np.concatenate(list(fiber_spikes.values()))
 
         # Estimate density using KDE
-        kde = gaussian_kde(all_spike_times, bw_method=0.5)
+        kde = gaussian_kde(all_spike_times, bw_method=0.1)
         
         firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)  # Normalize by number of neurons in that fiber type
 
@@ -69,18 +69,8 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     plt.show()
 
 
-    # Plot Muscle properties
-    plt.figure(figsize=(10, 5))
-    plt.plot(df['Time'], df['stretch'], label='stretch (a.u)')
-    plt.plot(df['Time'], df['velocity'], label='stretch velocity (s-1)')
-    plt.plot(df['Time'], df['fiber_length'], label='fiber_length (m)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Muscle states')
-    plt.legend()
-    plt.savefig('Muscle.png')
-    plt.show()
-
     # Plot activations
+    """
     activation_cols = [col for col in df.columns if col.startswith('activation_')]
     fig, axs_ = plt.subplots(len(activation_cols), 1, figsize=(10, 1. * (len(activation_cols))), sharex=True)
 
@@ -93,6 +83,36 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     plt.tight_layout()
     plt.savefig('Activation.png')
     plt.show()
+    """
+    fig, axs=plt.subplots(5,1, figsize=(10, 10), sharex=True)
+    axs[0].plot(df['Time'], df['mean_e'], label='mean e')
+    axs[0].legend()
+    axs[1].plot(df['Time'], df['mean_u'], label='mean u')
+    axs[1].legend()
+    axs[2].plot(df['Time'], df['mean_c'], label= 'mean c')
+    axs[2].legend()
+    axs[3].plot(df['Time'], df['mean_P'], label= 'mean P')
+    axs[3].legend()
+    axs[4].plot(df['Time'], df['mean_activation'], label= "mean activation")
+    axs[4].set_xlabel('Time(s)')
+    axs[4].legend()
+
+    fig.suptitle("Mean Activation Dynamic", fontsize=14)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95]) 
+    plt.savefig('activation.png')
+    plt.show()
+
+    # Plot Muscle properties
+    plt.figure(figsize=(10, 5))
+    plt.plot(df['Time'], df['stretch'], label='stretch (a.u)')
+    plt.plot(df['Time'], df['velocity'], label='stretch velocity (s-1)')
+    plt.plot(df['Time'], df['fiber_length'], label='fiber_length (m)')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Muscle states')
+    plt.legend()
+    plt.savefig('Muscle.png')
+    plt.show()
+
 
 
 
