@@ -48,29 +48,9 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
         # AP generation parameters
         'Ve': 90, 't_ap': 0.0014,
     }
-
+    """
     def generate_action_potentials(spike_times, dt, T, Ve=params['Ve'], t_ap=params['t_ap']):
-        """
-        Generate action potentials at spike times.
-        
-        Parameters:
-        -----------
-        spike_times : array-like
-            Times at which spikes occur
-        dt : float
-            Time step
-        T : float
-            Total simulation time
-        Ve : float
-            Amplitude of action potential
-        t_ap : float
-            Duration of action potential 
-            
-        Returns:
-        --------
-        e_t : ndarray
-            Action potential values at each time point
-        """
+
         time_points = np.arange(0, T, dt)
         e_t = np.zeros_like(time_points, dtype=float)
         
@@ -87,7 +67,22 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
 
     # Precompute e(t) for all motoneurons
     e_t_all = np.array([generate_action_potentials(spikes, dt, T) for spikes in spikes_times])
-    
+    """
+
+    def e_t_preprocessed(spikes_times, time, Ve=90, T=1.4e-3):
+
+        e_t_all = np.zeros((len(spikes_times), len(time)))
+
+        for i, spike_times_moto in enumerate(spikes_times):
+            for spike_time in spike_times_moto:
+                t_end = spike_time + T / 2
+                # Precompute sine values for the window
+                t_range = (time >= spike_time) & (time <= t_end)
+                e_t_all[i, t_range] = Ve * np.sin(2 * np.pi / T * (time[t_range] - spike_time))
+
+        return e_t_all
+
+
     # Create ODE system functions for each stage
     def fibre_ap_dynamics(t, u, e_t_func, a1=params['a1'], a2=params['a2'], a3=params['a3']):
         """ODE system for fiber action potential dynamics"""
@@ -120,14 +115,18 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
         'dense_output': True    # Enable dense output for efficient interpolation
     }
     
-    # Process each motoneuron
+
     time = np.arange(0, T, dt)
+    # Preprocess e(t) for all motoneurons
+    e_t_all = e_t_preprocessed(spikes_times, time)
+
     u_all = np.zeros((len(spikes_times), len(time)))
     c_all = np.zeros((len(spikes_times), len(time)))
     P_all = np.zeros((len(spikes_times), len(time)))
     a_all = np.zeros((len(spikes_times), len(time)))
     final_values = {i: {} for i in range(len(spikes_times))}  # Initialize final_values dictionary
     
+    # Process each motoneuron
     for i, e_t in enumerate(e_t_all):
         # Create interpolation function for e(t)
         e_t_interp = interp1d(time, e_t, kind='linear', bounds_error=False, fill_value=0.0)
@@ -173,4 +172,4 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
         P_all[i, :] = sol_P.y[0]
         a_all[i, :] = sol_a.y[0]
 
-    return u_all, c_all, P_all, a_all, final_values
+    return e_t_all, u_all, c_all, P_all, a_all, final_values
