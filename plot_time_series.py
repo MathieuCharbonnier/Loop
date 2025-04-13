@@ -103,16 +103,41 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     plt.show()
 
     # Plot Muscle properties
-    plt.figure(figsize=(10, 5))
-    plt.plot(df['Time'], df['stretch'], label='stretch (a.u)')
-    plt.plot(df['Time'], df['velocity'], label='stretch velocity (s-1)')
-    plt.plot(df['Time'], df['fiber_length'], label='fiber_length (m)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Muscle states')
-    plt.legend()
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10))
+
+    axs[0].plot(df['Time'], df['fiber_length'])
+    axs[0].set_xlabel('Time (s)')
+    axs[0].set_ylabel('Fiber length (m)')
+    axs[1].plot(df['Time'], df['stretch'])
+    axs[1].set_xlabel('Time (s)')
+    axs[1].set_ylabel('Stretch (a.u)')
+    axs[2].plot(df.iloc[20:]['Time'], df.iloc[20:]['velocity'])
+    axs[2].set_xlabel('Time (s)')
+    axs[2].set_ylabel('Stretch Velocity (s-1)')
     plt.savefig('Muscle.png')
     plt.show()
+"""
+#other methods maybe useful at some point
+def RampHold(T_reaction, dt, v=0.2, t_ramp=0.1*second, t_hold=0.3*second):
 
+  time = np.arange(0, T_reaction, dt)
 
+  stretch = np.piecewise(
+      time,
+      [time < t_ramp/second,
+      (time >= t_ramp/second) & (time < t_hold/second),
+      time >= t_hold/second],
+      [lambda t: v * t,
+      lambda t: v * t_ramp/second,
+      lambda t: v * t_ramp/second - v * (t - t_hold/second)]
+  )
 
+  return stretch
 
+def SinusoidalStretch(dt,T_reaction, A=0.01, f=2*hertz):
+
+  time = np.arange(0, T_reaction, dt)
+  stretch = A * np.sin(2 * np.pi * f/hertz * time)
+
+  return stretch
+"""
