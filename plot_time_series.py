@@ -24,7 +24,8 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
       ax.set(title=f" {fiber_type} Spikes Raster Plot", ylabel="Neuron Index")
       ax.grid(True)
     axs[-1].set_xlabel("Time (s)")
-    plt.savefig('Raster_plots.png')
+    fig_path=os.path.join(folder, 'Raster_plots.png')
+    plt.savefig(fig_path)
     plt.show()
 
     #Firing rate plots
@@ -107,7 +108,7 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
     plt.show()
 
 
-def plot_joint_angle_from_sto_file(filepath, columns_wanted ):
+def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder ):
     """
     Load a .sto file (OpenSim Storage file) into a pandas DataFrame.
     Skips header lines starting with 'header' or until it reaches the column names.
@@ -146,8 +147,9 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted ):
         ax.set_xlabel("Time (s)")
 
     # Improve layout and save
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # leave space for the suptitle
-    plt.savefig("joint_angles_and_speeds.png")
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  
+    fig_path=os.path.join(folder,"joint_angles_and_speeds.png" )
+    plt.savefig(fig_path)
     plt.show()
 
 
