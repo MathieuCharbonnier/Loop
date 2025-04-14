@@ -4,15 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import json
+import os
 
-def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
-    """
-    plt.plot(initial_time, initial_stretch)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Stretch (a.u)')
-    plt.title('Initial Profile')
-    plt.show()
-    """
+def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, folder):
+    
     #load files
     df = pd.read_csv(file_muscle)
     with open(file_spikes, "r") as f:
@@ -66,25 +61,11 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     axs[-1].set_xlabel('Time (s)')
     fig.suptitle("Smoothed Instantaneous Firing Rate (KDE)", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # leave space for suptitle
-    plt.savefig('Firing_plots.png')
+    path_fig=os.path.join(folder, 'Firing_plots.png')
+    plt.savefig(path_fig)
     plt.show()
 
 
-    # Plot activations
-    """
-    activation_cols = [col for col in df.columns if col.startswith('activation_')]
-    fig, axs_ = plt.subplots(len(activation_cols), 1, figsize=(10, 1. * (len(activation_cols))), sharex=True)
-
-    # Plot individual motor neuron activations
-    for i, col in enumerate(activation_cols):
-        axs_[i].plot(df['Time'], df[col], label=col.replace('_', ' ').capitalize())
-        axs_[i].set_ylabel('a')
-        axs_[i].legend(loc='upper right')
-    axs_[-1].set_xlabel('Time (s)')
-    plt.tight_layout()
-    plt.savefig('Activation.png')
-    plt.show()
-    """
     fig, axs=plt.subplots(5,1, figsize=(10, 10), sharex=True)
     axs[0].plot(df['Time'], df['mean_e'], label='mean e')
     axs[0].set_ylabel("mean e")
@@ -104,8 +85,9 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     axs[4].legend()
 
     fig.suptitle("Mean Activation Dynamic", fontsize=14)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95]) 
-    plt.savefig('activation.png')
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    path_fig=os.path.join(folder,'activation.png' ) 
+    plt.savefig(path_fig)
     plt.show()
 
     # Plot Muscle properties
@@ -120,30 +102,54 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     axs[2].plot(df.iloc[20:]['Time'], df.iloc[20:]['velocity'])
     axs[2].set_xlabel('Time (s)')
     axs[2].set_ylabel('Stretch Velocity (s-1)')
-    plt.savefig('Muscle.png')
+    path_fig=os.path.join(folder,'Muscle.png' )
+    plt.savefig(path_fig)
     plt.show()
-"""
-#other methods maybe useful at some point
-def RampHold(T_reaction, dt, v=0.2, t_ramp=0.1*second, t_hold=0.3*second):
 
-  time = np.arange(0, T_reaction, dt)
 
-  stretch = np.piecewise(
-      time,
-      [time < t_ramp/second,
-      (time >= t_ramp/second) & (time < t_hold/second),
-      time >= t_hold/second],
-      [lambda t: v * t,
-      lambda t: v * t_ramp/second,
-      lambda t: v * t_ramp/second - v * (t - t_hold/second)]
-  )
+def plot_joint_angle_from_sto_file(filepath, columns_wanted ):
+    """
+    Load a .sto file (OpenSim Storage file) into a pandas DataFrame.
+    Skips header lines starting with 'header' or until it reaches the column names.
+    """
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
 
-  return stretch
+    # Find where the actual data starts (usually marked by "endheader")
+    for i, line in enumerate(lines):
+        if 'endheader' in line.lower():
+            data_start_idx = i + 1
+            break
 
-def SinusoidalStretch(dt,T_reaction, A=0.01, f=2*hertz):
+    # Now read the actual data using pandas
+    df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
+    df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
 
-  time = np.arange(0, T_reaction, dt)
-  stretch = A * np.sin(2 * np.pi * f/hertz * time)
+    # Create subplots
+    fig, axs = plt.subplots(len(columns_wanted), 2, figsize=(12, 10), sharex=True)
+    fig.suptitle("Joint Angles and Speeds", fontsize=16)
 
-  return stretch
-"""
+    # Plot value and speed for each joint
+    for i, column in enumerate(columns_wanted):
+        axs[i, 0].plot(df['time'], df[column + '/value'], label=f"{column} value")
+        axs[i, 0].set_ylabel("Angle (rad)")
+        axs[i, 0].set_title(f"{column} - Value")
+        axs[i, 0].grid(True)
+
+        axs[i, 1].plot(df['time'], df[column + '/speed'], label=f"{column} speed", color='orange')
+        axs[i, 1].set_ylabel("Speed (rad/s)")
+        axs[i, 1].set_title(f"{column} - Speed")
+        axs[i, 1].grid(True)
+
+    # Common X label
+    for ax in axs[-1, :]:
+        ax.set_xlabel("Time (s)")
+
+    # Improve layout and save
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # leave space for the suptitle
+    plt.savefig("joint_angles_and_speeds.png")
+    plt.show()
+
+
+
+
