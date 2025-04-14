@@ -4,7 +4,7 @@ import sys
 import os
 import opensim as osim
 
-def run_simulation(dt, T, muscle_name, activation_array, file_states, iteration):
+def run_simulation(dt, T, muscle_name, activation_array, output_all, initial_state=None, stretch_file=None ):
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     
@@ -35,11 +35,12 @@ def run_simulation(dt, T, muscle_name, activation_array, file_states, iteration)
     reporter.set_report_time_interval(dt)
     muscle = model.getMuscles().get(muscle_name)
     reporter.addToReport(muscle.getOutput("fiber_length"), "fiber_length")
+
     model.addComponent(reporter)
     
     # IMPORTANT: Reinitialize the system after adding controllers and reporters
     state = model.initSystem()
-    if iteration >0 :
+    if initial_state is not None:
         print("Continue from previous state")
         try:
             # Load the .sto file as a TimeSeriesTable
@@ -78,8 +79,10 @@ def run_simulation(dt, T, muscle_name, activation_array, file_states, iteration)
     statesTable = manager.getStatesTable()
     osim.STOFileAdapter.write(statesTable, file_states)
 
-    results_table = reporter.getTable()
-    return results_table.getDependentColumn("fiber_length").to_numpy()
+    if stretch_file is not None:
+        results_table = reporter.getTable()
+        fiber_length=results_table.getDependentColumn("fiber_length").to_numpy()
+        np.save(stretch_file, fiber_length)
 
    
 if __name__ == "__main__":
@@ -88,24 +91,29 @@ if __name__ == "__main__":
     parser.add_argument('--dt', type=float, required=True, help='Time step')
     parser.add_argument('--T', type=float, required=True, help='Total simulation time')
     parser.add_argument('--muscle', type=str, required=True, help='Muscle name')
-    parser.add_argument('--input_file', type=str, required=True, help='Path to input numpy array file')
-    parser.add_argument('--output_file', type=str, required=True, help='Path to save output numpy array')
-    parser.add_argument('--states_file', type=str, help='Path to the saved states file (.sto)')
-    parser.add_argument('--iteration', type=int, help='current ietarition')
+    parser.add_argument('--activations', type=str, required=True, help='Path to input numpy array file')
+    parser.add_argument('--output_all', type=str,required=True, help='Path to the saved states file (.sto)')
+    parser.add_argument('--output_stretch', type=str,  help='Path to save output numpy array')
+    parser.add_argument('--initial_state', type=str, help='initial state file')
     args = parser.parse_args()
     
     # Load the input array
     activation_array = np.load(args.input_file)
 
+    optional={}
+    if args.stretch_file:
+      optional['stretch_file']=args.stretch_file
+    if args.initial_state:
+      optional['initial_state']=args.initial_state
+
     # Run the simulation
-    fiber_length = run_simulation(
+    run_simulation(
         args.dt, 
         args.T, 
         args.muscle, 
         activation_array,
-        args.states_file,
-        args.iteration
+        args.output_all,
+        **{optional}
     )
     
-    # Save the result to the output file
-    np.save(args.output_file, fiber_length)
+ 
