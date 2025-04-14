@@ -61,6 +61,7 @@ def run_simulation(dt, T, muscle_name, activation_array, output_all=None, initia
     if output_all is not None:
         statesTable = manager.getStatesTable()
         osim.STOFileAdapter.write(statesTable, output_all)
+        print(f'{output_all} file is saved')
 
     if final_state is not None:
         json_ = {}
