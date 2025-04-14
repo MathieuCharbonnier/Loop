@@ -24,7 +24,8 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     
     for (fiber_type, fiber_spikes), ax in zip(spikes.items(), axs) : 
       for neuron_id, neuron_spikes in fiber_spikes.items():
-        ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), 'k.', markersize=3)  # Raster dots
+        if neuron_spikes:
+            ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), 'k.', markersize=3)  # Raster dots
       ax.set(title=f" {fiber_type} Spikes Raster Plot", ylabel="Neuron Index")
       ax.grid(True)
     axs[-1].set_xlabel("Time (s)")
@@ -86,14 +87,19 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     """
     fig, axs=plt.subplots(5,1, figsize=(10, 10), sharex=True)
     axs[0].plot(df['Time'], df['mean_e'], label='mean e')
+    axs[0].set_ylabel("mean e")
     axs[0].legend()
     axs[1].plot(df['Time'], df['mean_u'], label='mean u')
+    axs[1].set_ylabel("mean u")
     axs[1].legend()
     axs[2].plot(df['Time'], df['mean_c'], label= 'mean c')
+    axs[2].set_ylabel('mean c')
     axs[2].legend()
     axs[3].plot(df['Time'], df['mean_P'], label= 'mean P')
+    axs[3].set_ylabel('mean P')
     axs[3].legend()
     axs[4].plot(df['Time'], df['mean_activation'], label= "mean activation")
+    axs[4].set_ylabel('mean a')
     axs[4].set_xlabel('Time(s)')
     axs[4].legend()
 
@@ -110,7 +116,7 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle):
     axs[0].set_ylabel('Fiber length (m)')
     axs[1].plot(df['Time'], df['stretch'])
     axs[1].set_xlabel('Time (s)')
-    axs[1].set_ylabel('Stretch (a.u)')
+    axs[1].set_ylabel('Stretch (dimless)')
     axs[2].plot(df.iloc[20:]['Time'], df.iloc[20:]['velocity'])
     axs[2].set_xlabel('Time (s)')
     axs[2].set_ylabel('Stretch Velocity (s-1)')
