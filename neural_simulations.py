@@ -203,8 +203,8 @@ def process_afferent_spikes(neuron_pop: Dict[str, int], afferent_spikes: Dict, e
         
         # Merge and filter spikes
         final_spikes = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
-        
-        if len(final_spikes) > 0:
+
+        if len(final_spikes)>0:
             result["II_indices"].extend([i] * len(final_spikes))
             result["II_times"].extend(final_spikes)
     
@@ -247,10 +247,9 @@ def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict,
             ees_i_spikes = ees_spikes[ees_idx] if ees_idx in ees_spikes else np.array([])
         
         # Merge and filter spikes
-        final_spikes = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
-        
-        if len(final_spikes) > 0:
-            moto_spike_dict[i] = final_spikes
+        final_value = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
+        if len(final_value>0):
+            moto_spike_dict[i]=final_value
     
     return moto_spike_dict
 
