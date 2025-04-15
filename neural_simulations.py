@@ -300,7 +300,7 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p
     # Prepare input arrays
     stretch_array = TimedArray(stretch, dt=dt_run)
     velocity_array = TimedArray(velocity, dt=dt_run)
-    
+    """
     # Set up afferent neurons
     Ia_without_ees, II_without_ees = setup_afferent_neurons(neuron_pop, stretch_array, velocity_array)
     
@@ -335,6 +335,32 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p
     # Create spike generator groups for Ia and II, with final spikes times, as input of the neural network
     Ia = SpikeGeneratorGroup(neuron_pop['Ia'], spike_data["Ia_indices"], spike_data["Ia_times"])
     II = SpikeGeneratorGroup(neuron_pop['II'], spike_data["II_indices"], spike_data["II_times"])
+    """
+    # Dynamic response (Ia) depends on stretch and velocity
+    ia_eq = '''
+        is_ees = i < aff_recruited*neuron_pop['Ia'] : boolean (constant) # Flag for EES-activated neurons
+        # Rate equation for non-EES neurons
+        rate_non_ees = 50 * hertz + 2 * hertz * stretch_array(t) + 4.3 * hertz * sign(velocity_array(t)) * abs(velocity_array(t)) ** 0.6 :hertz
+        # Rate equation for EES-activated neurons
+        rate_ees = rate_non_ees + ees_freq
+        # Use a conditional to select the appropriate rate for each neuron
+        rate = is_ees * rate_ees + (1-is_ees) * rate_non_ees : Hz
+    '''
+    Ia = NeuronGroup((1-aff_recruited)*neuron_pop["Ia"], ia_eq, threshold='rand() < rate*dt',reset='v=El', refractory=refr_period)
+
+    
+    # Static response (II) depends primarily on stretch
+    ii_eq = '''
+        is_ees = i < aff_recruited*neuron_pop['Ia'] : boolean (constant) # Flag for EES-activated neurons
+        # Rate equation for non-EES neurons
+        rate_non_ees = 80 * hertz + 13.5 * hertz * stretch_array(t)
+        # Rate equation for EES-activated neurons
+        rate_ees = rate_non_ees + ees_freq
+        # Use a conditional to select the appropriate rate for each neuron
+        rate = is_ees * rate_ees + (1-is_ees) * rate_non_ees : Hz
+    '''
+    II = NeuronGroup((1-aff_recruited)*neuron_pop["II"], ii_eq, threshold='rand() < rate*dt',reset='v=El', refractory=refr_period)
+    
     
     # Create neuron model
     eqs = '''
@@ -388,6 +414,11 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p
     II_Ex = Synapses(II, Excitatory, model=synapse_models["II_Ex"], on_pre='x += w_', method='exact')
     II_Ex.connect(p=p)
     II_Ex.w_ = w
+
+    II_ees_Ex=Synapses(II, Excitatory, model=synapse_models["II_Ex"], on_pre='x += w_', method='exact')
+    II_Ex.connect(p=p)
+    II_Ex.w_ = w
+
     
     Ia_Motoneuron = Synapses(Ia, Motoneuron, model=synapse_models["Ia_Motoneuron"], on_pre='y += w_', method='exact')
     Ia_Motoneuron.connect(p=p)
