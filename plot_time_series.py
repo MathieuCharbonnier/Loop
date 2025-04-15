@@ -42,11 +42,6 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
     velocity = np.gradient(stretch)
 
     for (fiber_type, fiber_spikes), ax in zip(spikes.items(), axs):
-        all_spike_times = np.concatenate(list(fiber_spikes.values()))
-        kde = gaussian_kde(all_spike_times, bw_method=0.1)
-        firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-
-        ax.plot(time, firing_rate, label="after EES integration", color=colorblind_friendly_colors["blue"])
 
         if fiber_type == 'Ia':
             theory = 50 + 2 * stretch + 4.3 * np.sign(velocity) * np.abs(velocity) ** 0.6
@@ -56,6 +51,16 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
             theory = 80 + 13.5 * stretch
             ax.plot(time, theory, label="calculated from muscle stretch", linestyle='--',
                     color=colorblind_friendly_colors["orange"])
+        if len(fiber_spikes)>0:
+            all_spike_times = np.concatenate(list(fiber_spikes.values()))
+            kde = gaussian_kde(all_spike_times, bw_method=0.1)
+            firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
+
+            ax.plot(time, firing_rate, label="after EES integration", color=colorblind_friendly_colors["blue"])
+        else:
+
+            ax.plot(time, np.zeros_like(time),label="after EES integration", color=colorblind_friendly_colors["blue"] )
+        
 
         ax.set_ylabel('Firing rate (Hz)')
         ax.set_title(f'Fiber type: {fiber_type}')
