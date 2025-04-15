@@ -62,17 +62,14 @@ def setup_ees_stimulation(neuron_pop: Dict[str, int], aff_recruited: float, eff_
         "motor": int(neuron_pop["motor"] * eff_recruited)
     }
     
-    # Calculate cumulative sum for indexing
-    cum_n = np.cumsum(list(n_poisson.values()))
-    
     # Create EES stimulation group only if needed
-    total_recruited = sum(n_poisson.values())
+    total_recruited = np.sum(list(n_poisson.values()))
     if total_recruited > 0 and ees_freq > 0*hertz:
         Gees = PoissonGroup(total_recruited, rates=ees_freq)
     else:
         Gees = None
     
-    return n_poisson, cum_n, Gees
+    return n_poisson,  Gees
 
 
 def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, T_refr: Quantity) -> np.ndarray:
@@ -106,13 +103,12 @@ def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, 
     # Create structured array for better memory efficiency
     dtype = [('time', float), ('is_natural', bool)]
     spikes = np.empty(len(natural_spikes) + len(ees_spikes), dtype=dtype)
-    
+  
     # Fill the structured array
     spikes['time'][:len(natural_spikes)] = natural_spikes
     spikes['time'][len(natural_spikes):] = ees_spikes
     spikes['is_natural'][:len(natural_spikes)] = True
     spikes['is_natural'][len(natural_spikes):] = False
-    
     # Sort by time
     spikes.sort(order='time')
     
@@ -124,15 +120,15 @@ def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, 
     final_count = 0
     
     # Add first spike
-    final_spikes[0] = spikes[0]['time']
+    final_spikes[0] = spikes[0]['time']*second
     final_count = 1
-    last_spike_time = spikes[0]['time']
+    last_spike_time = spikes[0]['time']*second
     
     # Process remaining spikes more efficiently
     for i in range(1, len(spikes)):
-        current_time = spikes[i]['time']
+        current_time = spikes[i]['time']*second
         is_natural = spikes[i]['is_natural']
-        
+
         if is_natural:
             if current_time - last_spike_time >= T_refr:
                 final_spikes[final_count] = current_time
@@ -143,13 +139,13 @@ def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, 
                 final_spikes[final_count] = current_time
                 final_count += 1
                 last_spike_time = current_time
-    
+
     # Return only the filled part of the array
-    return final_spikes[:final_count]
+    return final_spikes[:final_count]*second
 
 
 def process_afferent_spikes(neuron_pop: Dict[str, int], afferent_spikes: Dict, ees_spikes: Dict, 
-                          n_poisson: Dict[str, int], cum_n: np.ndarray, T_refr: Quantity) -> Dict[str, List]:
+                          n_poisson: Dict[str, int], T_refr: Quantity) -> Dict[str, List]:
     """
     Process afferent (Ia and II) spike trains, combining natural and EES-induced spikes.
     
@@ -163,8 +159,6 @@ def process_afferent_spikes(neuron_pop: Dict[str, int], afferent_spikes: Dict, e
         Dictionary with EES-induced spikes
     n_poisson : dict
         Dictionary of recruited neurons
-    cum_n : array
-        Cumulative sum of recruited neurons
     T_refr : Quantity
         Refractory period
         
@@ -186,10 +180,10 @@ def process_afferent_spikes(neuron_pop: Dict[str, int], afferent_spikes: Dict, e
         
         # Get EES-induced spikes for this neuron if it's in the recruited population
         ees_i_spikes = np.array([])
-        if i < n_poisson["Ia"] and cum_n[0] > 0:
+        if i < n_poisson["Ia"] :
             ees_idx = i
             ees_i_spikes = ees_spikes[ees_idx] if ees_idx in ees_spikes else np.array([])
-        
+  
         # Merge and filter spikes
         final_spikes = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
         
@@ -203,8 +197,8 @@ def process_afferent_spikes(neuron_pop: Dict[str, int], afferent_spikes: Dict, e
         
         # Get EES-induced spikes for this neuron if it's in the recruited population
         ees_i_spikes = np.array([])
-        if i < n_poisson["II"] and cum_n[0] > 0:
-            ees_idx = i + cum_n[0]
+        if i < n_poisson["II"] :
+            ees_idx = i + n_poisson["Ia"]
             ees_i_spikes = ees_spikes[ees_idx] if ees_idx in ees_spikes else np.array([])
         
         # Merge and filter spikes
@@ -217,78 +211,9 @@ def process_afferent_spikes(neuron_pop: Dict[str, int], afferent_spikes: Dict, e
     return result
 
 
-def create_lif_neuron_model() -> Tuple[str, Dict[str, Quantity]]:
-    """
-    Create a leaky integrate-and-fire (LIF) neuron model.
-    
-    Returns:
-    -------
-    tuple
-        Equations string and constants dictionary
-    """
-    # Constants for the model
-    constants = {
-        "El": -70 * mV,
-        "gL": 0.1 * mS,
-        "Cm": 1 * uF,
-        "E_ex": 0 * mV,
-        "E_inh": -75 * mV,
-        "tau_exc": 0.5 * ms,
-        "tau_inh": 3 * ms,
-        "threshold_v": -55 * mV
-    }
-    
-    # Neuron model (Leaky Integrate-and-Fire)
-    eqs = '''
-    dv/dt = (gL*(El - v) + Isyn) / Cm : volt
-    Isyn = (ge + ge2) * (E_ex - v) : amp
-    ge : siemens
-    ge2 : siemens
-    '''
-    
-    return eqs, constants
-
-
-def create_synapse_models(tau_exc: Quantity) -> Dict[str, str]:
-    """
-    Create equations for different synapse models.
-    
-    Parameters:
-    ----------
-    tau_exc : Quantity
-        Time constant for excitatory synapses
-        
-    Returns:
-    -------
-    dict
-        Dictionary with synapse model equations
-    """
-    synapse_models = {
-        "II_Ex": """
-        dx/dt = -x / tau_exc : siemens (clock-driven)
-        ge_post = x : siemens (summed)
-        w: siemens # Synaptic weight
-        """,
-        
-        "Ia_Motoneuron": """
-        dy/dt = -y / tau_exc : siemens (clock-driven)
-        ge_post = y : siemens (summed)
-        w: siemens # Synaptic weight
-        """,
-        
-        "Ex_Motoneuron": """
-        dz/dt = -z / tau_exc : siemens (clock-driven)
-        ge2_post = z : siemens (summed)
-        w: siemens # Synaptic weight
-        """
-    }
-    
-    return synapse_models
-
-
 def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict, 
                             ees_spikes: Dict, n_poisson: Dict[str, int], 
-                            cum_n: np.ndarray, T_refr: Quantity) -> Dict:
+                             T_refr: Quantity) -> Dict:
     """
     Process motoneuron spike trains, combining natural and EES-induced spikes.
     
@@ -302,8 +227,6 @@ def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict,
         Dictionary with EES-induced spikes
     n_poisson : dict
         Dictionary of recruited neurons
-    cum_n : array
-        Cumulative sum of recruited neurons
     T_refr : Quantity
         Refractory period
         
@@ -319,8 +242,8 @@ def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict,
         
         # Get EES-induced spikes for this neuron if it's in the recruited population
         ees_i_spikes = np.array([])
-        if i < n_poisson["motor"] and cum_n[1] > 0:
-            ees_idx = i + cum_n[1]
+        if i < n_poisson["motor"] :
+            ees_idx = i + n_poisson["Ia"]+n_poisson["II"]
             ees_i_spikes = ees_spikes[ees_idx] if ees_idx in ees_spikes else np.array([])
         
         # Merge and filter spikes
@@ -382,7 +305,7 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*u
     Ia_without_ees, II_without_ees = setup_afferent_neurons(neuron_pop, stretch_array, velocity_array)
     
     # Set up EES stimulation
-    n_poisson, cum_n, Gees = setup_ees_stimulation(neuron_pop, aff_recruited, eff_recruited, ees_freq)
+    n_poisson, Gees = setup_ees_stimulation(neuron_pop, aff_recruited, eff_recruited, ees_freq)
     
     # Set up monitoring for initial simulation
     mon_init_Ia = SpikeMonitor(Ia_without_ees)
@@ -405,38 +328,76 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*u
     
     # Get EES-induced spikes if applicable
     ees_spikes = mon_gees.spike_trains() if mon_gees is not None else {}
-    
+
     # Process afferent spike trains (combine natural and EES-induced spikes)
-    spike_data = process_afferent_spikes(neuron_pop, afferent_spikes, ees_spikes, n_poisson, cum_n, T_refr)
+    spike_data = process_afferent_spikes(neuron_pop, afferent_spikes, ees_spikes, n_poisson, T_refr)
     
-    # Create spike generator groups for Ia and II
+    # Create spike generator groups for Ia and II, with final spikes times, as input of the neural network
     Ia = SpikeGeneratorGroup(neuron_pop['Ia'], spike_data["Ia_indices"], spike_data["Ia_times"])
     II = SpikeGeneratorGroup(neuron_pop['II'], spike_data["II_indices"], spike_data["II_times"])
     
     # Create neuron model
-    eqs, constants = create_lif_neuron_model()
-    
+    # Constants for the LIF model
+    Eleaky= -70*mV,
+    gL= 0.1 * mS,
+    Cm= 1 * uF,
+    E_ex= 0 * mV,
+    E_inh= -75 * mV,
+    tau_exc= 0.5 * ms,
+    tau_inh= 3 * ms,
+    threshold_v= -55 * mV
+  
+
+    #equation for the LIF model
+    eqs = '''
+    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
+    Isyn = (ge + ge2) * (E_ex - v) : amp
+    ge : siemens
+    ge2 : siemens
+    '''
+ 
     # Creating the interneuron and motoneuron groups
     Excitatory = NeuronGroup(
         neuron_pop["exc"], 
         eqs, 
-        threshold=f"v > {constants['threshold_v']}", 
-        reset=f"v = {constants['El']}", 
+        threshold=f"v > threshold_v", 
+        reset="v = Eleaky", 
         method="exact"
     )
-    Excitatory.v = constants["El"]  # Set initial voltage
-    
+
+    print("Eleaky ", Eleaky)
+ 
+    Excitatory.v = Eleaky  # Set initial voltage
+    print("excitatory done")
     Motoneuron = NeuronGroup(
         neuron_pop["motor"], 
         eqs, 
-        threshold=f"v > {constants['threshold_v']}", 
-        reset=f"v = {constants['El']}", 
+        threshold=f"v > threshold_v", 
+        reset="v = Eleaky", 
         method="exact"
     )
-    Motoneuron.v = constants["El"]  # Set initial voltage
+    Motoneuron.v = Eleaky # Set initial voltage
     
     # Define synapse models
-    synapse_models = create_synapse_models(constants["tau_exc"])
+    synapse_models = {
+        "II_Ex": """
+        dx/dt = -x / tau_exc : siemens (clock-driven)
+        ge_post = x : siemens (summed)
+        w: siemens # Synaptic weight
+        """,
+        
+        "Ia_Motoneuron": """
+        dy/dt = -y / tau_exc : siemens (clock-driven)
+        ge_post = y : siemens (summed)
+        w: siemens # Synaptic weight
+        """,
+        
+        "Ex_Motoneuron": """
+        dz/dt = -z / tau_exc : siemens (clock-driven)
+        ge2_post = z : siemens (summed)
+        w: siemens # Synaptic weight
+        """
+    }
     
     # Create and connect synapses
     II_Ex = Synapses(II, Excitatory, model=synapse_models["II_Ex"], on_pre='x += w', method='exact')
@@ -450,12 +411,12 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*u
     Ex_Motoneuron = Synapses(Excitatory, Motoneuron, model=synapse_models["Ex_Motoneuron"], on_pre='z += w', method='exact')
     Ex_Motoneuron.connect(p=p_run)
     Ex_Motoneuron.w = w_run
-    
+    print("synapse done")
     # Set up monitoring for main simulation
     mon_motor = SpikeMonitor(Motoneuron)
     mon_Ia = SpikeMonitor(Ia)
     mon_II = SpikeMonitor(II)
-    
+    print("monitoring done")
     # Create and run main network
     net = Network()
     net.add([
@@ -468,7 +429,7 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*u
     # Process motoneuron spikes
     moto_spike_dict = process_motoneuron_spikes(
         neuron_pop, mon_motor.spike_trains(), ees_spikes, 
-        n_poisson, cum_n, T_refr
+        n_poisson,  T_refr
     )
     
     # Return final results
