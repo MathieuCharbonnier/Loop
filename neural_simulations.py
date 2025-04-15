@@ -255,8 +255,9 @@ def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict,
     return moto_spike_dict
 
 
-def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*uS, p_run=0.4, 
-                         ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
+def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p=0.4,Eleaky= -70*mV,
+    gL= 0.1 * mS,Cm= 1 * uF,E_ex= 0 * mV,E_inh= -75 * mV,tau_exc= 0.5 * ms,tau_inh= 3 * ms,
+    threshold_v= -55 * mV,ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
     """
     Run neural simulations with stretch and velocity inputs.
     
@@ -337,18 +338,6 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*u
     II = SpikeGeneratorGroup(neuron_pop['II'], spike_data["II_indices"], spike_data["II_times"])
     
     # Create neuron model
-    # Constants for the LIF model
-    Eleaky= -70*mV,
-    gL= 0.1 * mS,
-    Cm= 1 * uF,
-    E_ex= 0 * mV,
-    E_inh= -75 * mV,
-    tau_exc= 0.5 * ms,
-    tau_inh= 3 * ms,
-    threshold_v= -55 * mV
-  
-
-    #equation for the LIF model
     eqs = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
     Isyn = (ge + ge2) * (E_ex - v) : amp
@@ -364,11 +353,8 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*u
         reset="v = Eleaky", 
         method="exact"
     )
-
-    print("Eleaky ", Eleaky)
- 
     Excitatory.v = Eleaky  # Set initial voltage
-    print("excitatory done")
+
     Motoneuron = NeuronGroup(
         neuron_pop["motor"], 
         eqs, 
@@ -383,40 +369,40 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w_run=500*u
         "II_Ex": """
         dx/dt = -x / tau_exc : siemens (clock-driven)
         ge_post = x : siemens (summed)
-        w: siemens # Synaptic weight
+        w_: siemens # Synaptic weight
         """,
         
         "Ia_Motoneuron": """
         dy/dt = -y / tau_exc : siemens (clock-driven)
         ge_post = y : siemens (summed)
-        w: siemens # Synaptic weight
+        w_: siemens # Synaptic weight
         """,
         
         "Ex_Motoneuron": """
         dz/dt = -z / tau_exc : siemens (clock-driven)
         ge2_post = z : siemens (summed)
-        w: siemens # Synaptic weight
+        w_: siemens # Synaptic weight
         """
     }
     
     # Create and connect synapses
-    II_Ex = Synapses(II, Excitatory, model=synapse_models["II_Ex"], on_pre='x += w', method='exact')
-    II_Ex.connect(p=p_run)
-    II_Ex.w = w_run
+    II_Ex = Synapses(II, Excitatory, model=synapse_models["II_Ex"], on_pre='x += w_', method='exact')
+    II_Ex.connect(p=p)
+    II_Ex.w_ = w
     
-    Ia_Motoneuron = Synapses(Ia, Motoneuron, model=synapse_models["Ia_Motoneuron"], on_pre='y += w', method='exact')
-    Ia_Motoneuron.connect(p=p_run)
-    Ia_Motoneuron.w = w_run
+    Ia_Motoneuron = Synapses(Ia, Motoneuron, model=synapse_models["Ia_Motoneuron"], on_pre='y += w_', method='exact')
+    Ia_Motoneuron.connect(p=p)
+    Ia_Motoneuron.w_ = w
     
-    Ex_Motoneuron = Synapses(Excitatory, Motoneuron, model=synapse_models["Ex_Motoneuron"], on_pre='z += w', method='exact')
-    Ex_Motoneuron.connect(p=p_run)
-    Ex_Motoneuron.w = w_run
-    print("synapse done")
+    Ex_Motoneuron = Synapses(Excitatory, Motoneuron, model=synapse_models["Ex_Motoneuron"], on_pre='z += w_', method='exact')
+    Ex_Motoneuron.connect(p=p)
+    Ex_Motoneuron.w_ = w
+
     # Set up monitoring for main simulation
     mon_motor = SpikeMonitor(Motoneuron)
     mon_Ia = SpikeMonitor(Ia)
     mon_II = SpikeMonitor(II)
-    print("monitoring done")
+
     # Create and run main network
     net = Network()
     net.add([
