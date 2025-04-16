@@ -56,10 +56,10 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
             kde = gaussian_kde(all_spike_times, bw_method=0.1)
             firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
 
-            ax.plot(time, firing_rate, label="after EES integration", color=colorblind_friendly_colors["blue"])
+            ax.plot(time, firing_rate, label="with EES and refractory", color=colorblind_friendly_colors["blue"])
         else:
 
-            ax.plot(time, np.zeros_like(time),label="after EES integration", color=colorblind_friendly_colors["blue"] )
+            ax.plot(time, np.zeros_like(time),label="with EES and refractory", color=colorblind_friendly_colors["blue"] )
         
 
         ax.set_ylabel('Firing rate (Hz)')
