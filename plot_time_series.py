@@ -136,13 +136,13 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, aff_recruit
     fig.suptitle("Joint Angles and Speeds", fontsize=16)
 
     for i, column in enumerate(columns_wanted):
-        axs[i, 0].plot(df['time'], df[column + '/value'], label=f"{column} value", color=colorblind_friendly_colors["blue"])
-        axs[i, 0].set_ylabel("Angle (rad)")
+        axs[i, 0].plot(df['time'], df[column + '/value']*180/np.pi, label=f"{column} value", color=colorblind_friendly_colors["blue"])
+        axs[i, 0].set_ylabel("Angle (degree)")
         axs[i, 0].set_title(f"{column} - Value")
         axs[i, 0].grid(True)
 
-        axs[i, 1].plot(df['time'], df[column + '/speed'], label=f"{column} speed", color=colorblind_friendly_colors["orange"])
-        axs[i, 1].set_ylabel("Speed (rad/s)")
+        axs[i, 1].plot(df['time'], df[column + '/speed']*180/np.pi, label=f"{column} speed", color=colorblind_friendly_colors["orange"])
+        axs[i, 1].set_ylabel("Speed (degree/s)")
         axs[i, 1].set_title(f"{column} - Speed")
         axs[i, 1].grid(True)
 
