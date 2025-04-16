@@ -3,6 +3,106 @@ import numpy as np
 import os
 from typing import Dict, List, Union, Tuple, Optional
 
+def run_flexor_extensior_neuron_simulation():
+
+    # Set simulation parameters
+    defaultclock.dt = 0.025 * ms
+    cycle_time = 100 * ms
+    
+    # Constants
+    El, gL, Cm = -70 * mV, 0.1 * mS, 1 * uF
+    E_ex, E_inh = 0 * mV, -75 * mV
+    tau_exc, tau_inh = 0.5 * ms, 3 * ms
+    
+    # Neuron model (Leaky Integrate-and-Fire)
+    eqs = '''
+    dv/dt = (gL*(El - v) + Isyn)/ Cm : volt
+    Isyn = gi * (E_inh - v) + ge * (E_ex - v) : amp
+    ge : siemens
+    gi : siemens
+    '''
+    
+    # Neuron populations
+    n = {"Ia": 50, "II": 50, "inh": 50, "exc": 50, "motor": 50}
+    n_tot = sum(list(n.values()))
+    
+    neurons = NeuronGroup(n_tot * 2, eqs, threshold="v > -50*mV", reset="v = El", method="exact")
+    neurons.v = El  # Set initial voltage
+    
+    # Dynamic neuron group mapping
+    def get_indices(start, sizes):
+        indices = {}
+        current_index = start
+        for k, v in sizes.items():
+            indices[k] = slice(current_index, current_index + v)
+            current_index += v
+        return indices
+    
+    neurons_type = get_indices(0, {k + "_flexor": v for k, v in n.items()} | {k + "_extensor": v for k, v in n.items()})
+    
+    # Function to select a fraction of neurons
+    def select_fraction(neuron_group, fraction):
+        start, stop = neuron_group.start, neuron_group.stop
+        return slice(start, start + int(fraction * (stop - start)))
+    
+    # Select 50% of neurons for Poisson input
+    new_sli_II_flexor = select_fraction(neurons_type["II_flexor"], 0.5)
+    new_sli_Ia_flexor = select_fraction(neurons_type["Ia_flexor"], 0.5)
+    
+    # Create Poisson inputs for selected neurons
+    poisson_inputs = [
+        PoissonInput(neurons[new_sli_II_flexor], "v", N=10, rate=1/(10*ms), weight=100 * mV),
+        PoissonInput(neurons[new_sli_Ia_flexor], "v", N=10, rate=1/(10*ms), weight=100 * mV),
+        PoissonInput(neurons[neurons_type["II_extensor"]], "v", N=10, rate=1/(10*ms), weight=100 * mV),
+        PoissonInput(neurons[neurons_type["Ia_extensor"]], "v", N=10, rate=1/(10*ms), weight=100 * mV)
+    ]
+    
+    # Synapse model templates
+    synapse_eqs = {
+        "exc": """
+            dx/dt = -x / tau_exc : siemens (clock-driven)
+            ge_post = x : siemens  (summed)
+            w: siemens # Synaptic weight
+        """,
+        "inh": """
+            dg/dt = (x - g) / tau_inh : siemens (clock-driven)
+            dx/dt = -x / tau_inh : siemens (clock-driven)
+            gi_post = g : siemens  (summed)
+            w: siemens # Synaptic weight
+        """
+    }
+    
+    # Function to create synapses
+    def create_synapse(pre, post, syn_type, p=1.0):
+        syn = Synapses(neurons[neurons_type[pre]], neurons[neurons_type[post]], method='exact',
+                       model=synapse_eqs[syn_type], on_pre=' x += w')
+        syn.connect(p=p)
+        syn.w = '10*uS'
+        return syn
+    
+    # Synapse connections
+    synapses = {name: create_synapse(*name.split("_to_"), "exc" if "exc" in name or "Ia" in name or "II" in name else "inh", p=0.9)
+                for name in [
+                    "Ia_extensor_to_motor_extensor", "Ia_extensor_to_inh_extensor", "II_extensor_to_exc_extensor",
+                    "II_extensor_to_inh_extensor", "exc_extensor_to_motor_extensor", "inh_extensor_to_motor_flexor",
+                    "Ia_flexor_to_motor_flexor", "Ia_flexor_to_inh_flexor", "II_flexor_to_exc_flexor", "II_flexor_to_inh_flexor",
+                    "exc_flexor_to_motor_flexor", "inh_flexor_to_motor_extensor", "inh_flexor_to_inh_extensor", "inh_extensor_to_inh_flexor"
+                ]}
+    
+    # Network construction
+    net = Network([neurons] + poisson_inputs[0:2] + list(synapses.values()))
+    
+    # Monitoring
+    spikes = {name: SpikeMonitor(neurons[neurons_type[name]]) for name in neurons_type}
+    net.add(spikes.values())
+    
+    # Run the simulation
+    net.run(T)
+
+    
+    
+
+    
 
 
 def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, T_refr: Quantity) -> np.ndarray:
