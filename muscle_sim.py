@@ -5,7 +5,7 @@ import os
 import json
 import opensim as osim
 
-def run_simulation(dt, T, muscle_name, activation_array, output_all=None, initial_state=None, final_state=None, stretch_file=None):
+def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initial_state=None, final_state=None, stretch_file=None):
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     time_array = np.arange(0, T, dt)
@@ -14,24 +14,26 @@ def run_simulation(dt, T, muscle_name, activation_array, output_all=None, initia
         def __init__(self, model, muscle_name, time_array, activation_array):
             super().__init__()
             self.setName("ActivationController")
-            muscle = model.getMuscles().get(muscle_name)
-            self.addActuator(muscle)
+            for i,muscle_name in enumerate(muscle_names):
+                muscle = model.getMuscles().get(muscle_name)
+                self.addActuator(muscle)
 
-            func = osim.PiecewiseLinearFunction()
-            for t, a in zip(time_array, activation_array):
-                func.addPoint(t, float(a))
+                func = osim.PiecewiseLinearFunction()
+                for t, a in zip(time_array, activation_array[i]):
+                    func.addPoint(t, float(a))
 
-            self.prescribeControlForActuator(muscle_name, func)
+                self.prescribeControlForActuator(muscle_name, func)
 
-    controller = ActivationController(model, muscle_name, time_array, activation_array)
+    controller = ActivationController(model, muscle_names, time_array, activation_array)
     model.addController(controller)
 
     if stretch_file is not None:
         reporter = osim.TableReporter()
         reporter.setName("MuscleReporter")
         reporter.set_report_time_interval(dt)
-        muscle = model.getMuscles().get(muscle_name)
-        reporter.addToReport(muscle.getOutput("fiber_length"), "fiber_length")
+        for i,muscle_name in enumerate(muscle_names):
+            muscle = model.getMuscles().get(muscle_name)
+            reporter.addToReport(muscle.getOutput("fiber_length"), f'{muscle_name}_fiber_length')
         model.addComponent(reporter)
 
     # Initialize state
@@ -78,7 +80,9 @@ def run_simulation(dt, T, muscle_name, activation_array, output_all=None, initia
 
     if stretch_file is not None:
         results_table = reporter.getTable()
-        fiber_length = results_table.getDependentColumn("fiber_length").to_numpy()
+        fiber_length=np.zeros((len(muscle_names),int(T/dt)+1))
+        for i,muscle_name in enumerate(muscle_names):
+            fiber_length[i] = results_table.getDependentColumn(f'{muscle_name}_fiber_length').to_numpy()
         np.save(stretch_file, fiber_length)
 
     if output_all is None and final_state is None and stretch_file is None:
@@ -89,7 +93,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Muscle simulation')
     parser.add_argument('--dt', type=float, required=True, help='Time step')
     parser.add_argument('--T', type=float, required=True, help='Total simulation time')
-    parser.add_argument('--muscle', type=str, required=True, help='Muscle name')
+    parser.add_argument('--muscles', type=str, required=True, help='Muscle name')
     parser.add_argument('--activations', type=str, required=True, help='Path to input numpy array file')
     parser.add_argument('--initial_state', type=str, help='Initial state JSON file')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
@@ -114,7 +118,7 @@ if __name__ == "__main__":
     run_simulation(
         args.dt,
         args.T,
-        args.muscle,
+        args.muscles.split(','),
         activation_array,
         output_all=args.output_all,
         **{k: v for k, v in optional_args.items() if v is not None}
