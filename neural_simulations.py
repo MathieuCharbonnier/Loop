@@ -3,219 +3,180 @@ import numpy as np
 import os
 from typing import Dict, List, Union, Tuple, Optional
 
-def run_flexor_extensior_neuron_simulation():
+def run_flexor_extensior_neuron_simulation(stretch_flexor, velocity_flexor, stretch_extensor, velocity_extensor, 
+                                          neuron_pop, dt_run, T, w=500*uS, p=0.4, Eleaky=-70*mV,
+                                          gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
+                                          tau_exc=0.5*ms, tau_inh=3*ms, threshold_v=-55*mV, 
+                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
+    # Set up random seeds for reproducibility
+    np.random.seed(42)
+    seed(42)
+    defaultclock.dt = dt_run
 
-    # Set simulation parameters
-    defaultclock.dt = 0.025 * ms
-    cycle_time = 100 * ms
+    # Input arrays
+    stretch_flexor_array = TimedArray(stretch_flexor, dt=dt_run)
+    velocity_flexor_array = TimedArray(velocity_flexor, dt=dt_run)
+    stretch_extensor_array = TimedArray(stretch_extensor, dt=dt_run)
+    velocity_extensor_array = TimedArray(velocity_extensor, dt=dt_run)
+
+    # Afferent neuron equations
+    ia_eq = '''
+    is_flexor = int(i < neuron_pop['Ia']) : boolean
+    stretch_array(t)= is_flexor*stretch_flexor_array(t)+(1-is_flexor)*stretch_extensor_array(t) :1
+    velocity_array(t)= is_flexor*velocity_flexor_array(t)+(1-is_flexor)*velocity_extensor_array(t) :1
+    is_ees = int((is_flexor and i < aff_recruited) or (not is_flexor and i < neuron_pop['Ia'] + aff_recruited)) : boolean
+    rate = 50*hertz + 2*hertz*stretch_array(t) + 4.3*hertz*sign(velocity_array(t))*abs(velocity_array(t))**0.6) +is_ees*ees_freq : Hz
+    '''
     
-    # Constants
-    El, gL, Cm = -70 * mV, 0.1 * mS, 1 * uF
-    E_ex, E_inh = 0 * mV, -75 * mV
-    tau_exc, tau_inh = 0.5 * ms, 3 * ms
+    ii_eq = '''
+    is_flexor = int(i < neuron_pop['II']) : boolean
+    stretch_array(t)= is_flexor*stretch_flexor_array(t)+(1-is_flexor)*stretch_extensor_array(t) :1
+    is_ees = int((is_flexor and i < aff_recruited) or (not is_flexor and i < neuron_pop['II'] + aff_recruited)) : boolean
+    rate = 80*hertz + 13.5*hertz*stretch_array(t))+ is_ees* ees_freq : Hz
+    '''
     
-    # Neuron model (Leaky Integrate-and-Fire)
-    eqs = '''
-    dv/dt = (gL*(El - v) + Isyn)/ Cm : volt
-    Isyn = gi * (E_inh - v) + ge * (E_ex - v) : amp
+    # Create afferent neurons
+    Ia = NeuronGroup(2*neuron_pop['Ia'], ia_eq, threshold='rand() < rate*dt', refractory=T_refr)
+    II = NeuronGroup(2*neuron_pop['II'], ii_eq, threshold='rand() < rate*dt', refractory=T_refr)
+    
+    # LIF neuron equation
+    neuron_eq = '''
+    dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
+    Isyn = gi*(E_inh - v) + ge*(E_ex - v) : amp
     ge : siemens
     gi : siemens
     '''
     
-    # Neuron populations
-    n = {"Ia": 50, "II": 50, "inh": 50, "exc": 50, "motor": 50}
-    n_tot = sum(list(n.values()))
+    #Model all non afferent neuron with on neurongroup
+    non_afferent = {k: v for k, v in neuron_pop.items() if k not in ['Ia', 'II']}
+    n_total = sum(non_afferent.values()) * 2  # Total for flexor and extensor
+
+    # Create single neuron group for all non-afferent neurons
+    neurons = NeuronGroup(n_total, neuron_eq, threshold='v > threshold_v', 
+                         reset='v = Eleaky', refractory=T_refr, method='exact')
+    neurons.v = Eleaky
     
-    neurons = NeuronGroup(n_tot * 2, eqs, threshold="v > -50*mV", reset="v = El", method="exact")
-    neurons.v = El  # Set initial voltage
+    # Calculate indices for each neuron type
+    indices = {}
+    start_idx = 0
+    # First all flexor neurons
+    for neuron_type, count in non_afferent.items():
+        indices[f"{neuron_type}_flexor"] = slice(start_idx, start_idx + count)
+        start_idx += count
+    # Then all extensor neurons
+    for neuron_type, count in non_afferent.items():
+        indices[f"{neuron_type}_extensor"] = slice(start_idx, start_idx + count)
+        start_idx += count
     
-    # Dynamic neuron group mapping
-    def get_indices(start, sizes):
-        indices = {}
-        current_index = start
-        for k, v in sizes.items():
-            indices[k] = slice(current_index, current_index + v)
-            current_index += v
-        return indices
+    # Helper function to get the right neuron slice
+    def get_neurons_by_type(neuron_type):
+        if neuron_type.startswith("Ia_"):
+            if neuron_type == "Ia_flexor" 
+                return Ia[:neuron_pop['Ia']]
+            else:
+                return Ia[neuron_pop['Ia']:]
+        elif neuron_type.startswith("II_"):
+            if neuron_type == "II_flexor":
+                return II[:neuron_pop['II']]
+            else:
+                return II[neuron_pop['II']:]
+        else:
+            return neurons[indices[neuron_type]]
     
-    neurons_type = get_indices(0, {k + "_flexor": v for k, v in n.items()} | {k + "_extensor": v for k, v in n.items()})
-    
-    # Function to select a fraction of neurons
-    def select_fraction(neuron_group, fraction):
-        start, stop = neuron_group.start, neuron_group.stop
-        return slice(start, start + int(fraction * (stop - start)))
-    
-    # Select 50% of neurons for Poisson input
-    new_sli_II_flexor = select_fraction(neurons_type["II_flexor"], 0.5)
-    new_sli_Ia_flexor = select_fraction(neurons_type["Ia_flexor"], 0.5)
-    
-    # Create Poisson inputs for selected neurons
-    poisson_inputs = [
-        PoissonInput(neurons[new_sli_II_flexor], "v", N=10, rate=1/(10*ms), weight=100 * mV),
-        PoissonInput(neurons[new_sli_Ia_flexor], "v", N=10, rate=1/(10*ms), weight=100 * mV),
-        PoissonInput(neurons[neurons_type["II_extensor"]], "v", N=10, rate=1/(10*ms), weight=100 * mV),
-        PoissonInput(neurons[neurons_type["Ia_extensor"]], "v", N=10, rate=1/(10*ms), weight=100 * mV)
-    ]
-    
-    # Synapse model templates
+    # Synapse models
     synapse_eqs = {
         "exc": """
             dx/dt = -x / tau_exc : siemens (clock-driven)
-            ge_post = x : siemens  (summed)
+            ge_post = x : siemens (summed)
             w: siemens # Synaptic weight
         """,
         "inh": """
             dg/dt = (x - g) / tau_inh : siemens (clock-driven)
             dx/dt = -x / tau_inh : siemens (clock-driven)
-            gi_post = g : siemens  (summed)
+            gi_post = g : siemens (summed)
             w: siemens # Synaptic weight
         """
     }
     
-    # Function to create synapses
-    def create_synapse(pre, post, syn_type, p=1.0):
-        syn = Synapses(neurons[neurons_type[pre]], neurons[neurons_type[post]], method='exact',
-                       model=synapse_eqs[syn_type], on_pre=' x += w')
+    # Create synapses
+    synapses = {}
+    
+    # Define connections
+    connections = [
+        # Ia connections
+        ("Ia_flexor", "motor_flexor", "exc"),
+        ("Ia_flexor", "inh_flexor", "exc"),
+        ("Ia_extensor", "motor_extensor", "exc"),
+        ("Ia_extensor", "inh_extensor", "exc"),
+        
+        # II connections
+        ("II_flexor", "exc_flexor", "exc"),
+        ("II_flexor", "inh_flexor", "exc"),
+        ("II_extensor", "exc_extensor", "exc"),
+        ("II_extensor", "inh_extensor", "exc"),
+        
+        # Interneuron connections
+        ("exc_flexor", "motor_flexor", "exc"),
+        ("exc_extensor", "motor_extensor", "exc"),
+        ("inh_flexor", "motor_extensor", "inh"),
+        ("inh_extensor", "motor_flexor", "inh"),
+        ("inh_flexor", "inh_extensor", "inh"),
+        ("inh_extensor", "inh_flexor", "inh")
+    ]
+    
+    # Create synapses for each connection
+    for pre, post, syn_type in connections:
+            
+        pre_neurons = get_neurons_by_type(pre)
+        post_neurons = get_neurons_by_type(post)
+        
+        syn = Synapses(pre_neurons, post_neurons, model=synapse_eqs[syn_type], on_pre='x += w', method='exact')
         syn.connect(p=p)
-        syn.w = '10*uS'
-        return syn
+        syn.w = w
+        
+        synapses[f"{pre}_to_{post}"] = syn
     
-    # Synapse connections
-    synapses = {name: create_synapse(*name.split("_to_"), "exc" if "exc" in name or "Ia" in name or "II" in name else "inh", p=0.9)
-                for name in [
-                    "Ia_extensor_to_motor_extensor", "Ia_extensor_to_inh_extensor", "II_extensor_to_exc_extensor",
-                    "II_extensor_to_inh_extensor", "exc_extensor_to_motor_extensor", "inh_extensor_to_motor_flexor",
-                    "Ia_flexor_to_motor_flexor", "Ia_flexor_to_inh_flexor", "II_flexor_to_exc_flexor", "II_flexor_to_inh_flexor",
-                    "exc_flexor_to_motor_flexor", "inh_flexor_to_motor_extensor", "inh_flexor_to_inh_extensor", "inh_extensor_to_inh_flexor"
-                ]}
+    net_components = [Ia, II, neurons] + list(synapses.values())
     
-    # Network construction
-    net = Network([neurons] + poisson_inputs[0:2] + list(synapses.values()))
+    # Setup monitors
+    mon_Ia = SpikeMonitor(Ia)
+    mon_II = SpikeMonitor(II)
+    M_motoneuron_flexor = SpikeMonitor(neurons[indices[f"motor_flexor"]])
+    M_motoneuron_extensor = SpikeMonitor(neurons[indices[f"motor_extensor"]])
     
-    # Monitoring
-    spikes = {name: SpikeMonitor(neurons[neurons_type[name]]) for name in neurons_type}
-    net.add(spikes.values())
-    
-    # Run the simulation
+    monitors = [mon_Ia, mon_II, M_motoneuron_flexor, M_motoneuron_extensor]
+  
+
+    # Create and run network (and add EES if needed)
+    net = Network(net_components + monitors)
+
+    if ees_freq>0 and eff_recruited>0:
+        ees_motoneuron=PoissonGroup(N=2*eff_recruited*neuron_pop['motor'], rates= ees_freq)
+        mon_ees_motor=SpikeMonitor(ees_motoneuron)
+        net.add([ees_motoneuron+ mon_ees_motor])
+
     net.run(T)
+    
+    # Extract motoneuron spikes
+    motor_flexor_spikes = M_motoneuron_flexor.spike_trains()
+    motor_extensor_spikes = M_motoneuron_extensor.spike_trains()
+
+    if ees_freq>0 and eff_recruited>0:
+        # Process motoneuron spikes by adding EES effect
+        motor_flexor_spikes = process_motoneuron_spikes(
+        neuron_pop, motor_flexor_spikes, mon_ees_motor[:eff_recruited*neuron_pop['motor']].spike_trains(), T_refr)
+        motor_extensor_spikes=process_motoneuron_spikes(
+        neuron_pop, motor_extensor_spikes, mon_ees_motor[eff_recruited*neuron_pop['motor']:].spike_trains(), T_refr)
+
 
     
-    
-
-    
-
-
-def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, T_refr: Quantity) -> np.ndarray:
-    """
-    Merge natural and EES-induced spikes, filtering based on refractory period.
-    Natural spikes are preserved unless they violate the refractory period.
-    
-    Parameters:
-    ----------
-    natural_spikes : array-like
-        Array of natural spike times
-    ees_spikes : array-like
-        Array of EES-induced spike times
-    T_refr : Quantity
-        Refractory period
-        
-    Returns:
-    -------
-    array
-        Filtered spike times
-    """
-    # Handle empty arrays efficiently
-    if len(natural_spikes) == 0 and len(ees_spikes) == 0:
-        return np.array([], dtype=float)*second
-    
-    if len(natural_spikes) == 0:
-        natural_spikes = np.array([], dtype=float)*second
-    if len(ees_spikes) == 0:
-        ees_spikes = np.array([], dtype=float)*second
-    
-    # Create structured array for better memory efficiency
-    dtype = [('time', float), ('is_natural', bool)]
-    spikes = np.empty(len(natural_spikes) + len(ees_spikes), dtype=dtype)
-  
-    # Fill the structured array
-    spikes['time'][:len(natural_spikes)] = natural_spikes
-    spikes['time'][len(natural_spikes):] = ees_spikes
-    spikes['is_natural'][:len(natural_spikes)] = True
-    spikes['is_natural'][len(natural_spikes):] = False
-    # Sort by time
-    spikes.sort(order='time')
-    
-    if len(spikes) == 0:
-        return np.array([], dtype=float)
-    
-    # Pre-allocate result array for better performance (assume worst case size)
-    final_spikes = np.zeros(len(spikes), dtype=float)
-    final_count = 0
-    
-    # Add first spike
-    final_spikes[0] = spikes[0]['time']*second
-    final_count = 1
-    last_spike_time = spikes[0]['time']*second
-    
-    # Process remaining spikes more efficiently
-    for i in range(1, len(spikes)):
-        current_time = spikes[i]['time']*second
-        is_natural = spikes[i]['is_natural']
-
-        if is_natural:
-            if current_time - last_spike_time >= T_refr:
-                final_spikes[final_count] = current_time
-                final_count += 1
-                last_spike_time = current_time
-        else:  # EES spike
-            if current_time - last_spike_time >= T_refr:
-                final_spikes[final_count] = current_time
-                final_count += 1
-                last_spike_time = current_time
-
-    # Return only the filled part of the array
-    return final_spikes[:final_count]*second
-
-  
- 
-def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict, 
-                            ees_spikes: Dict, 
-                             T_refr: Quantity) -> Dict:
-    """
-    Process motoneuron spike trains, combining natural and EES-induced spikes.
-    
-    Parameters:
-    ----------
-    neuron_pop : dict
-        Dictionary with neuron population sizes
-    motor_spikes : dict
-        Dictionary with natural motoneuron spike trains
-    ees_spikes : dict
-        Dictionary with EES-induced spikes
-    n_poisson : dict
-        Dictionary of recruited neurons
-    T_refr : Quantity
-        Refractory period
-        
-    Returns:
-    -------
-    dict
-        Dictionary with processed motoneuron spike times
-    """
-    moto_spike_dict = {}
-    
-    for i in range(neuron_pop["motor"]):
-        nat_spikes = motor_spikes[i] 
-        
-        # Get EES-induced spikes for this neuron if it's in the recruited population
-        ees_i_spikes = np.array([])
-        if i < len(ees_spikes):
-            ees_i_spikes = ees_spikes[i]
-        
-        # Merge and filter spikes
-        moto_spike_dict[i] = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
-    
-    return moto_spike_dict
+    return {'flexor':{"Ia": mon_Ia.spike_trains()[:neuron_pop['Ia']],
+                      "II": mon_II.spike_trains()[:neuron_pop['II']],
+                      "MN": motor_flexor_spikes},
+            'extensor':{"Ia": mon_Ia.spike_trains()[neuron_pop['Ia']:],
+                      "II": mon_II.spike_trains()[neuron_pop['II']:],
+                      "MN": mon_extensor_spikes()}
+    }
 
 def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p=0.4,Eleaky= -70*mV,
     gL= 0.1 * mS,Cm= 1 * uF,E_ex= 0 * mV,E_inh= -75 * mV,tau_exc= 0.5 * ms,tau_inh= 3 * ms,
@@ -388,4 +349,118 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p
         "II": mon_II.spike_trains(), 
         "MN": moto_spike_dict
     }
+        
+def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, T_refr: Quantity) -> np.ndarray:
+    """
+    Merge natural and EES-induced spikes, filtering based on refractory period.
+    Natural spikes are preserved unless they violate the refractory period.
+    
+    Parameters:
+    ----------
+    natural_spikes : array-like
+        Array of natural spike times
+    ees_spikes : array-like
+        Array of EES-induced spike times
+    T_refr : Quantity
+        Refractory period
+        
+    Returns:
+    -------
+    array
+        Filtered spike times
+    """
+    # Handle empty arrays efficiently
+    if len(natural_spikes) == 0 and len(ees_spikes) == 0:
+        return np.array([], dtype=float)*second
+    
+    if len(natural_spikes) == 0:
+        natural_spikes = np.array([], dtype=float)*second
+    if len(ees_spikes) == 0:
+        ees_spikes = np.array([], dtype=float)*second
+    
+    # Create structured array for better memory efficiency
+    dtype = [('time', float), ('is_natural', bool)]
+    spikes = np.empty(len(natural_spikes) + len(ees_spikes), dtype=dtype)
+  
+    # Fill the structured array
+    spikes['time'][:len(natural_spikes)] = natural_spikes
+    spikes['time'][len(natural_spikes):] = ees_spikes
+    spikes['is_natural'][:len(natural_spikes)] = True
+    spikes['is_natural'][len(natural_spikes):] = False
+    # Sort by time
+    spikes.sort(order='time')
+    
+    if len(spikes) == 0:
+        return np.array([], dtype=float)
+    
+    # Pre-allocate result array for better performance (assume worst case size)
+    final_spikes = np.zeros(len(spikes), dtype=float)
+    final_count = 0
+    
+    # Add first spike
+    final_spikes[0] = spikes[0]['time']*second
+    final_count = 1
+    last_spike_time = spikes[0]['time']*second
+    
+    # Process remaining spikes more efficiently
+    for i in range(1, len(spikes)):
+        current_time = spikes[i]['time']*second
+        is_natural = spikes[i]['is_natural']
+
+        if is_natural:
+            if current_time - last_spike_time >= T_refr:
+                final_spikes[final_count] = current_time
+                final_count += 1
+                last_spike_time = current_time
+        else:  # EES spike
+            if current_time - last_spike_time >= T_refr:
+                final_spikes[final_count] = current_time
+                final_count += 1
+                last_spike_time = current_time
+
+    # Return only the filled part of the array
+    return final_spikes[:final_count]*second
+
+  
+ 
+def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict, 
+                            ees_spikes: Dict, 
+                             T_refr: Quantity) -> Dict:
+    """
+    Process motoneuron spike trains, combining natural and EES-induced spikes.
+    
+    Parameters:
+    ----------
+    neuron_pop : dict
+        Dictionary with neuron population sizes
+    motor_spikes : dict
+        Dictionary with natural motoneuron spike trains
+    ees_spikes : dict
+        Dictionary with EES-induced spikes
+    n_poisson : dict
+        Dictionary of recruited neurons
+    T_refr : Quantity
+        Refractory period
+        
+    Returns:
+    -------
+    dict
+        Dictionary with processed motoneuron spike times
+    """
+    moto_spike_dict = {}
+    
+    for i in range(neuron_pop["motor"]):
+        nat_spikes = motor_spikes[i] 
+        
+        # Get EES-induced spikes for this neuron if it's in the recruited population
+        ees_i_spikes = np.array([])
+        if i < len(ees_spikes):
+            ees_i_spikes = ees_spikes[i]
+        
+        # Merge and filter spikes
+        moto_spike_dict[i] = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
+    
+    return moto_spike_dict
+
+
 
