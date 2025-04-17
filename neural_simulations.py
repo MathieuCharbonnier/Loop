@@ -59,27 +59,21 @@ def run_flexor_extensior_neuron_simulation(stretch_flexor, velocity_flexor, stre
     # Calculate indices for each neuron type
     indices = {}
     start_idx = 0
-    # First all flexor neurons
-    for neuron_type, count in non_afferent.items():
-        indices[f"{neuron_type}_flexor"] = slice(start_idx, start_idx + count)
-        start_idx += count
-    # Then all extensor neurons
-    for neuron_type, count in non_afferent.items():
-        indices[f"{neuron_type}_extensor"] = slice(start_idx, start_idx + count)
-        start_idx += count
-    
-    # Helper function to get the right neuron slice
+
+    # Generate indices dictionary with a consistent pattern
+    for side in ['flexor', 'extensor']:
+        for neuron_type, count in non_afferent.items():
+            key = f"{neuron_type}_{side}"
+            indices[key] = slice(start_idx, start_idx + count)
+            start_idx += count
+
     def get_neurons_by_type(neuron_type):
-        if neuron_type.startswith("Ia_"):
-            if neuron_type == "Ia_flexor" 
-                return Ia[:neuron_pop['Ia']]
-            else:
-                return Ia[neuron_pop['Ia']:]
-        elif neuron_type.startswith("II_"):
-            if neuron_type == "II_flexor":
-                return II[:neuron_pop['II']]
-            else:
-                return II[neuron_pop['II']:]
+        neuron_class, side = neuron_type.split('_')
+    
+        if neuron_class == "Ia":
+            return Ia[:neuron_pop['Ia']] if side == "flexor" else Ia[neuron_pop['Ia']:]
+        elif neuron_class == "II":
+            return II[:neuron_pop['II']] if side == "flexor" else II[neuron_pop['II']:]
         else:
             return neurons[indices[neuron_type]]
     
