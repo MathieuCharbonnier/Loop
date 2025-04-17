@@ -14,14 +14,14 @@ colorblind_friendly_colors = {
     "red": "#D55E00",
     "purple": "#CC79A7"
 }
-
-def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, folder, ees_freq, aff_recruited, eff_recruited):
+def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle_1, file_muscle_2, folder, ees_freq, aff_recruited, eff_recruited):
     # Load files
-    df = pd.read_csv(file_muscle)
+    df1 = pd.read_csv(file_muscle_1)
+    df2 = pd.read_csv(file_muscle_2)
     with open(file_spikes, "r") as f:
         spikes = json.load(f)
 
-    # Raster Plots
+    # Raster Plots (same as before)
     fig, axs = plt.subplots(len(spikes), 1, figsize=(10, 10), sharex=True)
     for (fiber_type, fiber_spikes), ax in zip(spikes.items(), axs):
         for neuron_id, neuron_spikes in fiber_spikes.items():
@@ -34,15 +34,14 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
     plt.savefig(fig_path)
     plt.show()
 
-    # Firing rate plots
+    # Firing rate plots (same as before)
     fig, axs = plt.subplots(len(spikes), 1, figsize=(10, 10), sharex=True)
-    time = df['Time'].values
-    stretch = np.concatenate([initial_stretch, df["stretch"].values])
+    time = df1['Time'].values
+    stretch = np.concatenate([initial_stretch, df1["stretch"].values])
     stretch = stretch[:len(time)]
     velocity = np.gradient(stretch)
 
     for (fiber_type, fiber_spikes), ax in zip(spikes.items(), axs):
-
         if fiber_type == 'Ia':
             theory = 50 + 2 * stretch + 4.3 * np.sign(velocity) * np.abs(velocity) ** 0.6
             ax.plot(time, theory, label="calculated from muscle stretch", linestyle='--',
@@ -51,21 +50,16 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
             theory = 80 + 13.5 * stretch
             ax.plot(time, theory, label="calculated from muscle stretch", linestyle='--',
                     color=colorblind_friendly_colors["orange"])
-        if len(fiber_spikes)>0:
+        if len(fiber_spikes) > 0:
             all_spike_times = np.concatenate(list(fiber_spikes.values()))
             kde = gaussian_kde(all_spike_times, bw_method=0.1)
             firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-
             ax.plot(time, firing_rate, label="with EES and refractory", color=colorblind_friendly_colors["blue"])
         else:
-
-            ax.plot(time, np.zeros_like(time),label="with EES and refractory", color=colorblind_friendly_colors["blue"] )
-        
-
+            ax.plot(time, np.zeros_like(time), label="with EES and refractory", color=colorblind_friendly_colors["blue"])
         ax.set_ylabel('Firing rate (Hz)')
         ax.set_title(f'Fiber type: {fiber_type}')
         ax.legend()
-
     axs[-1].set_xlabel('Time (s)')
     fig.suptitle("Smoothed Instantaneous Firing Rate (KDE)", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -73,52 +67,42 @@ def plot_times_series(initial_time, initial_stretch, file_spikes, file_muscle, f
     plt.savefig(path_fig)
     plt.show()
 
-    # Mean activation dynamics
-    fig, axs = plt.subplots(5, 1, figsize=(10, 10), sharex=True)
-    axs[0].plot(df['Time'], df['mean_e'], label='mean e', color=colorblind_friendly_colors["blue"])
-    axs[0].set_ylabel("mean e")
-    axs[0].legend()
+    # Mean activation dynamics - for both muscles
+    fig, axs = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
+    labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'mean_activation']
+    colors = ["blue", "green", "orange", "purple", "red"]
 
-    axs[1].plot(df['Time'], df['mean_u'], label='mean u', color=colorblind_friendly_colors["green"])
-    axs[1].set_ylabel("mean u")
-    axs[1].legend()
+    for i, label in enumerate(labels):
+        axs[i].plot(df1['Time'], df1[label], label=f'Muscle 1 {label}', color=colorblind_friendly_colors[colors[i]])
+        axs[i].plot(df2['Time'], df2[label], label=f'Muscle 2 {label}', linestyle='--', color=colorblind_friendly_colors[colors[i]])
+        axs[i].set_ylabel(label)
+        axs[i].legend()
 
-    axs[2].plot(df['Time'], df['mean_c'], label='mean c', color=colorblind_friendly_colors["orange"])
-    axs[2].set_ylabel('mean c')
-    axs[2].legend()
-
-    axs[3].plot(df['Time'], df['mean_P'], label='mean P', color=colorblind_friendly_colors["purple"])
-    axs[3].set_ylabel('mean P')
-    axs[3].legend()
-
-    axs[4].plot(df['Time'], df['mean_activation'], label='mean activation', color=colorblind_friendly_colors["red"])
-    axs[4].set_ylabel('mean a')
-    axs[4].set_xlabel('Time(s)')
-    axs[4].legend()
-
-    fig.suptitle("Mean Activation Dynamic", fontsize=14)
+    axs[-1].set_xlabel('Time (s)')
+    fig.suptitle("Mean Activation Dynamics: Muscle 1 vs Muscle 2", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    path_fig = os.path.join(folder, f'Activation_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    path_fig = os.path.join(folder, f'Activation_COMPARE_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
-    # Muscle properties
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10))
-    axs[0].plot(df['Time'], df['fiber_length'], color=colorblind_friendly_colors["blue"])
-    axs[0].set_xlabel('Time (s)')
-    axs[0].set_ylabel('Fiber length (m)')
+    # Muscle properties - for both muscles
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+    props = ['fiber_length', 'stretch', 'velocity']
+    ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s-1)']
 
-    axs[1].plot(df['Time'], df['stretch'], color=colorblind_friendly_colors["orange"])
-    axs[1].set_xlabel('Time (s)')
-    axs[1].set_ylabel('Stretch (dimless)')
+    for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
+        axs[i].plot(df1['Time'], df1[prop], label='Muscle 1', color=colorblind_friendly_colors["blue"])
+        axs[i].plot(df2['Time'], df2[prop], label='Muscle 2', linestyle='--', color=colorblind_friendly_colors["orange"])
+        axs[i].set_ylabel(ylabel)
+        axs[i].legend()
 
-    axs[2].plot(df.iloc[20:]['Time'], df.iloc[20:]['velocity'], color=colorblind_friendly_colors["green"])
-    axs[2].set_xlabel('Time (s)')
-    axs[2].set_ylabel('Stretch Velocity (s-1)')
-
-    path_fig = os.path.join(folder, f'Muscle_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    axs[-1].set_xlabel('Time (s)')
+    fig.suptitle("Muscle Properties: Muscle 1 vs Muscle 2", fontsize=14)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    path_fig = os.path.join(folder, f'Muscle_COMPARE_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
+
 
 def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, aff_recruited, eff_recruited, ees_freq):
     with open(filepath, 'r') as file:
