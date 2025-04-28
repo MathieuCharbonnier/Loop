@@ -137,7 +137,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
             partial(fibre_ap_dynamics, e_t_func=e_t_interp),
             [0, T], u_init, t_eval=time, **solver_kwargs
         )
-        final_values[i]['u0'] = sol_u.y[:, -1]
+        final_values[i]['u0'] = sol_u.sol(T)
         u_interp = interp1d(sol_u.t, sol_u.y[0], kind='linear', bounds_error=False, fill_value=0.0)
       
         # Solve calcium dynamics
@@ -146,7 +146,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
             partial(calcium_dynamics, u_func=u_interp),
             [0, T], c_init, t_eval=time, **solver_kwargs
         )
-        final_values[i]['c0'] = sol_c.y[:, -1]  # Fixed key name to cf
+        final_values[i]['c0'] = sol_c.sol(T)
         c_interp = interp1d(sol_c.t, sol_c.y[0], kind='linear', bounds_error=False, fill_value=0.0)
    
         # Solve calcium-troponin binding
@@ -155,7 +155,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
             partial(ca_troponin_dynamics, c_func=c_interp),
             [0, T], P_init, t_eval=time, **solver_kwargs
         )
-        final_values[i]['P0'] = sol_P.y[:, -1]  # Fixed key name to Pf
+        final_values[i]['P0'] = sol_P.sol(T)
         P_interp = interp1d(sol_P.t, sol_P.y[0], kind='linear', bounds_error=False, fill_value=0.0)
 
         # Solve activation dynamics
@@ -164,7 +164,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
             partial(activation_dynamics, P_func=P_interp),
             [0, T], a_init, t_eval=time, **solver_kwargs
         )
-        final_values[i]['a0'] = sol_a.y[:, -1]  # Fixed key name to af
+        final_values[i]['a0'] = sol_a.sol(T)
         
         # Store results
         u_all[i, :] = sol_u.y[0]
