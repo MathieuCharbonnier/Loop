@@ -48,26 +48,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
         # AP generation parameters
         'Ve': 90, 't_ap': 0.0014,
     }
-    """
-    def generate_action_potentials(spike_times, dt, T, Ve=params['Ve'], t_ap=params['t_ap']):
 
-        time_points = np.arange(0, T, dt)
-        e_t = np.zeros_like(time_points, dtype=float)
-        
-        # For each spike time, create action potential waveform
-        for spike_time in spike_times:
-            # Find indices of time points within action potential duration after spike
-            spike_idx = np.where((time_points >= spike_time) & (time_points < spike_time + t_ap))[0]
-            
-            # Calculate sine wave for action potential
-            if len(spike_idx) > 0:
-                e_t[spike_idx] += Ve * np.sin(2 * np.pi / t_ap * (time_points[spike_idx] - spike_time))
-        
-        return e_t
-
-    # Precompute e(t) for all motoneurons
-    e_t_all = np.array([generate_action_potentials(spikes, dt, T) for spikes in spikes_times])
-    """
 
     def e_t_preprocessed(spikes_times, time, Ve=90, T=1.4e-3):
 
@@ -119,7 +100,6 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
     time = np.arange(0, T, dt)
     # Preprocess e(t) for all motoneurons
     e_t_all = e_t_preprocessed(spikes_times, time)
-
     u_all = np.zeros((len(spikes_times), len(time)))
     c_all = np.zeros((len(spikes_times), len(time)))
     P_all = np.zeros((len(spikes_times), len(time)))
@@ -155,7 +135,8 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
             partial(ca_troponin_dynamics, c_func=c_interp),
             [0, T], P_init, t_eval=time, **solver_kwargs
         )
-        final_values[i]['P0'] = sol_P.sol(T)
+        #final_values[i]['P0'] = sol_P.sol(T)
+        final_values[i]['P0'] = sol_P.y[:,-1]
         P_interp = interp1d(sol_P.t, sol_P.y[0], kind='linear', bounds_error=False, fill_value=0.0)
 
         # Solve activation dynamics
