@@ -66,6 +66,7 @@ def plot_times_series(file_spikes, muscle_data, muscle_names, folder, ees_freq, 
             else:
                 axs[j].plot(time, np.zeros_like(time), label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
             axs[j].set_ylabel(f'{fiber_type} firing rate (Hz)')
+            axs[j].legend()
 
     axs[-1].set_xlabel('Time (s)')
     fig.suptitle("Smoothed Instantaneous Firing Rate (KDE)", fontsize=14)
