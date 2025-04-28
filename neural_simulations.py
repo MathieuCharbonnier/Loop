@@ -150,7 +150,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         
         net.add(syn)
         synapses[key] = syn
-        net.add(syn)  # Add to network immediately
+        net.add(syn)  
       
     # Setup monitors
     mon_Ia = SpikeMonitor(Ia)
@@ -164,7 +164,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     if ees_freq>0 and eff_recruited>0:
         ees_motoneuron=PoissonGroup(N=2*eff_recruited*neuron_pop['motor'], rates= ees_freq)
         mon_ees_motor=SpikeMonitor(ees_motoneuron)
-        net.add([ees_motoneuron+ mon_ees_motor])
+        net.add([ees_motoneuron, mon_ees_motor])
 
     net.run(T)
     
@@ -175,9 +175,13 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     if ees_freq>0 and eff_recruited>0:
         # Process motoneuron spikes by adding EES effect
         motor_flexor_spikes = process_motoneuron_spikes(
-        neuron_pop, motor_flexor_spikes, mon_ees_motor[:eff_recruited*neuron_pop['motor']].spike_trains(), T_refr)
-        motor_extensor_spikes=process_motoneuron_spikes(
-        neuron_pop, motor_extensor_spikes, mon_ees_motor[eff_recruited*neuron_pop['motor']:].spike_trains(), T_refr)
+        neuron_pop, motor_flexor_spikes,
+        [mon_ees_motor.spike_trains()[i] for i in range(int(eff_recruited * neuron_pop['motor']))],
+        T_refr)
+        motor_extensor_spikes = process_motoneuron_spikes(
+        neuron_pop, motor_extensor_spikes,
+        [mon_ees_motor.spike_trains()[i] for i in range(int(eff_recruited * neuron_pop['motor']), neuron_pop['motor'])],
+        T_refr)
 
 
     
