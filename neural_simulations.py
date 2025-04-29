@@ -334,17 +334,20 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p
         II_Ex, Ia_Motoneuron, Ex_Motoneuron,
         mon_Ia, mon_II, mon_motor])
 
-    ees_motoneuron=PoissonGroup(N=eff_recruited*neuron_pop['motor'], rates= ees_freq)
-    mon_ees_motor=SpikeMonitor(ees_motoneuron)
-    net.add([ees_motoneuron, mon_ees_motor])
+    if (ees_freq>0 and eff_recruited>0):
+        ees_motoneuron=PoissonGroup(N=eff_recruited*neuron_pop['motor'], rates= ees_freq)
+        mon_ees_motor=SpikeMonitor(ees_motoneuron)
+        net.add([ees_motoneuron, mon_ees_motor])
 
     net.run(T)
- 
-    # Process motoneuron spikes by adding EES effect
-    moto_spike_dict = process_motoneuron_spikes(
+
+    if (ees_freq>0 and eff_recruited>0):
+        # Process motoneuron spikes by adding EES effect
+        moto_spike_dict = process_motoneuron_spikes(
         neuron_pop, mon_motor.spike_trains(), mon_ees_motor.spike_trains(), T_refr
         )
-
+    else:
+        moto_spike_dict=mon_motor.spike_trains()
   
     # Return final results
     return [{
