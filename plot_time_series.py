@@ -16,18 +16,16 @@ colorblind_friendly_colors = {
 }
 color_keys = list(colorblind_friendly_colors.keys())
 
-def plot_times_series(file_spikes, muscle_data, muscle_names, folder, ees_freq, aff_recruited, eff_recruited):
-
-    
-    # Load spike data
-    with open(file_spikes, "r") as f:
-        spikes = json.load(f)
+def plot_times_series(spikes, muscle_data, muscle_names, folder, ees_freq, aff_recruited, eff_recruited):
 
     num_muscles = len(spikes)
-    num_fiber_types = len(next(iter(spikes.values())))  # assuming all muscles have the same fiber types
+    num_fiber_types = len(next(iter(spikes.values())))  
     
     # Raster Plots
     fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
+    
+    if num_muscles == 1:
+        axs = np.expand_dims(axs, axis=1)
 
     # Iterate over muscles and fiber types to plot spikes
     for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
