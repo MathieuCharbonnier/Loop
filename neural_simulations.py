@@ -69,7 +69,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     indices = {}
     start_idx = 0
 
-    # Generate indices dictionary with a consistent pattern
+    # Generate indices dictionary
     for side in ['flexor', 'extensor']:
         for neuron_type, count in non_afferent.items():
             key = f"{neuron_type}_{side}"
@@ -185,12 +185,12 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
 
     
-    return {'flexor':{"Ia": {i: mon_Ia.spike_trains()[i] for i in range(neuron_pop['Ia'])},
+    return [{"Ia": {i: mon_Ia.spike_trains()[i] for i in range(neuron_pop['Ia'])},
                       "II": {i: mon_II.spike_trains()[i] for i in range(neuron_pop['II'])},
                       "MN": motor_flexor_spikes},
-            'extensor':{"Ia": {i: mon_Ia.spike_trains()[i] for i in range(neuron_pop['Ia'], 2*neuron_pop['Ia'])},
+            {"Ia": {i: mon_Ia.spike_trains()[i] for i in range(neuron_pop['Ia'], 2*neuron_pop['Ia'])},
                         "II": {i: mon_II.spike_trains()[i] for i in range(neuron_pop['II'],2*neuron_pop['II'] )},
-                        "MN": motor_extensor_spikes}}
+                        "MN": motor_extensor_spikes}]
 
 def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p=0.4,Eleaky= -70*mV,
     gL= 0.1 * mS,Cm= 1 * uF,E_ex= 0 * mV,E_inh= -75 * mV,tau_exc= 0.5 * ms,tau_inh= 3 * ms,
@@ -236,35 +236,24 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p
     defaultclock.dt = dt_run
     
     # Prepare input arrays
-    stretch_array = TimedArray(stretch, dt=dt_run)
-    velocity_array = TimedArray(velocity, dt=dt_run)
+    stretch_array = TimedArray(stretch[0], dt=dt_run)
+    velocity_array = TimedArray(velocity[0], dt=dt_run)
     
     ia_recruited=aff_recruited*neuron_pop['Ia']
     # Dynamic response (Ia) depends on stretch and velocity
     ia_eq = '''
-        is_ees = int(i < ia_recruited): boolean  
-        # Rate equation for non-EES neurons
-        rate_non_ees = 50 * hertz + 2 * hertz * stretch_array(t) + 4.3 * hertz * sign(velocity_array(t)) * abs(velocity_array(t)) ** 0.6 :hertz
-        # Rate equation for EES-activated neurons
-        rate_ees = rate_non_ees + ees_freq :Hz
-        # Use a conditional to select the appropriate rate for each neuron
-        rate = is_ees * rate_ees + (1-is_ees) * rate_non_ees : Hz
+        is_ees = (i < aff_recruited): boolean
+        rate = 10*hertz + 0.4*hertz*stretch_array(t) + 0.86*hertz*sign(velocity_array(t))*abs(velocity_array(t))**0.6 + ees_freq * int(is_ees) : Hz
     '''
     Ia = NeuronGroup(neuron_pop["Ia"], ia_eq, threshold='rand() < rate*dt',reset='v=Eleaky', refractory=T_refr)
 
     ii_recruited=aff_recruited*neuron_pop['II']
     # Static response (II) depends primarily on stretch
     ii_eq = '''
-        is_ees = int(i < ii_recruited) : boolean 
-        # Rate equation for non-EES neurons
-        rate_non_ees = 80 * hertz + 13.5 * hertz * stretch_array(t): Hz
-        # Rate equation for EES-activated neurons
-        rate_ees = rate_non_ees + ees_freq : Hz
-        # Use a conditional to select the appropriate rate for each neuron
-        rate = is_ees * rate_ees + (1-is_ees) * rate_non_ees : Hz
+        is_ees = (i < aff_recruited) : boolean
+        rate = 20*hertz + 3.375*hertz*stretch_array(t) + ees_freq * int(is_ees) : Hz
     '''
     II = NeuronGroup(neuron_pop["II"], ii_eq, threshold='rand() < rate*dt',reset='v=Eleaky', refractory=T_refr)
-    
     
     # Create neuron model
     eqs = '''
@@ -358,11 +347,11 @@ def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p
 
   
     # Return final results
-    return {
+    return [{
         "Ia": mon_Ia.spike_trains(), 
         "II": mon_II.spike_trains(), 
         "MN": moto_spike_dict
-    }
+    }]
         
 def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, T_refr: Quantity) -> np.ndarray:
     """
