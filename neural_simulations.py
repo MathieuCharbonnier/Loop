@@ -109,48 +109,51 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         w_: siemens
     """
     }
-
-    # Define connections with targets
     connections = {
-    ("Ia_flexor", "motor_flexor"): "exc1",
-    ("Ia_flexor", "inh_flexor"): "exc1",
-    ("Ia_extensor", "motor_extensor"): "exc1",
-    ("Ia_extensor", "inh_extensor"): "exc1",
+    ("Ia_flexor", "motor_flexor"): {"type": "exc1", "weight": 0.021*nS, "N": 60},
+    ("Ia_flexor", "inh_flexor"): {"type": "exc1", "weight": 0.0364*nS, "N": 62},
+    ("Ia_extensor", "motor_extensor"): {"type": "exc1", "weight": 0.021*nS, "N": 60},
+    ("Ia_extensor", "inh_extensor"): {"type": "exc1", "weight": 0.0364*nS, "N": 62},
     
-    ("II_flexor", "exc_flexor"): "exc2",
-    ("II_flexor", "inh_flexor"): "exc2",
-    ("II_extensor", "exc_extensor"): "exc2",
-    ("II_extensor", "inh_extensor"): "exc2",
+    ("II_flexor", "exc_flexor"): {"type": "exc2", "weight": 0.0165*nS, "N": 62},
+    ("II_flexor", "inh_flexor"): {"type": "exc2", "weight": 0.029*nS, "N": 62},
+    ("II_extensor", "exc_extensor"): {"type": "exc2", "weight":0.0165*nS , "N": 62},
+    ("II_extensor", "inh_extensor"): {"type": "exc2", "weight": 0.029*nS, "N": 62},
     
-    ("exc_flexor", "motor_flexor"): "exc3",
-    ("exc_extensor", "motor_extensor"): "exc3",
+    ("exc_flexor", "motor_flexor"): {"type": "exc3", "weight":0.007*nS , "N": 116},
+    ("exc_extensor", "motor_extensor"): {"type": "exc3", "weight":0.007*nS , "N": 116},
     
-    # All inhibitory connections use the same "inh" type
-    ("inh_flexor", "motor_extensor"): "inh",
-    ("inh_extensor", "motor_flexor"): "inh",
-    ("inh_flexor", "inh_extensor"): "inh",
-    ("inh_extensor", "inh_flexor"): "inh"
-}
+    ("inh_flexor", "motor_extensor"): {"type": "inh", "weight":-0.002*nS , "N": 232},
+    ("inh_extensor", "motor_flexor"): {"type": "inh", "weight": -0.002*nS, "N": 232},
+    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": -0.0076*nS, "N": 100},
+    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": -0.0076*nS, "N": 100}
+    }
+    
     synapses = {}
-    # Then when creating synapses:
-    for pre, post in connections:
+    for (pre, post), conn_info in connections.items():
         pre_neurons = get_neurons_by_type(pre)
         post_neurons = get_neurons_by_type(post)
         key = f"{pre}_to_{post}"
-        # Get the correct synapse type
-        syn_type = connections[(pre, post)]
-        
-        # Create synapse
-        syn = Synapses(pre_neurons, post_neurons, model=synapse_eqs[syn_type], 
+
+        syn_type = conn_info["type"]
+        w = conn_info["weight"]
+        N = conn_info["N"]
+
+        syn = Synapses(pre_neurons, post_neurons,
+                      model=synapse_eqs[syn_type],
                       on_pre='x += w_', method='exact')
-        
-        # Connect with probability p (your original method)
-        syn.connect(p=p)
-        syn.w_ = w
-        
+
+        # Directly set the connections
+        for target in post_neurons:
+        # Pick N random source neurons for each target
+            sources_to_connect = random.sample(range(len(pre_neurons)), N)
+            for source in sources_to_connect:
+                synapses.connect(i=source, j=target)
+                synapses.w_[target] = w
+
         net.add(syn)
         synapses[key] = syn
-        net.add(syn)  
+   
       
     # Setup monitors
     mon_Ia = SpikeMonitor(Ia)
