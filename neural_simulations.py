@@ -110,23 +110,23 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     """
     }
     connections = {
-    ("Ia_flexor", "motor_flexor"): {"type": "exc1", "weight": 0.021*nS, "N": 60},
-    ("Ia_flexor", "inh_flexor"): {"type": "exc1", "weight": 0.0364*nS, "N": 62},
-    ("Ia_extensor", "motor_extensor"): {"type": "exc1", "weight": 0.021*nS, "N": 60},
-    ("Ia_extensor", "inh_extensor"): {"type": "exc1", "weight": 0.0364*nS, "N": 62},
+    ("Ia_flexor", "motor_flexor"): {"type": "exc1", "weight": 0.021*nS, "p": 1},
+    ("Ia_flexor", "inh_flexor"): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
+    ("Ia_extensor", "motor_extensor"): {"type": "exc1", "weight": 0.021*nS, "p": 1},
+    ("Ia_extensor", "inh_extensor"): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
     
-    ("II_flexor", "exc_flexor"): {"type": "exc2", "weight": 0.0165*nS, "N": 62},
-    ("II_flexor", "inh_flexor"): {"type": "exc2", "weight": 0.029*nS, "N": 62},
-    ("II_extensor", "exc_extensor"): {"type": "exc2", "weight":0.0165*nS , "N": 62},
-    ("II_extensor", "inh_extensor"): {"type": "exc2", "weight": 0.029*nS, "N": 62},
+    ("II_flexor", "exc_flexor"): {"type": "exc2", "weight": 0.0165*nS, "p": 1},
+    ("II_flexor", "inh_flexor"): {"type": "exc2", "weight": 0.029*nS, "p": 1},
+    ("II_extensor", "exc_extensor"): {"type": "exc2", "weight":0.0165*nS , "p": 1},
+    ("II_extensor", "inh_extensor"): {"type": "exc2", "weight": 0.029*nS, "p": 1},
     
-    ("exc_flexor", "motor_flexor"): {"type": "exc3", "weight":0.007*nS , "N": 116},
-    ("exc_extensor", "motor_extensor"): {"type": "exc3", "weight":0.007*nS , "N": 116},
+    ("exc_flexor", "motor_flexor"): {"type": "exc3", "weight":0.007*nS , "p": 0.6},
+    ("exc_extensor", "motor_extensor"): {"type": "exc3", "weight":0.007*nS , "p": 0.6},
     
-    ("inh_flexor", "motor_extensor"): {"type": "inh", "weight":-0.002*nS , "N": 232},
-    ("inh_extensor", "motor_flexor"): {"type": "inh", "weight": -0.002*nS, "N": 232},
-    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": -0.0076*nS, "N": 100},
-    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": -0.0076*nS, "N": 100}
+    ("inh_flexor", "motor_extensor"): {"type": "inh", "weight":-0.002*nS , "p": 1},
+    ("inh_extensor", "motor_flexor"): {"type": "inh", "weight": -0.002*nS, "p": 1},
+    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": -0.0076*nS, "p": 0.5},
+    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": -0.0076*nS, "p": 0.5}
     }
     
     synapses = {}
@@ -137,23 +137,20 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
         syn_type = conn_info["type"]
         w = conn_info["weight"]
-        N = conn_info["N"]
+        p = conn_info["p"]
 
         syn = Synapses(pre_neurons, post_neurons,
                       model=synapse_eqs[syn_type],
-                      on_pre='x += w_', method='exact')
-
-        # Directly set the connections
-        for target in post_neurons:
-        # Pick N random source neurons for each target
-            sources_to_connect = random.sample(range(len(pre_neurons)), N)
-            for source in sources_to_connect:
-                synapses.connect(i=source, j=target)
-                synapses.w_[target] = w
+                      on_pre='x += w', method='exact')
+        syn.connect(p=p)
+        
+        # Generate weights with noise
+        noise_percent = 0.2  # 20% noise
+        syn.w_ = np.random.normal(w, abs(w*noise_percent), size=len(syn))*siemens
 
         net.add(syn)
         synapses[key] = syn
-   
+      
       
     # Setup monitors
     mon_Ia = SpikeMonitor(Ia)
