@@ -76,7 +76,9 @@ def run_flexor_extensor_neuron_simulation_2(stretch, velocity,
     # Extract neuron counts from dictionary
     n_Ia = neuron_pop['Ia']
     n_II = neuron_pop['II']
-    n_motor = neuron_pop['motor']  # Added missing definition
+    n_exc=neuron_pop['exc']
+    n_inh=neuron_pop['inh']
+    n_motor = neuron_pop['motor']  
 
     # Afferent neuron equations
     ia_eq_flexor = '''
@@ -109,32 +111,51 @@ def run_flexor_extensor_neuron_simulation_2(stretch, velocity,
     neuron_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
     Isyn = gi*(E_inh - v) + ge*(E_ex - v) : amp
-    ge : siemens  # Excitatory input
+    ge1 : siemens  # Excitatory input
+    ge2 : siemens  # Excitatory input
+    ge3 : siemens  # Excitatory input
     gi : siemens  # Inhibitory input
     '''
   
     # Create motor neuron groups - Fixed variable names and use n_motor instead of n_total
-    inh_flexor = NeuronGroup(n_motor, neuron_eq, threshold='v > threshold_v', 
+    inh_flexor = NeuronGroup(n_inh, neuron_eq, threshold='v > threshold_v', 
                          reset='v = Eleaky', refractory=T_refr, method='exact')
-    inh_extensor = NeuronGroup(n_motor, neuron_eq, threshold='v > threshold_v', 
+    inh_extensor = NeuronGroup(n_inh, neuron_eq, threshold='v > threshold_v', 
                          reset='v = Eleaky', refractory=T_refr, method='exact')
-    exc_flexor = NeuronGroup(n_motor, neuron_eq, threshold='v > threshold_v', 
+    exc_flexor = NeuronGroup(n_exc, neuron_eq, threshold='v > threshold_v', 
                          reset='v = Eleaky', refractory=T_refr, method='exact')
-    exc_extensor = NeuronGroup(n_motor, neuron_eq, threshold='v > threshold_v', 
+    exc_extensor = NeuronGroup(n_exc, neuron_eq, threshold='v > threshold_v', 
                          reset='v = Eleaky', refractory=T_refr, method='exact')                                        
     moto_extensor = NeuronGroup(n_motor, neuron_eq, threshold='v > threshold_v', 
                          reset='v = Eleaky', refractory=T_refr, method='exact')
     moto_flexor = NeuronGroup(n_motor, neuron_eq, threshold='v > threshold_v', 
                          reset='v = Eleaky', refractory=T_refr, method='exact')
+    inh_flexor.v=Eleaky
+    inh_extensor.v=Eleaky
+    exc_flexor.v=Eleaky
+    exc_extensor.v=Eleaky
+    moto_flexor.v=Eleaky
+    moto_extensor.v=Eleaky
+
     
     # Fixed variable names
     net.add([inh_flexor, inh_extensor, exc_flexor, exc_extensor, moto_extensor, moto_flexor])
   
     # Define synapse equations
     synapse_eqs = {
-    "exc": """
+    "exc1": """
         dx/dt = -x / tau_exc : siemens (clock-driven)
-        ge_post = x : siemens (summed)
+        ge1_post = x : siemens (summed)
+        w_: siemens
+    """,
+    "exc2": """
+        dx/dt = -x / tau_exc : siemens (clock-driven)
+        ge2_post = x : siemens (summed)
+        w_: siemens
+    """,
+    "exc3": """
+        dx/dt = -x / tau_exc : siemens (clock-driven)
+        ge3_post = x : siemens (summed)
         w_: siemens
     """,
     "inh": """
@@ -145,49 +166,35 @@ def run_flexor_extensor_neuron_simulation_2(stretch, velocity,
     """
     }
     
-    # Helper function to get neuron groups by name
-    def get_neurons_by_type(neuron_type):
-        neuron_map = {
-            "Ia_flexor": Ia_flexor,
-            "Ia_extensor": Ia_extensor,
-            "II_flexor": II_flexor,
-            "II_extensor": II_extensor,
-            "inh_flexor": inh_flexor,
-            "inh_extensor": inh_extensor,
-            "exc_flexor": exc_flexor,
-            "exc_extensor": exc_extensor,
-            "moto_flexor": moto_flexor,
-            "moto_extensor": moto_extensor
-        }
-        return neuron_map[neuron_type]
-    
+  
     # Define neural connections
     connections = {
-    ("Ia_flexor", "moto_flexor"): {"type": "exc", "weight": 0.021*nS, "p": 1},
-    ("Ia_flexor", "inh_flexor"): {"type": "exc", "weight": 0.0364*nS, "p": 1},
-    ("Ia_extensor", "moto_extensor"): {"type": "exc", "weight": 0.021*nS, "p": 1},
-    ("Ia_extensor", "inh_extensor"): {"type": "exc", "weight": 0.0364*nS, "p": 1},
+    (Ia_flexor, moto_flexor): {"type": "exc1", "weight": 0.021*nS, "p": 1},
+    (Ia_flexor, inh_flexor): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
+    (Ia_extensor, moto_extensor): {"type": "exc1", "weight": 0.021*nS, "p": 1},
+    (Ia_extensor, inh_extensor): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
     
-    ("II_flexor", "exc_flexor"): {"type": "exc", "weight": 0.0165*nS, "p": 1},
-    ("II_flexor", "inh_flexor"): {"type": "exc", "weight": 0.029*nS, "p": 1},
-    ("II_extensor", "exc_extensor"): {"type": "exc", "weight": 0.0165*nS, "p": 1},
-    ("II_extensor", "inh_extensor"): {"type": "exc", "weight": 0.029*nS, "p": 1},
+    (II_flexor, exc_flexor): {"type": "exc2", "weight": 0.0165*nS, "p": 1},
+    (II_flexor, inh_flexor): {"type": "exc2", "weight": 0.029*nS, "p": 1},
+    (II_extensor, exc_extensor): {"type": "exc2", "weight": 0.0165*nS, "p": 1},
+    (II_extensor, inh_extensor): {"type": "exc2", "weight": 0.029*nS, "p": 1},
     
-    ("exc_flexor", "moto_flexor"): {"type": "exc", "weight": 0.007*nS, "p": 0.6},
-    ("exc_extensor", "moto_extensor"): {"type": "exc", "weight": 0.007*nS, "p": 0.6},
+    (exc_flexor, moto_flexor): {"type": "exc3", "weight": 0.007*nS, "p": 0.6},
+    (exc_extensor, moto_extensor): {"type": "exc3", "weight": 0.007*nS, "p": 0.6},
     
-    ("inh_flexor", "moto_extensor"): {"type": "inh", "weight": 0.2*nS, "p": 1},
-    ("inh_extensor", "moto_flexor"): {"type": "inh", "weight": 0.2*nS, "p": 1},
-    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": 0.76*nS, "p": 0.5},
-    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": 0.76*nS, "p": 0.5}
+    (inh_flexor, moto_extensor): {"type": "inh", "weight": 0.2*nS, "p": 1},
+    (inh_extensor, moto_flexor): {"type": "inh", "weight": 0.2*nS, "p": 1},
+    (inh_flexor, inh_extensor): {"type": "inh", "weight": 0.76*nS, "p": 0.5},
+    (inh_extensor, inh_flexor): {"type": "inh", "weight": 0.76*nS, "p": 0.5}
     }
     
     # Create synaptic connections
     synapses = {}
-    for (pre, post), conn_info in connections.items():
-        pre_neurons = get_neurons_by_type(pre)
-        post_neurons = get_neurons_by_type(post)
-        key = f"{pre}_to_{post}"
+    for (pre_neurons, post_neurons), conn_info in connections.items():
+      
+        pre_neurons_name = pre_neurons.__class__.__name__.lower()
+        post_neurons_name =  post_neurons.__class__.__name__.lower()
+        key = f"{pre_neurons_name}_to_{post_neurons_name}"
 
         syn_type = conn_info["type"]
         w = conn_info["weight"]
