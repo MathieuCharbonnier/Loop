@@ -123,10 +123,10 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     ("exc_flexor", "motor_flexor"): {"type": "exc3", "weight":0.007*nS , "p": 0.6},
     ("exc_extensor", "motor_extensor"): {"type": "exc3", "weight":0.007*nS , "p": 0.6},
     
-    ("inh_flexor", "motor_extensor"): {"type": "inh", "weight":-0.002*nS , "p": 1},
-    ("inh_extensor", "motor_flexor"): {"type": "inh", "weight": -0.002*nS, "p": 1},
-    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": -0.0076*nS, "p": 0.5},
-    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": -0.0076*nS, "p": 0.5}
+    ("inh_flexor", "motor_extensor"): {"type": "inh", "weight":0.002*nS , "p": 1},
+    ("inh_extensor", "motor_flexor"): {"type": "inh", "weight": 0.002*nS, "p": 1},
+    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": 0.0076*nS, "p": 0.5},
+    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": 0.0076*nS, "p": 0.5}
     }
     
     synapses = {}
@@ -150,8 +150,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
         net.add(syn)
         synapses[key] = syn
-      
-      
+          
     # Setup monitors
     mon_Ia = SpikeMonitor(Ia)
     mon_II = SpikeMonitor(II)
@@ -176,14 +175,13 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         # Process motoneuron spikes by adding EES effect
         motor_flexor_spikes = process_motoneuron_spikes(
         neuron_pop, motor_flexor_spikes,
-        [mon_ees_motor.spike_trains()[i] for i in range(int(eff_recruited * neuron_pop['motor']))],
+        [mon_ees_motor.spike_trains()[i] for i in mon_ees_motor.spike_trains() if int(eff_recruited * neuron_pop['motor']) <= i < neuron_pop['motor']],
         T_refr)
-        motor_extensor_spikes = process_motoneuron_spikes(
+    motor_extensor_spikes = process_motoneuron_spikes(
         neuron_pop, motor_extensor_spikes,
-        [mon_ees_motor.spike_trains()[i] for i in range(int(eff_recruited * neuron_pop['motor']), neuron_pop['motor'])],
+        [mon_ees_motor.spike_trains()[i] for i in mon_ees_motor.spike_trains() if int(eff_recruited * neuron_pop['motor']) <= i < neuron_pop['motor']],
         T_refr)
-
-
+        
     
     return [{"Ia": {i: mon_Ia.spike_trains()[i] for i in range(neuron_pop['Ia'])},
                       "II": {i: mon_II.spike_trains()[i] for i in range(neuron_pop['II'])},
