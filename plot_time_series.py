@@ -145,3 +145,40 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, aff_recruit
     fig_path = os.path.join(folder, f'Joint_angles_and_speed_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
+
+
+def plot_act_length_from_sto_file(filepath, muscle_names, folder, aff_recruited, eff_recruited, ees_freq):
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+
+    for i, line in enumerate(lines):
+        if 'endheader' in line.lower():
+            data_start_idx = i + 1
+            break
+
+    df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
+    df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
+
+    fig, axs = plt.subplots(len(muscle_names), 2, figsize=(12, 10), sharex=True)
+    fig.suptitle("Activations and fiber lengths", fontsize=16)
+
+    for i, muscle_name in enumerate(muscle_names):
+        axs[i, 1].plot(df['time'], df[muscle_name + '/fiber_length'], label=f"{muscle_name}", color=colorblind_friendly_colors["blue"])
+        axs[i, 1].set_ylabel("L (m)")
+        axs[i, 1].set_title("Fiber length")
+        axs[i, 1].legend()
+        axs[i, 1].grid(True)
+
+        axs[i, 0].plot(df['time'], df[muscle_name + '/activation'], label=f"{muscle_name} ", color=colorblind_friendly_colors["orange"])
+        axs[i, 0].set_ylabel("a (dimless)")
+        axs[i, 0].set_title("Activation")
+        axs[i, 0].legend()
+        axs[i, 0].grid(True)
+
+    for ax in axs[-1, :]:
+        ax.set_xlabel("Time (s)")
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    fig_path = os.path.join(folder, f'act_length_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    plt.savefig(fig_path)
+    plt.show()
