@@ -177,7 +177,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         neuron_pop, motor_flexor_spikes,
         [mon_ees_motor.spike_trains()[i] for i in mon_ees_motor.spike_trains() if int(eff_recruited * neuron_pop['motor']) <= i < neuron_pop['motor']],
         T_refr)
-    motor_extensor_spikes = process_motoneuron_spikes(
+        motor_extensor_spikes = process_motoneuron_spikes(
         neuron_pop, motor_extensor_spikes,
         [mon_ees_motor.spike_trains()[i] for i in mon_ees_motor.spike_trains() if int(eff_recruited * neuron_pop['motor']) <= i < neuron_pop['motor']],
         T_refr)
