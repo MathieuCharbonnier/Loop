@@ -10,7 +10,7 @@ def run_flexor_extensor_neuron_simulation_2(stretch, velocity,
                                           neuron_pop, dt_run, T, w=500*uS, p=0.4, Eleaky=-70*mV,
                                           gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_exc=0.5*ms, tau_inh=3*ms, threshold_v=-55*mV, 
-                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
+                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms, scaling_weight=1):
     """
     Run a simulation of flexor-extensor neuron dynamics.
     
@@ -169,18 +169,18 @@ def run_flexor_extensor_neuron_simulation_2(stretch, velocity,
   
     # Define neural connections
     connections = {
-    (Ia_flexor, moto_flexor): {"type": "exc1", "weight": 0.021*nS, "p": 1},
-    (Ia_flexor, inh_flexor): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
-    (Ia_extensor, moto_extensor): {"type": "exc1", "weight": 0.021*nS, "p": 1},
-    (Ia_extensor, inh_extensor): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
+    (Ia_flexor, moto_flexor): {"type": "exc1", "weight": 2.1*nS, "p": 1},
+    (Ia_flexor, inh_flexor): {"type": "exc1", "weight": 3.64*nS, "p": 1},
+    (Ia_extensor, moto_extensor): {"type": "exc1", "weight": 2.1*nS, "p": 1},
+    (Ia_extensor, inh_extensor): {"type": "exc1", "weight": 3.64*nS, "p": 1},
     
-    (II_flexor, exc_flexor): {"type": "exc2", "weight": 0.0165*nS, "p": 1},
-    (II_flexor, inh_flexor): {"type": "exc2", "weight": 0.029*nS, "p": 1},
-    (II_extensor, exc_extensor): {"type": "exc2", "weight": 0.0165*nS, "p": 1},
-    (II_extensor, inh_extensor): {"type": "exc2", "weight": 0.029*nS, "p": 1},
+    (II_flexor, exc_flexor): {"type": "exc2", "weight": 1.65*nS, "p": 1},
+    (II_flexor, inh_flexor): {"type": "exc2", "weight": 2.9*nS, "p": 1},
+    (II_extensor, exc_extensor): {"type": "exc2", "weight": 1.65*nS, "p": 1},
+    (II_extensor, inh_extensor): {"type": "exc2", "weight": 2.9*nS, "p": 1},
     
-    (exc_flexor, moto_flexor): {"type": "exc3", "weight": 0.007*nS, "p": 0.6},
-    (exc_extensor, moto_extensor): {"type": "exc3", "weight": 0.007*nS, "p": 0.6},
+    (exc_flexor, moto_flexor): {"type": "exc3", "weight": 0.7*nS, "p": 0.6},
+    (exc_extensor, moto_extensor): {"type": "exc3", "weight": 0.7*nS, "p": 0.6},
     
     (inh_flexor, moto_extensor): {"type": "inh", "weight": 0.2*nS, "p": 1},
     (inh_extensor, moto_flexor): {"type": "inh", "weight": 0.2*nS, "p": 1},
@@ -206,9 +206,10 @@ def run_flexor_extensor_neuron_simulation_2(stretch, velocity,
         syn.connect(p=p)
         
         # Generate weights with noise
-        noise_percent = 0.2  # 20% noise
-        syn.w_ = w * (1 + noise_percent * (2 * np.random.random(len(syn)) - 1))
-
+        #noise_percent = 0.2  # 20% noise
+        #syn.w_ = w * (1 + noise_percent * (2 * np.random.random(len(syn)) - 1))
+        syn.w_ = w*scaling_weight
+      
         net.add(syn)
         synapses[key] = syn
           
@@ -267,7 +268,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
                                           neuron_pop, dt_run, T, w=500*uS, p=0.4, Eleaky=-70*mV,
                                           gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_exc=0.5*ms, tau_inh=3*ms, threshold_v=-55*mV, 
-                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
+                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms, scaling_weight):
     # Set up random seeds for reproducibility
     np.random.seed(42)
     seed(42)
@@ -370,23 +371,23 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     """
     }
     connections = {
-    ("Ia_flexor", "motor_flexor"): {"type": "exc1", "weight": 0.021*nS, "p": 1},
-    ("Ia_flexor", "inh_flexor"): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
-    ("Ia_extensor", "motor_extensor"): {"type": "exc1", "weight": 0.021*nS, "p": 1},
-    ("Ia_extensor", "inh_extensor"): {"type": "exc1", "weight": 0.0364*nS, "p": 1},
+    ("Ia_flexor", "motor_flexor"): {"type": "exc1", "weight": 2.1*nS, "p": 1},
+    ("Ia_flexor", "inh_flexor"): {"type": "exc1", "weight": 3.64*nS, "p": 1},
+    ("Ia_extensor", "motor_extensor"): {"type": "exc1", "weight": 2.1*nS, "p": 1},
+    ("Ia_extensor", "inh_extensor"): {"type": "exc1", "weight": 3.64*nS, "p": 1},
     
-    ("II_flexor", "exc_flexor"): {"type": "exc2", "weight": 0.0165*nS, "p": 1},
-    ("II_flexor", "inh_flexor"): {"type": "exc2", "weight": 0.029*nS, "p": 1},
-    ("II_extensor", "exc_extensor"): {"type": "exc2", "weight":0.0165*nS , "p": 1},
-    ("II_extensor", "inh_extensor"): {"type": "exc2", "weight": 0.029*nS, "p": 1},
+    ("II_flexor", "exc_flexor"): {"type": "exc2", "weight": 1.65*nS, "p": 1},
+    ("II_flexor", "inh_flexor"): {"type": "exc2", "weight": 2.9*nS, "p": 1},
+    ("II_extensor", "exc_extensor"): {"type": "exc2", "weight":1.65*nS , "p": 1},
+    ("II_extensor", "inh_extensor"): {"type": "exc2", "weight": 2.9*nS, "p": 1},
     
-    ("exc_flexor", "motor_flexor"): {"type": "exc3", "weight":0.007*nS , "p": 0.6},
-    ("exc_extensor", "motor_extensor"): {"type": "exc3", "weight":0.007*nS , "p": 0.6},
+    ("exc_flexor", "motor_flexor"): {"type": "exc3", "weight":0.7*nS , "p": 0.6},
+    ("exc_extensor", "motor_extensor"): {"type": "exc3", "weight":0.7*nS , "p": 0.6},
     
-    ("inh_flexor", "motor_extensor"): {"type": "inh", "weight":0.002*nS , "p": 1},
-    ("inh_extensor", "motor_flexor"): {"type": "inh", "weight": 0.002*nS, "p": 1},
-    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": 0.0076*nS, "p": 0.5},
-    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": 0.0076*nS, "p": 0.5}
+    ("inh_flexor", "motor_extensor"): {"type": "inh", "weight":0.2*nS , "p": 1},
+    ("inh_extensor", "motor_flexor"): {"type": "inh", "weight": 0.2*nS, "p": 1},
+    ("inh_flexor", "inh_extensor"): {"type": "inh", "weight": 0.76*nS, "p": 0.5},
+    ("inh_extensor", "inh_flexor"): {"type": "inh", "weight": 0.76*nS, "p": 0.5}
     }
     
     synapses = {}
@@ -405,8 +406,9 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         syn.connect(p=p)
         
         # Generate weights with noise
-        noise_percent = 0.2  # 20% noise
-        syn.w_ = np.random.normal(w, abs(w*noise_percent), size=len(syn))*siemens
+        #noise_percent = 0.2  # 20% noise
+        #syn.w_ = np.random.normal(w, abs(w*noise_percent), size=len(syn))*siemens
+        syn.w_=w*scaling_weight
 
         net.add(syn)
         synapses[key] = syn
