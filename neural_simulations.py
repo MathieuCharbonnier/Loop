@@ -110,7 +110,7 @@ def run_flexor_extensor_neuron_simulation_2(stretch, velocity,
     # LIF neuron equation
     neuron_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
-    Isyn = gi*(E_inh - v) + ge*(E_ex - v) : amp
+    Isyn = gi*(E_inh - v) + (ge1+ge2+ge3)*(E_ex - v) : amp
     ge1 : siemens  # Excitatory input
     ge2 : siemens  # Excitatory input
     ge3 : siemens  # Excitatory input
