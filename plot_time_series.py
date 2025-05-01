@@ -20,7 +20,8 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
 
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))  
-
+    
+    plt.figure(figsize=(10,10))
     for i,muscle in enumerate(muscle_names):
         time = muscle_data[i]['Time'].values
         stretch_init = np.append(initial_stretch[i], muscle_data[i]['stretch'].values)
@@ -28,20 +29,30 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
         velocity_init = np.gradient(stretch_init, time)
         
         Ia_firing_rate = 10 + 0.4 * stretch_init + 0.86 * np.sign(velocity_init) * np.abs(velocity_init) ** 0.6
-        II_firing_rate = 20 + 3.375 *  stretch_init
-        plt.figure(figsize=(10,10))
-        plt.plot(time, Ia_firing_rate, label='from stretching Ia firing rate')
-        plt.plot(time, II_firing_rate, label='from stretching II firing rate')
+
+        plt.plot(time, Ia_firing_rate, label=f'from {muscle}stretching')
         plt.xlabel('Time (s)')
         plt.ylabel('Frequency (Hz)')
         plt.ylim([0, 50])
-        plt.title(f'{muscle} firing rate ')
-        plt.legend()
-        plt.show()
-
-
+    plt.title('Ia')
+    plt.legend()
+    plt.show()
     
-    
+    plt.figure(figsize=(10,10))
+    for i,muscle in enumerate(muscle_names):
+        time = muscle_data[i]['Time'].values
+        stretch_init = np.append(initial_stretch[i], muscle_data[i]['stretch'].values)
+        stretch_init = stretch_init[:len(muscle_data[i])] 
+        velocity_init = np.gradient(stretch_init, time)
+        II_firing_rate = 20 + 3.375 *  stretch_init
+        plt.plot(time, II_firing_rate, label=f'from {muscle} stretching')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Frequency (Hz)')
+        plt.ylim([0, 50])
+    plt.title('II')
+    plt.legend()
+    plt.show()
+
     # Raster Plots
     fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
     
