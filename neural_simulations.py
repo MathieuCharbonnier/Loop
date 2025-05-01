@@ -7,9 +7,9 @@ from brian2 import *
 import numpy as np
 
 def run_flexor_extensor_neuron_simulation(stretch, velocity, 
-                                          neuron_pop, dt_run, T, w=500*uS, p=0.4, Eleaky=-70*mV,
+                                          neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
                                           gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
-                                          tau_exc=0.5*ms, tau_inh=3*ms, threshold_v=-55*mV, 
+                                          tau_exc=0.5*ms, tau_inh_1=1.5*ms,tau_inh_2=2*ms, threshold_v=-55*mV, 
                                           ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms, scaling_weight=1):
     """
     Run a simulation of flexor-extensor neuron dynamics.
@@ -92,7 +92,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
     ii_eq_flexor = '''
     is_ees = (i < aff_recruited) : boolean
-    rate = 20*hertz + 3.375*hertz*stretch_flexor_array(t) + ees_freq * int(is_ees) : Hz
+    rate = 20*hertz +3.375*hertz*stretch_flexor_array(t) + ees_freq * int(is_ees) : Hz
     '''
                                             
     ii_eq_extensor = '''
@@ -130,12 +130,20 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
                          reset='v = Eleaky', refractory=T_refr, method='exact')
     moto_flexor = NeuronGroup(n_motor, neuron_eq, threshold='v > threshold_v', 
                          reset='v = Eleaky', refractory=T_refr, method='exact')
-    inh_flexor.v=Eleaky
-    inh_extensor.v=Eleaky
-    exc_flexor.v=Eleaky
-    exc_extensor.v=Eleaky
-    moto_flexor.v=Eleaky
-    moto_extensor.v=Eleaky
+    if initial_potentials is None: 
+        inh_flexor.v=Eleaky
+        inh_extensor.v=Eleaky
+        exc_flexor.v=Eleaky
+        exc_extensor.v=Eleaky
+        moto_flexor.v=Eleaky
+        moto_extensor.v=Eleaky
+    else:
+        inh_flexor.v=initial_potentials['inh_flexor']
+        inh_extensor.v=initial_potentials['inh_extensor']
+        exc_flexor.v=initial_potentials['exc_flexor']
+        exc_extensor.v=initial_potentials['exc_extensor']
+        moto_flexor.v=initial_potentials['moto_flexor']
+        moto_extensor.v=initial_potentials['moto_extensor']
 
     
     # Fixed variable names
@@ -159,8 +167,8 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         w_: siemens
     """,
     "inh": """
-        dg/dt = (x - g) / tau_inh : siemens (clock-driven)
-        dx/dt = -x / tau_inh : siemens (clock-driven)
+        dg/dt = ((tau_inh_2/tau_inh_1)**(tau_inh_1/(tau_inh_2-tau_inh_1))*x-g) / tau_inh_1 : siemens (clock-driven)
+        dx/dt = -x / tau_inh_2 : siemens (clock-driven)
         gi_post = g : siemens (summed)
         w_: siemens
     """
@@ -179,13 +187,13 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     (II_extensor, exc_extensor): {"type": "exc2", "weight": 1.65*nS, "p": 1},
     (II_extensor, inh_extensor): {"type": "exc2", "weight": 2.9*nS, "p": 1},
     
-    (exc_flexor, moto_flexor): {"type": "exc3", "weight": 0.7*nS, "p": 0.6},
-    (exc_extensor, moto_extensor): {"type": "exc3", "weight": 0.7*nS, "p": 0.6},
+    (exc_flexor, moto_flexor): {"type": "exc3", "weight": 0.7*nS, "p": 1},
+    (exc_extensor, moto_extensor): {"type": "exc3", "weight": 0.7*nS, "p": 1},
     
     (inh_flexor, moto_extensor): {"type": "inh", "weight": 0.2*nS, "p": 1},
     (inh_extensor, moto_flexor): {"type": "inh", "weight": 0.2*nS, "p": 1},
-    (inh_flexor, inh_extensor): {"type": "inh", "weight": 0.76*nS, "p": 0.5},
-    (inh_extensor, inh_flexor): {"type": "inh", "weight": 0.76*nS, "p": 0.5}
+    (inh_flexor, inh_extensor): {"type": "inh", "weight": 0.76*nS, "p": 1},
+    (inh_extensor, inh_flexor): {"type": "inh", "weight": 0.76*nS, "p": 1}
     }
     
     # Create synaptic connections
@@ -215,16 +223,24 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
           
     # Setup monitors
     mon_Ia_flexor = SpikeMonitor(Ia_flexor)
-    mon_II_flexor = SpikeMonitor(II_flexor)
     mon_Ia_extensor = SpikeMonitor(Ia_extensor)
+    mon_II_flexor = SpikeMonitor(II_flexor)
     mon_II_extensor = SpikeMonitor(II_extensor)
+    mon_exc_flexor= SpikeMonitor(exc_flexor)
+    mon_exc_extensor= SpikeMonitor(exc_extensor)
+    mon_inh_flexor= SpikeMonitor(inh_flexor)
+    mon_inh_extensor= SpikeMonitor(inh_extensor)
     M_motoneuron_flexor = SpikeMonitor(moto_flexor)
     M_motoneuron_extensor = SpikeMonitor(moto_extensor)
+
+
       
-    monitors = [mon_Ia_flexor, mon_Ia_extensor, mon_II_flexor, mon_II_extensor, M_motoneuron_flexor, M_motoneuron_extensor]
+    monitors = [mon_Ia_flexor, mon_Ia_extensor, mon_II_flexor, mon_II_extensor,
+    mon_exc_flexor, mon_exc_extensor, mon_inh_flexor, mon_inh_extensor,
+     M_motoneuron_flexor, M_motoneuron_extensor]
+                                            
     net.add(monitors)
     
-
     # Handle EES stimulation if enabled
     if ees_freq > 0 and eff_recruited > 0:
         num_ees_neurons = int(eff_recruited * n_motor)
@@ -253,14 +269,32 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
             neuron_pop, moto_flexor_spikes, mon_ees_moto_flexor.spike_trains(), T_refr)
         motor_extensor_spikes = process_motoneuron_spikes(
             neuron_pop, moto_extensor_spikes, mon_ees_moto_extensor.spike_trains(), T_refr)
-    
+   
     # Return results
-    return [{"Ia": mon_Ia_flexor.spike_trains(),
-             "II": mon_II_flexor.spike_trains(),
-             "MN": motor_flexor_spikes},
-            {"Ia": mon_Ia_extensor.spike_trains(),
-             "II": mon_II_extensor.spike_trains(),
-             "MN": motor_extensor_spikes}]
+    return [
+      {
+        "Ia": mon_Ia_flexor.spike_trains(),
+        "II": mon_II_flexor.spike_trains(),
+        "exc": mon_exc_flexor.spike_trains(),
+        "inh": mon_inh_flexor.spike_trains(),
+        "MN": motor_flexor_spikes
+      },
+      {
+        "Ia": mon_Ia_extensor.spike_trains(),
+        "II": mon_II_extensor.spike_trains(),
+        "exc": mon_exc_extensor.spike_trains(),
+        "inh": mon_inh_extensor.spike_trains(),
+        "MN": motor_extensor_spikes
+      }
+    ],{
+        'inh_flexor': inh_flexor.v[:],
+        'inh_extensor': inh_extensor.v[:],
+        'exc_flexor': exc_flexor.v[:],
+        'exc_extensor': exc_extensor.v[:],
+        'moto_flexor': moto_flexor.v[:],
+        'moto_extensor': moto_extensor.v[:]
+      } 
+
 
 
 
