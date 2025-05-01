@@ -268,7 +268,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
                                           neuron_pop, dt_run, T, w=500*uS, p=0.4, Eleaky=-70*mV,
                                           gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_exc=0.5*ms, tau_inh=3*ms, threshold_v=-55*mV, 
-                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms, scaling_weight):
+                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms, scaling_weight=1):
     # Set up random seeds for reproducibility
     np.random.seed(42)
     seed(42)
