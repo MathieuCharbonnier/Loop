@@ -16,27 +16,31 @@ colorblind_friendly_colors = {
 }
 color_keys = list(colorblind_friendly_colors.keys())
 
-def plot_times_series(initial_stretch, spikes, muscle_data, muscle_names, folder, ees_freq, aff_recruited, eff_recruited):
+def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder, ees_freq, aff_recruited, eff_recruited):
 
     num_muscles = len(spikes)
-    num_fiber_types = len(next(iter(spikes.values())))
+    num_fiber_types = len(next(iter(spikes.values())))  
 
-    time = muscle_data['Time'].values
-    stretch_init = np.append(initial_stretch, muscle_data['stretch'].values)
-    stretch_init = stretch_init[:len(muscle_data)] 
+    for i,muscle in enumerate(muscle_names):
+        time = muscle_data[i]['Time'].values
+        stretch_init = np.append(initial_stretch[i], muscle_data[i]['stretch'].values)
+        stretch_init = stretch_init[:len(muscle_data[i])] 
+        velocity_init = np.gradient(stretch_init, time)
+        
+        Ia_firing_rate = 10 + 0.4 * stretch_init + 0.86 * np.sign(velocity_init) * np.abs(velocity_init) ** 0.6
+        II_firing_rate = 20 + 3.375 *  stretch_init
+        plt.figure(figsize=(10,10))
+        plt.plot(time, Ia_firing_rate, label='from stretching Ia firing rate')
+        plt.plot(time, II_firing_rate, label='from stretching II firing rate')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Frequency (Hz)')
+        plt.ylim([0, 50])
+        plt.title(f'{muscle} firing rate ')
+        plt.legend()
+        plt.show()
+
+
     
-    velocity_init = np.gradient(stretch_init, time)
-    
-    Ia_firing_rate = 10 + 0.4 * stretch_init + 0.86 * np.sign(velocity_init) * np.abs(velocity_init) ** 0.6
-    II_firing_rate = 20 + 3.375 *  stretch_init
-    
-    plt.plot(time, Ia_firing_rate, label='Ia firing rate')
-    plt.plot(time, II_firing_rate, label='II firing rate')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Frequency (Hz)')
-    plt.title('Firing rate calculated from stretching')
-    plt.legend()
-    plt.show()
     
     # Raster Plots
     fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
@@ -75,7 +79,7 @@ def plot_times_series(initial_stretch, spikes, muscle_data, muscle_names, folder
             all_spike_times = np.concatenate(list(fiber_spikes.values()))
             
             if len(all_spike_times)>0:
-                kde = gaussian_kde(all_spike_times, bw_method=0.1)
+                kde = gaussian_kde(all_spike_times, bw_method=0.3)
                 firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
                 axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
             else:
