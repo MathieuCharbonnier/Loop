@@ -10,7 +10,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
                                           neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
                                           gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_exc=0.5*ms, tau_inh_1=1.5*ms, tau_inh_2=2*ms, threshold_v=-55*mV, 
-                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms, scaling_weight=1):
+                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
     """
     Run a simulation of flexor-extensor neuron dynamics.
     
@@ -54,8 +54,6 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         Fraction of efferent neurons recruited.
     T_refr : time, optional
         Refractory period.
-    scaling_weight : float, optional
-        Weight scaling factor.
     
     Returns:
     -------
@@ -114,25 +112,25 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     ex_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
     Isyn = gII*(E_ex - v) : amp
-    dgII/dt = -gII / tau_exc : siemens (clock-driven)
+    dgII/dt = -gII / tau_exc : siemens 
     '''
     
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
     Isyn =  (gIa+gex)*(E_ex - v) + gi*(E_inh - v) : amp
-    dgIa/dt = -gIa / tau_exc : siemens (clock-driven)
-    dgex/dt = -gex / tau_exc : siemens (clock-driven)
-    dgi/dt = ((tau_inh_2/tau_inh_1)**(tau_inh_1/(tau_inh_2-tau_inh_1))*x-gi) / tau_inh_1 : siemens (clock-driven)
-    dx/dt = -x / tau_inh_2 : siemens (clock-driven)
+    dgIa/dt = -gIa / tau_exc : siemens 
+    dgex/dt = -gex / tau_exc : siemens 
+    dgi/dt = ((tau_inh_2/tau_inh_1)**(tau_inh_1/(tau_inh_2-tau_inh_1))*x-gi) / tau_inh_1 : siemens 
+    dx/dt = -x / tau_inh_2 : siemens 
     '''
 
     inh_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
     Isyn = gi*(E_inh - v) + (gIa+gII)*(E_ex - v) : amp
-    dgIa/dt = -gIa / tau_exc : siemens (clock-driven)
-    dgII/dt = -gII / tau_exc : siemens (clock-driven)
-    dgi/dt = ((tau_inh_2/tau_inh_1)**(tau_inh_1/(tau_inh_2-tau_inh_1))*x-gi) / tau_inh_1 : siemens (clock-driven)
-    dx/dt = -x / tau_inh_2 : siemens (clock-driven)
+    dgIa/dt = -gIa / tau_exc : siemens 
+    dgII/dt = -gII / tau_exc : siemens 
+    dgi/dt = ((tau_inh_2/tau_inh_1)**(tau_inh_1/(tau_inh_2-tau_inh_1))*x-gi) / tau_inh_1 : siemens 
+    dx/dt = -x / tau_inh_2 : siemens 
     '''
   
     # Create neuron groups
@@ -170,23 +168,23 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     
     # Define neural connections
     connections = {
-        (Ia_flexor, moto_flexor): {"model": "gIa_post += w", "weight": 2.1*nS, "p": 1},
-        (Ia_flexor, inh_flexor): {"model": "gIa_post += w", "weight": 3.64*nS, "p": 1},
-        (Ia_extensor, moto_extensor): {"model": "gIa_post += w", "weight": 2.1*nS, "p": 1},
-        (Ia_extensor, inh_extensor): {"model": "gIa_post += w", "weight": 3.64*nS, "p": 1},
+        (Ia_flexor, moto_flexor): {"model": "gIa_post += 2.1*nS", "p": 1},
+        (Ia_flexor, inh_flexor): {"model": "gIa_post += 3.64*nS", "p": 1},
+        (Ia_extensor, moto_extensor): {"model": "gIa_post += 2.1*nS", "p": 1},
+        (Ia_extensor, inh_extensor): {"model": "gIa_post += 3.64*nS", "p": 1},
         
-        (II_flexor, exc_flexor): {"model": "gII_post += w", "weight": 1.65*nS, "p": 1},
-        (II_flexor, inh_flexor): {"model": "gII_post += w", "weight": 2.9*nS, "p": 1},
-        (II_extensor, exc_extensor): {"model": "gII_post += w", "weight": 1.65*nS, "p": 1},
-        (II_extensor, inh_extensor): {"model": "gII_post += w", "weight": 2.9*nS, "p": 1},
+        (II_flexor, exc_flexor): {"model": "gII_post += 1.65*nS", "p": 1},
+        (II_flexor, inh_flexor): {"model": "gII_post += 2.9*nS", "p": 1},
+        (II_extensor, exc_extensor): {"model": "gII_post += 1.65*nS", "p": 1},
+        (II_extensor, inh_extensor): {"model": "gII_post += 2.9*nS", "p": 1},
         
-        (exc_flexor, moto_flexor): {"model": "gex_post += w", "weight": 0.7*nS, "p": 1},
-        (exc_extensor, moto_extensor): {"model": "gex_post += w", "weight": 0.7*nS, "p": 1},
+        (exc_flexor, moto_flexor): {"model": "gex_post += 0.7*nS" , "p": 1},
+        (exc_extensor, moto_extensor): {"model": "gex_post += 0.7*nS", "p": 1},
         
-        (inh_flexor, moto_extensor): {"model": "gi_post += w", "weight": 0.2*nS, "p": 1},
-        (inh_extensor, moto_flexor): {"model": "gi_post += w", "weight": 0.2*nS, "p": 1},
-        (inh_flexor, inh_extensor): {"model": "gi_post += w", "weight": 0.76*nS, "p": 1},
-        (inh_extensor, inh_flexor): {"model": "gi_post += w", "weight": 0.76*nS, "p": 1}
+        (inh_flexor, moto_extensor): {"model": "gi_post += 0.2*nS", "p": 1},
+        (inh_extensor, moto_flexor): {"model": "gi_post +=  0.2*nS", "p": 1},
+        (inh_flexor, inh_extensor): {"model": "gi_post += 0.76*nS", "p": 1},
+        (inh_extensor, inh_flexor): {"model": "gi_post += 0.76*nS", "p": 1}
     }
     
     # Create synaptic connections
@@ -197,15 +195,11 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         key = f"{pre_neurons_name}_to_{post_neurons_name}"
 
         model = conn_info["model"]
-        w = conn_info["weight"]
         p = conn_info["p"]
 
         syn = Synapses(pre_neurons, post_neurons,
                       on_pre=model, method='exact')
         syn.connect(p=p)
-        
-        # Apply scaling weight
-        syn.w = w * scaling_weight
       
         net.add(syn)
         synapses[key] = syn
