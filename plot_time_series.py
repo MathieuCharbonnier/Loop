@@ -16,7 +16,7 @@ colorblind_friendly_colors = {
 }
 color_keys = list(colorblind_friendly_colors.keys())
 
-def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder, ees_freq, aff_recruited, eff_recruited):
+def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited):
 
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))  
@@ -27,13 +27,11 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
         stretch_init = np.append(initial_stretch[i], muscle_data[i]['stretch'].values)
         stretch_init = stretch_init[:len(muscle_data[i])] 
         velocity_init = np.gradient(stretch_init, time)
-        
         Ia_firing_rate = 10 + 0.4 * stretch_init + 0.86 * np.sign(velocity_init) * np.abs(velocity_init) ** 0.6
-
         plt.plot(time, Ia_firing_rate, label=f'from {muscle}stretching')
         plt.xlabel('Time (s)')
         plt.ylabel('Frequency (Hz)')
-        plt.ylim([0, 50])
+        #plt.ylim([0, 50])
     plt.title('Ia')
     plt.legend()
     plt.show()
@@ -48,7 +46,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
         plt.plot(time, II_firing_rate, label=f'from {muscle} stretching')
         plt.xlabel('Time (s)')
         plt.ylabel('Frequency (Hz)')
-        plt.ylim([0, 50])
+        #plt.ylim([0, 50])
     plt.title('II')
     plt.legend()
     plt.show()
@@ -77,7 +75,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ensure titles and labels do not overlap
 
     # Save and display the plot
-    fig_path = os.path.join(folder, f'Raster_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
 
@@ -90,6 +88,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
             all_spike_times = np.concatenate(list(fiber_spikes.values()))
             
             if len(all_spike_times)>1:
+
                 kde = gaussian_kde(all_spike_times, bw_method=0.3)
                 firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
                 axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
@@ -101,7 +100,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     axs[-1].set_xlabel('Time (s)')
     fig.suptitle("Smoothed Instantaneous Firing Rate (KDE)", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    path_fig = os.path.join(folder, f'Firing_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    path_fig = os.path.join(folder, f'Firing_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
@@ -119,7 +118,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     axs[-1].set_xlabel('Time (s)')
     fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    path_fig = os.path.join(folder, f'Activation_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    path_fig = os.path.join(folder, f'Activation_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
@@ -138,13 +137,13 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     axs[-1].set_xlabel('Time (s)')
     fig.suptitle("Muscle Properties: Muscle Comparison", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    path_fig = os.path.join(folder, f'Muscle_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    path_fig = os.path.join(folder, f'Muscle_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
 
 
-def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, aff_recruited, eff_recruited, ees_freq):
+def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
@@ -174,12 +173,12 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, aff_recruit
         ax.set_xlabel("Time (s)")
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    fig_path = os.path.join(folder, f'Joint_angles_and_speed_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    fig_path = os.path.join(folder, f'Joint_angles_and_speed_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
 
 
-def plot_act_length_from_sto_file(filepath, muscle_names, folder, aff_recruited, eff_recruited, ees_freq):
+def plot_act_length_from_sto_file(filepath, muscle_names, folder, Ia_recruited, II_recruited, efferent_recruited, ees_freq):
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
@@ -211,6 +210,6 @@ def plot_act_length_from_sto_file(filepath, muscle_names, folder, aff_recruited,
         ax.set_xlabel("Time (s)")
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    fig_path = os.path.join(folder, f'act_length_aff_{aff_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    fig_path = os.path.join(folder, f'act_length_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
