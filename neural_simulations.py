@@ -51,7 +51,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     aff_recruited : int, optional
         Number of afferent neurons recruited.
     eff_recruited : float, optional
-        Fraction of efferent neurons recruited.
+        Number of efferent neurons recruited.
     T_refr : time, optional
         Refractory period.
     
@@ -200,11 +200,10 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     # Variables for EES monitors
     mon_ees_moto_flexor = None
     mon_ees_moto_extensor = None
-    num_ees_neurons = int(eff_recruited * n_motor)
                                             
     # Handle EES stimulation if enabled
-    if ees_freq > 0 and num_ees_neurons > 0:
-        ees_motoneuron = PoissonGroup(N=2*num_ees_neurons, rates=ees_freq)
+    if ees_freq > 0 and eff_recruited > 0:
+        ees_motoneuron = PoissonGroup(N=2*eff_recruited, rates=ees_freq)
         mon_ees_moto = SpikeMonitor(ees_motoneuron)
         net.add([ees_motoneuron, mon_ees_moto])
 
@@ -222,9 +221,9 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     if ees_freq > 0 and eff_recruited > 0:
         ees_spikes = mon_ees_moto.spike_trains()
         motor_flexor_spikes = process_motoneuron_spikes(
-        neuron_pop, moto_flexor_spikes, {i: ees_spikes[i] for i in range(num_ees_neurons)}, T_refr)
+        neuron_pop, moto_flexor_spikes, {i: ees_spikes[i] for i in range(eff_recruited)}, T_refr)
         motor_extensor_spikes = process_motoneuron_spikes(
-        neuron_pop, moto_extensor_spikes, {i: ees_spikes[i+num_ees_neurons] for i in range(num_ees_neurons)}, T_refr)
+        neuron_pop, moto_extensor_spikes, {i: ees_spikes[i+eff_recruited] for i in range(eff_recruited)}, T_refr)
    
     # Final membrane potentials
     final_potentials = {
