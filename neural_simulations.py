@@ -152,23 +152,23 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     
     # Define neural connections
     connections = {
-        ("Ia_flexor", "moto_flexor"): {"pre": Ia[:n_Ia], "post": moto[:n_motor], "model": "gIa_post += 21*uS", "p": 1},
-        ("Ia_flexor", "inh_flexor"): {"pre": Ia[:n_Ia], "post": inh[:n_inh], "model": "gIa_post += 36.4*uS", "p": 1},
-        ("Ia_extensor", "moto_extensor"): {"pre": Ia[n_Ia:], "post": moto[n_motor:], "model": "gIa_post += 21*uS", "p": 1},
-        ("Ia_extensor", "inh_extensor"): {"pre": Ia[n_Ia:], "post": inh[n_inh:], "model": "gIa_post += 36.4*uS", "p": 1},
+        ("Ia_flexor", "moto_flexor"): {"pre": Ia[:n_Ia], "post": moto[:n_motor], "model": "gIa_post += 2.1*nS", "p": 1},
+        ("Ia_flexor", "inh_flexor"): {"pre": Ia[:n_Ia], "post": inh[:n_inh], "model": "gIa_post += 3.64*nS", "p": 1},
+        ("Ia_extensor", "moto_extensor"): {"pre": Ia[n_Ia:], "post": moto[n_motor:], "model": "gIa_post += 2.1*nS", "p": 1},
+        ("Ia_extensor", "inh_extensor"): {"pre": Ia[n_Ia:], "post": inh[n_inh:], "model": "gIa_post += 3.64*nS", "p": 1},
         
-        ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "model": "gII_post += 16.5*uS", "p": 1},
-        ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "model": "gII_post += 29*uS", "p": 1},
-        ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:], "model": "gII_post += 16.5*uS", "p": 1},
-        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:], "model": "gII_post += 29*uS", "p": 1},
+        ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "model": "gII_post += 1.65*nS", "p": 1},
+        ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "model": "gII_post += 2.9*nS", "p": 1},
+        ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:], "model": "gII_post += 1.65*nS", "p": 1},
+        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:], "model": "gII_post += 2.9*nS", "p": 1},
         
-        ("exc_flexor", "moto_flexor"): {"pre": exc[:n_exc], "post": moto[:n_motor], "model": "gex_post += 7*uS", "p": 0.6},
-        ("exc_extensor", "moto_extensor"): {"pre": exc[n_exc:], "post": moto[n_motor:], "model": "gex_post += 7*uS", "p": 0.6},
+        ("exc_flexor", "moto_flexor"): {"pre": exc[:n_exc], "post": moto[:n_motor], "model": "gex_post += 0.7*nS", "p": 0.6},
+        ("exc_extensor", "moto_extensor"): {"pre": exc[n_exc:], "post": moto[n_motor:], "model": "gex_post += 0.7*nS", "p": 0.6},
         
-        ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:], "model": "gi_post += 2*uS", "p": 1},
-        ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor], "model": "gi_post += 2*uS", "p": 1},
-        ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:], "model": "gi_post += 7.6*uS", "p": 0.5},
-        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh], "model": "gi_post += 7.6*uS", "p": 0.5}
+        ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:], "model": "gi_post += 0.2*nS", "p": 1},
+        ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor], "model": "gi_post += 0.2*nS", "p": 1},
+        ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:], "model": "gi_post += 0.76*nS", "p": 0.5},
+        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh], "model": "gi_post += 0.76*nS", "p": 0.5}
     }
     
     # Create synaptic connections
