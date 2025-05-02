@@ -10,7 +10,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
                                           neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
                                           gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_exc=0.5*ms, tau_1=1.5*ms, tau_2=2*ms, threshold_v=-55*mV, 
-                                          ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
+                                          ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=10*ms):
     """
     Run a simulation of flexor-extensor neuron dynamics.
     
@@ -87,14 +87,14 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     is_flexor = (i < n_Ia) : boolean
     stretch_array = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
     velocity_array = velocity_flexor_array(t) * int(is_flexor) + velocity_extensor_array(t) * int(not is_flexor) : 1
-    is_ees = ((is_flexor and i < aff_recruited) or (not is_flexor and i < n_Ia + aff_recruited)) : boolean
+    is_ees = ((is_flexor and i < Ia_recruited) or (not is_flexor and i < n_Ia + Ia_recruited)) : boolean
     rate = 10*hertz + 0.4*hertz*stretch_array + 0.86*hertz*sign(velocity_array)*abs(velocity_array)**0.6 + ees_freq * int(is_ees) : Hz
     '''
  
     ii_eq = '''
     is_flexor = (i < n_II) : boolean
     stretch_array = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
-    is_ees = ((is_flexor and i < aff_recruited) or (not is_flexor and i < n_II + aff_recruited)) : boolean
+    is_ees = ((is_flexor and i < II_recruited) or (not is_flexor and i < n_II + II_recruited)) : boolean
     rate = 20*hertz + 3.375*hertz*stretch_array + ees_freq * int(is_ees) : Hz
     '''
     
