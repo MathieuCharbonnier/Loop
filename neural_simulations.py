@@ -151,37 +151,36 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     
     # Define neural connections
     connections = {
-        ("Ia_flexor", "moto_flexor"): {"pre":Ia[:n_Ia],"post":moto[:n_moto],"model": "gIa_post += 21*nS", "p": 1},
-        ("Ia_flexor", "inh_flexor"): {"pre":Ia[:n_Ia],"post":inh[:n_inh],"model": "gIa_post += 36.4*nS", "p": 1},
-        ("Ia_extensor", "moto_extensor"): {"pre":Ia[n_Ia:],"post":moto[n_moto:],"model": "gIa_post += 21*nS", "p": 1},
-        ("Ia_extensor", "inh_extensor"): {"pre":Ia[n_Ia:], "post":inh[n_inh:],"model": "gIa_post += 36.4*nS", "p": 1},
+        ("Ia_flexor", "moto_flexor"): {"pre":Ia[:n_Ia],"post":moto[:n_moto], "model": "gIa_post += 21*nS", "p": 1},
+        ("Ia_flexor", "inh_flexor"): {"pre":Ia[:n_Ia],"post":inh[:n_inh], "model": "gIa_post += 36.4*nS", "p": 1},
+        ("Ia_extensor", "moto_extensor"): {"pre":Ia[n_Ia:],"post":moto[n_moto:], "model": "gIa_post += 21*nS", "p": 1},
+        ("Ia_extensor", "inh_extensor"): {"pre":Ia[n_Ia:], "post":inh[n_inh:], "model": "gIa_post += 36.4*nS", "p": 1},
         
-        ("II_flexor", "exc_flexor"): {"pre":II[:n_II], "post":exc[:n_exc] ,"model": "gII_post += 16.5*nS", "p": 1},
-        ("II_flexor", "inh_flexor"): {"pre":II[,"post":,"model": "gII_post += 29*nS", "p": 1},
-        ("II_extensor", "exc_extensor"): {"pre":,"post":,"model": "gII_post += 16.5*nS", "p": 1},
-        ("II_extensor", "inh_extensor"): {"pre":,"post":,"model": "gII_post += 29*nS", "p": 1},
+        ("II_flexor", "exc_flexor"): {"pre":II[:n_II], "post":exc[:n_exc], "model": "gII_post += 16.5*nS", "p": 1},
+        ("II_flexor", "inh_flexor"): {"pre":II[:n_II],"post":inh[:n_inh], "model": "gII_post += 29*nS", "p": 1},
+        ("II_extensor", "exc_extensor"): {"pre":II[n_II:],"post":exc[n_exc:], "model": "gII_post += 16.5*nS", "p": 1},
+        ("II_extensor", "inh_extensor"): {"pre":II[n_II:],"post":inh[n_inh:], "model": "gII_post += 29*nS", "p": 1},
         
-        ("exc_flexor", "moto_flexor"): {"pre":,"post":,"model": "gex_post += 7*nS" , "p": 0.6},
-        ("exc_extensor", "moto_extensor"): {"pre":,"post":,"model": "gex_post += 7*nS", "p": 0.6},
+        ("exc_flexor", "moto_flexor"): {"pre":exc[:n_exc],"post":moto[:n_moto], "model": "gex_post += 7*nS" , "p": 0.6},
+        ("exc_extensor", "moto_extensor"): {"pre":exc[n_exc:],"post":moto[n_moto:], "model": "gex_post += 7*nS", "p": 0.6},
         
-        ("inh_flexor", "moto_extensor"): {"pre":,"post":,"model": "gi_post += 2*nS", "p": 1},
-        ("inh_extensor", "moto_flexor"): {"pre":,"post":,"model": "gi_post +=  2*nS", "p": 1},
-        ("inh_flexor", "inh_extensor"): {"pre":,"post":,"model": "gi_post += 7.6*nS", "p": 0.5},
-        ("inh_extensor", "inh_flexor"): {"pre":,"post":,"model": "gi_post += 7.6*nS", "p": 0.5}
+        ("inh_flexor", "moto_extensor"): {"pre":inh[:n_inh],"post":moto[n_moto:], "model": "gi_post += 2*nS", "p": 1},
+        ("inh_extensor", "moto_flexor"): {"pre":inh[n_inh:],"post":moto[:n_moto], "model": "gi_post +=  2*nS", "p": 1},
+        ("inh_flexor", "inh_extensor"): {"pre":inh[:n_inh],"post":inh[n_inh:], "model": "gi_post += 7.6*nS", "p": 0.5},
+        ("inh_extensor", "inh_flexor"): {"pre":inh[n_inh:],"post":inh[:n_inh], "model": "gi_post += 7.6*nS", "p": 0.5}
     }
     
     # Create synaptic connections
     synapses = {}
     for (pre_neurons, post_neurons), conn_info in connections.items():
 
-        pre_neurons_name = pre_neurons.__class__.__name__.lower()
-        post_neurons_name = post_neurons.__class__.__name__.lower()
-        key = f"{pre_neurons_name}_{muscle}_to_{post_neurons_name}_{muscle}"
-
+        key = f"{pre_neurons}_to_{post_neurons}"
+        pre=conn_info["pre"]
+        post=conn_info["post"]
         model = conn_info["model"]
         p = conn_info["p"]
-      
-        syn = Synapses(pre_neurons[i*], post_neurons,
+  
+        syn = Synapses(pre, post,
                           on_pre=model, method='exact')
         syn.connect(p=p)
           
@@ -203,60 +202,53 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     # Variables for EES monitors
     mon_ees_moto_flexor = None
     mon_ees_moto_extensor = None
-    
+    num_ees_neurons = int(eff_recruited * n_motor)
+                                            
     # Handle EES stimulation if enabled
-    if ees_freq > 0 and eff_recruited > 0:
-        num_ees_neurons = int(eff_recruited * n_motor)
-        ees_motoneuron_extensor = PoissonGroup(N=num_ees_neurons, rates=ees_freq)
-        ees_motoneuron_flexor = PoissonGroup(N=num_ees_neurons, rates=ees_freq)
-        mon_ees_moto_flexor = SpikeMonitor(ees_motoneuron_flexor)
-        mon_ees_moto_extensor = SpikeMonitor(ees_motoneuron_extensor)
+    if ees_freq > 0 and num_ees_neuron> 0:
+        
+        ees_motoneuron = PoissonGroup(N=2*num_ees_neurons, rates=ees_freq)
+        mon_ees_moto = SpikeMonitor(ees_motoneuron)
       
-        net.add([ees_motoneuron_extensor, ees_motoneuron_flexor, 
-                mon_ees_moto_flexor, mon_ees_moto_extensor])
+        net.add([ees_motoneuron, mon_ees_moto])
 
     # Run simulation
     net.run(T)
     
     # Extract motoneuron spikes
-    moto_flexor_spikes = mon_motoneuron_flexor.spike_trains()
-    moto_extensor_spikes = mon_motoneuron_extensor.spike_trains()
+    moto_flexor_spikes = mon_motoneuron.spike_trains()[:n_moto]
+    moto_extensor_spikes = mon_motoneuron.spike_trains()[n_moto:]
 
-    # Final motor neuron spike trains
-    motor_flexor_spikes = moto_flexor_spikes
-    motor_extensor_spikes = moto_extensor_spikes
 
     # Process motoneuron spikes by adding EES effect if enabled
     if ees_freq > 0 and eff_recruited > 0:
+
         motor_flexor_spikes = process_motoneuron_spikes(
-            neuron_pop, moto_flexor_spikes, mon_ees_moto_flexor.spike_trains(), T_refr)
+            neuron_pop, moto_flexor_spikes, mon_ees_moto.spike_trains()[:num_ees_neurons], T_refr)
         motor_extensor_spikes = process_motoneuron_spikes(
-            neuron_pop, moto_extensor_spikes, mon_ees_moto_extensor.spike_trains(), T_refr)
+            neuron_pop, moto_extensor_spikes, mon_ees_moto_extensor.spike_trains()[num_ees_neurons:], T_refr)
    
     # Final membrane potentials
     final_potentials = {
-        'inh_flexor': inh_flexor.v[:],
-        'inh_extensor': inh_extensor.v[:],
-        'exc_flexor': exc_flexor.v[:],
-        'exc_extensor': exc_extensor.v[:],
-        'moto_flexor': moto_flexor.v[:],
-        'moto_extensor': moto_extensor.v[:]
+        'inh': inh.v[:],
+        'exc': exc.v[:],
+        'moto': moto.v[:]
     } 
     
     # Return results
     return [
         {
-            "Ia": mon_Ia_flexor.spike_trains(),
-            "II": mon_II_flexor.spike_trains(),
-            "exc": mon_exc_flexor.spike_trains(),
-            "inh": mon_inh_flexor.spike_trains(),
+            "Ia": mon_Ia_flexor.spike_trains()[:n_Ia],
+            "II": mon_II_flexor.spike_trains()[:n_II],
+            "exc": mon_exc_flexor.spike_trains()[:n_exc],
+            "inh": mon_inh_flexor.spike_trains()[:n_inh],
             "MN": motor_flexor_spikes
         },
         {
-            "Ia": mon_Ia_extensor.spike_trains(),
-            "II": mon_II_extensor.spike_trains(),
-            "exc": mon_exc_extensor.spike_trains(),
-            "inh": mon_inh_extensor.spike_trains(),
+            "Ia": mon_Ia_extensor.spike_trains()[n_Ia:],
+            "II": mon_II_extensor.spike_trains()[n_II:],
+            "exc": mon_exc_extensor.spike_trains()[n_exc:],
+            "inh": mon_inh_extensor.spike_trains()[n_inh:],
             "MN": motor_extensor_spikes
         }
     ], final_potentials
