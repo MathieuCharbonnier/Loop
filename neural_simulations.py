@@ -9,7 +9,7 @@ import numpy as np
 def run_flexor_extensor_neuron_simulation(stretch, velocity, 
                                           neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
                                           gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
-                                          tau_exc=0.5*ms, tau_inh_1=1.5*ms, tau_inh_2=2*ms, threshold_v=-55*mV, 
+                                          tau_exc=0.5*ms, tau_1=1.5*ms, tau_2=2*ms, threshold_v=-55*mV, 
                                           ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
     """
     Run a simulation of flexor-extensor neuron dynamics.
@@ -82,143 +82,121 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     n_motor = neuron_pop['motor']  
 
     # Afferent neuron equations
-    ia_eq_flexor = '''
-    is_ees = (i < aff_recruited) : boolean
-    rate = 10*hertz + 0.4*hertz*stretch_flexor_array(t) + 0.86*hertz*sign(velocity_flexor_array(t))*abs(velocity_flexor_array(t))**0.6 + ees_freq * int(is_ees) : Hz
-    '''
-    ia_eq_extensor = '''
-    is_ees = (i < aff_recruited) : boolean
-    rate = 10*hertz + 0.4*hertz*stretch_extensor_array(t) + 0.86*hertz*sign(velocity_extensor_array(t))*abs(velocity_extensor_array(t))**0.6 + ees_freq * int(is_ees) : Hz
+    ia_eq = '''
+    is_ees = (i < aff_recruited) or (i>n_Ia & i<n_II+aff_recruited) : boolean
+    stretch_array=(i<n_II)*stretch_flexor_array(t)+ (i>n_II)*stretch_extensor_array(t)
+    rate = 10*hertz + 0.4*hertz*stretch_array(t) + 0.86*hertz*sign(velocity_array(t))*abs(velocity_array(t))**0.6 + ees_freq * int(is_ees) : Hz
     '''
 
-    ii_eq_flexor = '''
-    is_ees = (i < aff_recruited) : boolean
-    rate = 20*hertz + 3.375*hertz*stretch_flexor_array(t) + ees_freq * int(is_ees) : Hz
+    ii_eq = '''
+    is_ees = (i < aff_recruited) or (i>n_II & i<n_II+aff_recruited) : boolean
+    stretch_array=(i<n_II)*stretch_flexor_array(t)+ (i>n_II)*stretch_extensor_array(t)
+    rate = 20*hertz + 3.375*hertz*stretch_array + ees_freq * int(is_ees) : Hz
     '''
-                                            
-    ii_eq_extensor = '''
-    is_ees = (i < aff_recruited) : boolean
-    rate = 20*hertz + 3.375*hertz*stretch_extensor_array(t) + ees_freq * int(is_ees) : Hz
-    '''
+
     
     # Create afferent neurons
-    Ia_flexor = NeuronGroup(n_Ia, ia_eq_flexor, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-    Ia_extensor = NeuronGroup(n_Ia, ia_eq_extensor, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-    II_flexor = NeuronGroup(n_II, ii_eq_flexor, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-    II_extensor = NeuronGroup(n_II, ii_eq_extensor, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-    net.add([Ia_flexor, Ia_extensor, II_flexor, II_extensor])
+    Ia= NeuronGroup(2*n_Ia,ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
+    II = NeuronGroup(2*n_II, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
+    net.add([Ia, II])
 
     # LIF neuron equations
     ex_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
-    Isyn = gII*(E_ex - v) : amp
+    Isyn=gII*(E_ex - v) :amp
     dgII/dt = -gII / tau_exc : siemens 
+    '''
+    mn_eq = '''
+    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
+    Isyn= gIa *(E_ex - v)+ gex*(E_ex-v) + gi*(E_inh - v) :amp
+    dgIa/dt = -gIa / tau_exc : siemens 
+    dgex/dt = -gex / tau_exc : siemens
+    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-gi)/tau_1 : siemens
+    dx/dt = -x/tau_2: siemens
+    '''
+    inh_eq = '''
+    dv/dt = (gL*(Eleaky - v)+Isyn ) / Cm : volt
+    Isyn= gi*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
+    dgIa/dt = -gIa / tau_exc : siemens 
+    dgII/dt = -gII / tau_exc : siemens 
+    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-gi)/tau_1 : siemens
+    dx/dt = -x/tau_2: siemens
     '''
     
-    mn_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
-    Isyn =  (gIa+gex)*(E_ex - v) + gi*(E_inh - v) : amp
-    dgIa/dt = -gIa / tau_exc : siemens 
-    dgex/dt = -gex / tau_exc : siemens 
-    dgi/dt = ((tau_inh_2/tau_inh_1)**(tau_inh_1/(tau_inh_2-tau_inh_1))*x-gi) / tau_inh_1 : siemens 
-    dx/dt = -x / tau_inh_2 : siemens 
-    '''
 
-    inh_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
-    Isyn = gi*(E_inh - v) + (gIa+gII)*(E_ex - v) : amp
-    dgIa/dt = -gIa / tau_exc : siemens 
-    dgII/dt = -gII / tau_exc : siemens 
-    dgi/dt = ((tau_inh_2/tau_inh_1)**(tau_inh_1/(tau_inh_2-tau_inh_1))*x-gi) / tau_inh_1 : siemens 
-    dx/dt = -x / tau_inh_2 : siemens 
-    '''
-  
     # Create neuron groups
-    inh_flexor = NeuronGroup(n_inh, inh_eq, threshold='v > threshold_v', 
-                         reset='v = Eleaky', refractory=T_refr, method='exact')
-    inh_extensor = NeuronGroup(n_inh, inh_eq, threshold='v > threshold_v', 
-                         reset='v = Eleaky', refractory=T_refr, method='exact')
-    exc_flexor = NeuronGroup(n_exc, ex_eq, threshold='v > threshold_v', 
-                         reset='v = Eleaky', refractory=T_refr, method='exact')
-    exc_extensor = NeuronGroup(n_exc, ex_eq, threshold='v > threshold_v', 
-                         reset='v = Eleaky', refractory=T_refr, method='exact')                                        
-    moto_extensor = NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
-                         reset='v = Eleaky', refractory=T_refr, method='exact')
-    moto_flexor = NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
-                         reset='v = Eleaky', refractory=T_refr, method='exact')
+    inh = NeuronGroup(n_inh, inh_eq, threshold='v > threshold_v', 
+                         reset='v = Eleaky', refractory=T_refr, method='euler')
+  
+    exc = NeuronGroup(n_exc, ex_eq, threshold='v > threshold_v', 
+                         reset='v = Eleaky', refractory=T_refr, method='euler')
+                                         
+    moto= NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
+                         reset='v = Eleaky', refractory=T_refr, method='euler')
+  
                          
     # Initialize membrane potentials
     if initial_potentials is None: 
-        inh_flexor.v = Eleaky
-        inh_extensor.v = Eleaky
-        exc_flexor.v = Eleaky
-        exc_extensor.v = Eleaky
-        moto_flexor.v = Eleaky
-        moto_extensor.v = Eleaky
+        inh.v = Eleaky
+        exc.v = Eleaky
+        moto.v = Eleaky
+
     else:
-        inh_flexor.v = initial_potentials['inh_flexor']
-        inh_extensor.v = initial_potentials['inh_extensor']
-        exc_flexor.v = initial_potentials['exc_flexor']
-        exc_extensor.v = initial_potentials['exc_extensor']
-        moto_flexor.v = initial_potentials['moto_flexor']
-        moto_extensor.v = initial_potentials['moto_extensor']
-    
+        inh.v = initial_potentials['inh']
+        exc.v = initial_potentials['exc']
+        moto.v = initial_potentials['moto']
+
     # Add neuron groups to the network
-    net.add([inh_flexor, inh_extensor, exc_flexor, exc_extensor, moto_extensor, moto_flexor])
+    net.add([inh, exc, moto])
     
     # Define neural connections
     connections = {
-        (Ia_flexor, moto_flexor): {"model": "gIa_post += 2.1*nS", "p": 1},
-        (Ia_flexor, inh_flexor): {"model": "gIa_post += 3.64*nS", "p": 1},
-        (Ia_extensor, moto_extensor): {"model": "gIa_post += 2.1*nS", "p": 1},
-        (Ia_extensor, inh_extensor): {"model": "gIa_post += 3.64*nS", "p": 1},
+        ("Ia_flexor", "moto_flexor"): {"pre":Ia[:n_Ia],"post":moto[:n_moto],"model": "gIa_post += 21*nS", "p": 1},
+        ("Ia_flexor", "inh_flexor"): {"pre":Ia[:n_Ia],"post":inh[:n_inh],"model": "gIa_post += 36.4*nS", "p": 1},
+        ("Ia_extensor", "moto_extensor"): {"pre":Ia[n_Ia:],"post":moto[n_moto:],"model": "gIa_post += 21*nS", "p": 1},
+        ("Ia_extensor", "inh_extensor"): {"pre":Ia[n_Ia:], "post":inh[n_inh:],"model": "gIa_post += 36.4*nS", "p": 1},
         
-        (II_flexor, exc_flexor): {"model": "gII_post += 1.65*nS", "p": 1},
-        (II_flexor, inh_flexor): {"model": "gII_post += 2.9*nS", "p": 1},
-        (II_extensor, exc_extensor): {"model": "gII_post += 1.65*nS", "p": 1},
-        (II_extensor, inh_extensor): {"model": "gII_post += 2.9*nS", "p": 1},
+        ("II_flexor", "exc_flexor"): {"pre":II[:n_II], "post":exc[:n_exc] ,"model": "gII_post += 16.5*nS", "p": 1},
+        ("II_flexor", "inh_flexor"): {"pre":II[,"post":,"model": "gII_post += 29*nS", "p": 1},
+        ("II_extensor", "exc_extensor"): {"pre":,"post":,"model": "gII_post += 16.5*nS", "p": 1},
+        ("II_extensor", "inh_extensor"): {"pre":,"post":,"model": "gII_post += 29*nS", "p": 1},
         
-        (exc_flexor, moto_flexor): {"model": "gex_post += 0.7*nS" , "p": 1},
-        (exc_extensor, moto_extensor): {"model": "gex_post += 0.7*nS", "p": 1},
+        ("exc_flexor", "moto_flexor"): {"pre":,"post":,"model": "gex_post += 7*nS" , "p": 0.6},
+        ("exc_extensor", "moto_extensor"): {"pre":,"post":,"model": "gex_post += 7*nS", "p": 0.6},
         
-        (inh_flexor, moto_extensor): {"model": "gi_post += 0.2*nS", "p": 1},
-        (inh_extensor, moto_flexor): {"model": "gi_post +=  0.2*nS", "p": 1},
-        (inh_flexor, inh_extensor): {"model": "gi_post += 0.76*nS", "p": 1},
-        (inh_extensor, inh_flexor): {"model": "gi_post += 0.76*nS", "p": 1}
+        ("inh_flexor", "moto_extensor"): {"pre":,"post":,"model": "gi_post += 2*nS", "p": 1},
+        ("inh_extensor", "moto_flexor"): {"pre":,"post":,"model": "gi_post +=  2*nS", "p": 1},
+        ("inh_flexor", "inh_extensor"): {"pre":,"post":,"model": "gi_post += 7.6*nS", "p": 0.5},
+        ("inh_extensor", "inh_flexor"): {"pre":,"post":,"model": "gi_post += 7.6*nS", "p": 0.5}
     }
     
     # Create synaptic connections
     synapses = {}
     for (pre_neurons, post_neurons), conn_info in connections.items():
+
         pre_neurons_name = pre_neurons.__class__.__name__.lower()
         post_neurons_name = post_neurons.__class__.__name__.lower()
-        key = f"{pre_neurons_name}_to_{post_neurons_name}"
+        key = f"{pre_neurons_name}_{muscle}_to_{post_neurons_name}_{muscle}"
 
         model = conn_info["model"]
         p = conn_info["p"]
-
-        syn = Synapses(pre_neurons, post_neurons,
-                      on_pre=model, method='exact')
-        syn.connect(p=p)
       
+        syn = Synapses(pre_neurons[i*], post_neurons,
+                          on_pre=model, method='exact')
+        syn.connect(p=p)
+          
         net.add(syn)
         synapses[key] = syn
           
     # Setup monitors
-    mon_Ia_flexor = SpikeMonitor(Ia_flexor)
-    mon_Ia_extensor = SpikeMonitor(Ia_extensor)
-    mon_II_flexor = SpikeMonitor(II_flexor)
-    mon_II_extensor = SpikeMonitor(II_extensor)
-    mon_exc_flexor = SpikeMonitor(exc_flexor)
-    mon_exc_extensor = SpikeMonitor(exc_extensor)
-    mon_inh_flexor = SpikeMonitor(inh_flexor)
-    mon_inh_extensor = SpikeMonitor(inh_extensor)
-    mon_motoneuron_flexor = SpikeMonitor(moto_flexor)
-    mon_motoneuron_extensor = SpikeMonitor(moto_extensor)
+    mon_Ia = SpikeMonitor(Ia)
+    mon_II = SpikeMonitor(II)
+    mon_exc = SpikeMonitor(exc)
+    mon_inh= SpikeMonitor(inh)
+    mon_motoneuron = SpikeMonitor(moto)
 
-    monitors = [mon_Ia_flexor, mon_Ia_extensor, mon_II_flexor, mon_II_extensor,
-                mon_exc_flexor, mon_exc_extensor, mon_inh_flexor, mon_inh_extensor,
-                mon_motoneuron_flexor, mon_motoneuron_extensor]
+
+    monitors = [mon_Ia, mon_II, mon_exc, mon_inh,mon_motoneuron]
                                             
     net.add(monitors)
     
