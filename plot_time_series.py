@@ -89,7 +89,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
         for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
             all_spike_times = np.concatenate(list(fiber_spikes.values()))
             
-            if len(all_spike_times)>0:
+            if len(all_spike_times)>1:
                 kde = gaussian_kde(all_spike_times, bw_method=0.3)
                 firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
                 axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
