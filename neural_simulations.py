@@ -134,8 +134,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
                                          
     moto = NeuronGroup(2*n_motor, mn_eq, threshold='v > threshold_v', 
                        reset='v = Eleaky', refractory=T_refr, method='euler')
-  
-    print('initial_potentials :', initial_potentials)                     
+                       
     # Initialize membrane potentials
     inh.v = initial_potentials['inh']
     exc.v = initial_potentials['exc']
