@@ -3,7 +3,6 @@ import numpy as np
 import os
 from typing import Dict, List, Union, Tuple, Optional
 
-import matplotlib.pyplot as plt
 
 def run_flexor_extensor_neuron_simulation(stretch, velocity, 
                                           neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
@@ -186,13 +185,13 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     mon_inh = SpikeMonitor(inh)
     mon_motoneuron = SpikeMonitor(moto)
     
-    mon_exc_flexor=StateMonitor(exc, ['v', 'gII'], 20)
-    mon_inh_flexor=StateMonitor(inh, ['v','gIa','gII','gi'], 20)
-    mon_moto_flexor=StateMonitor(moto, ['v','gIa','gex','gi'], 20)
+    mon_exc_flexor=StateMonitor(exc, ['v', 'gII'], n_exc/2)
+    mon_inh_flexor=StateMonitor(inh, ['v','gIa','gII','gi'], n_inh/2)
+    mon_moto_flexor=StateMonitor(moto, ['v','gIa','gex','gi'], n_motor/2)
     
-    mon_exc_extensor=StateMonitor(exc, ['v', 'gII'], 80)
-    mon_inh_extensor=StateMonitor(inh, ['v','gIa','gII','gi'], 80)
-    mon_moto_extensor=StateMonitor(moto, ['v','gIa','gex','gi'], 80)
+    mon_exc_extensor=StateMonitor(exc, ['v', 'gII'], 3*n_exc/2)
+    mon_inh_extensor=StateMonitor(inh, ['v','gIa','gII','gi'], 3*n_inh/2)
+    mon_moto_extensor=StateMonitor(moto, ['v','gIa','gex','gi'], 3*n_motor/2)
     
     
     # Add all monitors to the network
