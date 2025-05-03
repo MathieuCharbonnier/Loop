@@ -265,20 +265,21 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         "Ia": {i: mon_Ia.spike_trains()[i] for i in range(n_Ia)},
         "II": {i: mon_II.spike_trains()[i] for i in range(n_II)},
         "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc)},
-        "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh)},
-        "MN": motor_flexor_spikes
+        "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh)}
     }
     result_extensor = {
         "Ia": {i%n_Ia: mon_Ia.spike_trains()[i] for i in range(n_Ia, 2*n_Ia)},
         "II": {i%n_II: mon_II.spike_trains()[i] for i in range(n_II, 2*n_II)},
         "exc": {i%n_exc: mon_exc.spike_trains()[i] for i in range(n_exc, 2*n_exc)},
-        "inh": {i%n_inh: mon_inh.spike_trains()[i] for i in range(n_inh, 2*n_inh)},
-        "MN": motor_extensor_spikes
+        "inh": {i%n_inh: mon_inh.spike_trains()[i] for i in range(n_inh, 2*n_inh)}
     }
 
     if ees_freq > 0 and eff_recruited > 0:
-        result_flexor["MN_before_ees"] = before_motor_flexor_spikes
-        result_extensor["MN_before_ees"] = before_motor_extensor_spikes
+        result_flexor["MN0"] = before_motor_flexor_spikes
+        result_extensor["MN0"] = before_motor_extensor_spikes
+
+    result_flexor["MN"]= motor_flexor_spikes
+    result_extensor["MN"]=motor_extensor_spikes
 
     return [result_flexor, result_extensor], final_potentials, state_monitors
 
