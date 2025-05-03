@@ -3,8 +3,7 @@ import numpy as np
 import os
 from typing import Dict, List, Union, Tuple, Optional
 
-from brian2 import *
-import numpy as np
+import matplotlib.pyplot as plt
 
 def run_flexor_extensor_neuron_simulation(stretch, velocity, 
                                           neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
@@ -193,6 +192,35 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     mon_inh = SpikeMonitor(inh)
     mon_motoneuron = SpikeMonitor(moto)
 
+    mon_v_moto_flexor=StateMonitor(moto, 'v', 20)
+    mon_gIa_moto_flexor=StateMonitor(moto, 'gIa', 20)
+    mon_gex_moto_flexor=StateMonitor(moto 'g_ex', 20)
+    mon_gi_moto_flexor=StateMonitor(moto, 'gIa', 20)
+    mon_v_moto_extensor=StateMonitor(moto, 'v', 80)
+    mon_gIa_moto_extensor=StateMonitor(moto, 'gIa', 80)
+    mon_gex_moto_extensor=StateMonitor(moto 'g_ex', 80)
+    mon_gi_moto_extensor=StateMonitor(moto, 'gIa', 80)
+    
+    plt.title(" Motoneurons Voltage")
+    plt.plot(mon_v_moto_flexor.t/ms, mon_v_moto_flexor.v/mV, label="flexor")
+    plt.plot(mon_v_moto_extensor.t/ms, mon_v_moto_extensor.v/mV, label="extensor")
+    plt.xlabel('time (ms)')
+    plt.ylabel('V (mV)')
+    plt.legend()
+    plt.show()
+
+    plt.title("Motonerons Conductances")
+    plt.plot(mon_gIa_moto_flexor.t/ms, mon_gIa_moto_flexor.gIa/nS, label="flexor gIa")
+    plt.plot(mon_gex_moto_flexor.t/ms, mon_gex_moto_flexor.gex/nS, label="flexor gex")
+    plt.plot(mon_gi_moto_flexor.t/ms, mon_gi_moto_flexor.gi/nS, label="flexor gi")
+    plt.plot(mon_gIa_moto_extensor.t/ms, mon_gIa_moto_extensor.gIa/nS, label="extensor gIa")
+    plt.plot(mon_gex_moto_extensor.t/ms, mon_gex_moto_extensor.gex/nS, label="extensor gex")
+    plt.plot(mon_gi_moto_extensor.t/ms, mon_gi_moto_extensor.gi/nS, label="extensor gi")
+    plt.xlabel('time (ms)')
+    plt.ylabel('g (nS)')
+    plt.legend()
+    plt.show()
+    
     monitors = [mon_Ia, mon_II, mon_exc, mon_inh, mon_motoneuron]
                                             
     net.add(monitors)
