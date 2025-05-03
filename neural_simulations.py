@@ -198,7 +198,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     mon_gi_moto_flexor=StateMonitor(moto, 'gIa', 20)
     mon_v_moto_extensor=StateMonitor(moto, 'v', 80)
     mon_gIa_moto_extensor=StateMonitor(moto, 'gIa', 80)
-    mon_gex_moto_extensor=StateMonitor(moto 'g_ex', 80)
+    mon_gex_moto_extensor=StateMonitor(moto 'gex', 80)
     mon_gi_moto_extensor=StateMonitor(moto, 'gIa', 80)
     
     plt.title(" Motoneurons Voltage")
