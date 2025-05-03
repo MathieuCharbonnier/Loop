@@ -218,7 +218,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     
     # Extract motoneuron spikes
     motor_flexor_spikes ={i: mon_motoneuron.spike_trains()[i] for i in range(n_motor)} 
-    motor_extensor_spikes = {i: mon_motoneuron.spike_trains()[i] for i in range(n_motor, 2*n_motor)} 
+    motor_extensor_spikes = {i%n_motor: mon_motoneuron.spike_trains()[i] for i in range(n_motor, 2*n_motor)} 
 
     
     if ees_freq > 0 and eff_recruited > 0:
@@ -228,7 +228,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         motor_flexor_spikes = process_motoneuron_spikes(
         neuron_pop, motor_flexor_spikes, {i: ees_spikes[i] for i in range(eff_recruited)}, T_refr)
         motor_extensor_spikes = process_motoneuron_spikes(
-        neuron_pop, motor_extensor_spikes, {i: ees_spikes[i+eff_recruited] for i in range(eff_recruited)}, T_refr)
+        neuron_pop, motor_extensor_spikes, {i%eff_recruited: ees_spikes[i+eff_recruited] for i in range(eff_recruited)}, T_refr)
         
     # Final membrane potentials
     final_potentials = {
@@ -269,10 +269,10 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         "MN": motor_flexor_spikes
     }
     result_extensor = {
-        "Ia": {i: mon_Ia.spike_trains()[i] for i in range(n_Ia, 2*n_Ia)},
-        "II": {i: mon_II.spike_trains()[i] for i in range(n_II, 2*n_II)},
-        "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc, 2*n_exc)},
-        "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh, 2*n_inh)},
+        "Ia": {i%n_Ia: mon_Ia.spike_trains()[i] for i in range(n_Ia, 2*n_Ia)},
+        "II": {i%n_II: mon_II.spike_trains()[i] for i in range(n_II, 2*n_II)},
+        "exc": {i%n_exc: mon_exc.spike_trains()[i] for i in range(n_exc, 2*n_exc)},
+        "inh": {i%n_inh: mon_inh.spike_trains()[i] for i in range(n_inh, 2*n_inh)},
         "MN": motor_extensor_spikes
     }
 
@@ -546,8 +546,7 @@ def process_motoneuron_spikes(neuron_pop: Dict[str, int], motor_spikes: Dict,
     """
     moto_spike_dict = {}
     
-    for i in range(neuron_pop["motor"]):
-        nat_spikes = motor_spikes[i] 
+    for i, nat_spikes in motor_spikes.items():
         
         # Get EES-induced spikes for this neuron if it's in the recruited population
         ees_i_spikes = np.array([])
