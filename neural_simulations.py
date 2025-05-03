@@ -135,16 +135,11 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     moto = NeuronGroup(2*n_motor, mn_eq, threshold='v > threshold_v', 
                        reset='v = Eleaky', refractory=T_refr, method='euler')
   
-                         
+    print('initial_potentials :', initial_potentials)                     
     # Initialize membrane potentials
-    if initial_potentials is None: 
-        inh.v = Eleaky
-        exc.v = Eleaky
-        moto.v = Eleaky
-    else:
-        inh.v = initial_potentials['inh']
-        exc.v = initial_potentials['exc']
-        moto.v = initial_potentials['moto']
+    inh.v = initial_potentials['inh']
+    exc.v = initial_potentials['exc']
+    moto.v = initial_potentials['moto']
 
     # Add neuron groups to the network
     net.add([inh, exc, moto])
@@ -191,38 +186,23 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     mon_exc = SpikeMonitor(exc)
     mon_inh = SpikeMonitor(inh)
     mon_motoneuron = SpikeMonitor(moto)
-
-    mon_v_moto_flexor=StateMonitor(moto, 'v', 20)
-    mon_gIa_moto_flexor=StateMonitor(moto, 'gIa', 20)
-    mon_gex_moto_flexor=StateMonitor(moto, 'gex', 20)
-    mon_gi_moto_flexor=StateMonitor(moto, 'gIa', 20)
-    mon_v_moto_extensor=StateMonitor(moto, 'v', 80)
-    mon_gIa_moto_extensor=StateMonitor(moto, 'gIa', 80)
-    mon_gex_moto_extensor=StateMonitor(moto, 'gex', 80)
-    mon_gi_moto_extensor=StateMonitor(moto, 'gIa', 80)
     
-    plt.title(" Motoneurons Voltage")
-    plt.plot(mon_v_moto_flexor.t/ms, mon_v_moto_flexor.v/mV, label="flexor")
-    plt.plot(mon_v_moto_extensor.t/ms, mon_v_moto_extensor.v/mV, label="extensor")
-    plt.xlabel('time (ms)')
-    plt.ylabel('V (mV)')
-    plt.legend()
-    plt.show()
-
-    plt.title("Motonerons Conductances")
-    plt.plot(mon_gIa_moto_flexor.t/ms, mon_gIa_moto_flexor.gIa/nS, label="flexor gIa")
-    plt.plot(mon_gex_moto_flexor.t/ms, mon_gex_moto_flexor.gex/nS, label="flexor gex")
-    plt.plot(mon_gi_moto_flexor.t/ms, mon_gi_moto_flexor.gi/nS, label="flexor gi")
-    plt.plot(mon_gIa_moto_extensor.t/ms, mon_gIa_moto_extensor.gIa/nS, label="extensor gIa")
-    plt.plot(mon_gex_moto_extensor.t/ms, mon_gex_moto_extensor.gex/nS, label="extensor gex")
-    plt.plot(mon_gi_moto_extensor.t/ms, mon_gi_moto_extensor.gi/nS, label="extensor gi")
-    plt.xlabel('time (ms)')
-    plt.ylabel('g (nS)')
-    plt.legend()
-    plt.show()
+    mon_exc_flexor=StateMonitor(exc, ['v', 'gII'], 20)
+    mon_inh_flexor=StateMonitor(inh, ['v','gIa','gII','gi'], 20)
+    mon_moto_flexor=StateMonitor(moto, ['v','gIa','gex','gi'], 20)
     
-    monitors = [mon_Ia, mon_II, mon_exc, mon_inh, mon_motoneuron]
-                                            
+    mon_exc_extensor=StateMonitor(exc, ['v', 'gII'], 80)
+    mon_inh_extensor=StateMonitor(inh, ['v','gIa','gII','gi'], 80)
+    mon_moto_extensor=StateMonitor(moto, ['v','gIa','gex','gi'], 80)
+    
+    
+    # Add all monitors to the network
+    monitors = [
+        mon_Ia, mon_II, mon_exc, mon_inh, mon_motoneuron, 
+        mon_exc_flexor, mon_inh_flexor, mon_moto_flexor,
+        mon_exc_extensor, mon_inh_extensor, mon_moto_extensor
+    ]
+                 
     net.add(monitors)
     
     # Variables for EES monitors
@@ -259,7 +239,32 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         'exc': exc.v[:],
         'moto': moto.v[:]
     } 
-    
+    # Store state monitors for plotting
+    state_monitors = [ {
+            'v_exc': mon_exc_flexor.v[0]/mV,
+            'gII_exc': mon_exc_flexor.gII[0]/nS,
+            'v_inh': mon_inh_flexor.v[0]/mV,
+            'gIa_inh': mon_inh_flexor.gIa[0]/nS,
+            'gII_inh': mon_inh_flexor.gII[0]/nS,
+            'gi_inh': mon_inh_flexor.gi[0]/nS,
+            'v_moto': mon_moto_flexor.v[0]/mV,
+            'gIa_moto': mon_moto_flexor.gIa[0]/nS,
+            'gex_moto': mon_moto_flexor.gex[0]/nS,
+            'gi_moto': mon_moto_flexor.gi[0]/nS
+        },{
+            'v_exc': mon_exc_extensor.v[0]/mV,
+            'gII_exc': mon_exc_extensor.gII[0]/nS,
+            'v_inh': mon_inh_extensor.v[0]/mV,
+            'gIa_inh': mon_inh_extensor.gIa[0]/nS,
+            'gII_inh': mon_inh_extensor.gII[0]/nS,
+            'gi_inh': mon_inh_extensor.gi[0]/nS,
+            'v_moto': mon_moto_extensor.v[0]/mV,
+            'gIa_moto': mon_moto_extensor.gIa[0]/nS,
+            'gex_moto': mon_moto_extensor.gex[0]/nS,
+            'gi_moto': mon_moto_extensor.gi[0]/nS
+        }
+    ]
+
     # Return results
     return [{"Ia": {i: mon_Ia.spike_trains()[i] for i in range(n_Ia)},
             "II": {i: mon_II.spike_trains()[i] for i in range(n_II)},
@@ -270,7 +275,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
             "II": {i: mon_II.spike_trains()[i] for i in range(n_II, 2*n_II)},
             "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc, 2*n_exc)},
             "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh, 2*n_inh)},
-            "MN": motor_extensor_spikes}], final_potentials
+            "MN": motor_extensor_spikes}], final_potentials, state_monitors
 
 
 def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p=0.4,Eleaky= -70*mV,
