@@ -178,7 +178,7 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, Ia_recruite
     plt.show()
 
 
-def plot_act_length_from_sto_file(filepath, muscle_names, folder, Ia_recruited, II_recruited, efferent_recruited, ees_freq):
+def plot_act_length_from_sto_file(filepath, muscle_names, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
