@@ -1,4 +1,5 @@
 import argparse
+from jinja2.runtime import F
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,34 +22,30 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))  
     
-    plt.figure(figsize=(10,10))
+    time = muscle_data[0]['Time'].values
+    stretch=np.zeros((num_muscles, len(time)))
+    velocity=np.zeros((num_muscles, len(time)))
     for i,muscle in enumerate(muscle_names):
-        time = muscle_data[i]['Time'].values
         stretch_init = np.append(initial_stretch[i], muscle_data[i]['stretch'].values)
-        stretch_init = stretch_init[:len(muscle_data[i])] 
-        velocity_init = np.gradient(stretch_init, time)
-        Ia_firing_rate = 10 + 0.4 * stretch_init + 0.86 * np.sign(velocity_init) * np.abs(velocity_init) ** 0.6
-        plt.plot(time, Ia_firing_rate, label=f'from {muscle}stretching')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Frequency (Hz)')
-        #plt.ylim([0, 50])
-    plt.title('Ia')
-    plt.legend()
-    plt.show()
-    
-    plt.figure(figsize=(10,10))
+        stretch_init = stretch_init[:len(time)] 
+        stretch[i]=stretch_init
+        velocity[i] = np.gradient(stretch_init, time)
+    Ia_rates=10 + 0.4 * stretch + 0.86 * np.sign(velocity) * np.abs(velocity) ** 0.6
+    II_rates=20 + 3.375*stretch
+
+    fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
     for i,muscle in enumerate(muscle_names):
-        time = muscle_data[i]['Time'].values
-        stretch_init = np.append(initial_stretch[i], muscle_data[i]['stretch'].values)
-        stretch_init = stretch_init[:len(muscle_data[i])] 
-        velocity_init = np.gradient(stretch_init, time)
-        II_firing_rate = 20 + 3.375 *  stretch_init
-        plt.plot(time, II_firing_rate, label=f'from {muscle} stretching')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Frequency (Hz)')
-        #plt.ylim([0, 50])
-    plt.title('II')
-    plt.legend()
+        axs[0].plot(time, Ia_rates[i], label=f'Ia rate, {muscle} ')
+        axs[1].plot(time, II_rates[i], label=f'II rate, {muscle} ')
+
+    axs[0].plot(time, np.ones_like(time) * 10, 'k--', label='Base rate')
+    axs[1].plot(time, np.ones_like(time) * 20, 'k--', label='Base rate')
+    axs[1].set_xlabel('Time (s)')
+    axs[0].set_ylabel('Ia rate (Hz)')
+    axs[1].set_ylabel('II rate (Hz)')
+    axs[0].legend()
+    axs[1].legend()
+    fig.suptitle('Impact of stretching on the afferent firing rate')
     plt.show()
 
     # Raster Plots
@@ -104,13 +101,72 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     plt.savefig(path_fig)
     plt.show()
 
+    # Plot voltages
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+    fig.suptitle("Voltage")
+    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):  
+            axs[0].plot(df['Time'], df['v_exc'], label=f' exc {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+            axs[1].plot(df['Time'], df['v_inh'], label=f' inh {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+            axs[2].plot(df['Time'], df['v_moto'], label=f' moto {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+    axs[2].set_xlabel('time (ms)')
+    axs[0].set_ylabel('v exc (mV)')
+    axs[1].set_ylabel('v inh (mV)')
+    axs[2].set_ylabel('v moto (mV)')
+    axs[0].legend()
+    axs[1].legend()
+    axs[2].legend()
+    plt.show()
+
+    # Plot conductances
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+    fig.suptitle("Inhibitory Conductances")
+    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
+        axs[0].plot(df['Time'],df['gIa_inh'], label=f'gIa {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+        axs[1].plot(df['Time'],df['gII_inh'], label=f'gII {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+        axs[2].plot(df['Time'],df['gi_inh'], label=f'gi {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+    
+    axs[2].set_xlabel('time (ms)')
+    axs[0].set_ylabel('gIa (nS)')
+    axs[1].set_ylabel('gII (nS)')
+    axs[2].set_ylabel('gi (nS)')
+    axs[0].legend()
+    axs[1].legend()
+    axs[2].legend()
+    plt.show()
+
+    plt.figure(figsize=(10,4))
+    plt.title("Excitatory Conductances")
+    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
+        plt.plot(df['Time'],df['gII_exc'], label=f'gII {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])  
+    plt.xlabel('time (ms)')
+    plt.ylabel('gII (nS)')
+    plt.legend()
+    plt.show()
+
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+    fig.suptitle("Motoneurons Conductances")
+    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
+        axs[0].plot(df['Time'],df['gIa_moto'], label=f'gIa {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+        axs[1].plot(df['Time'],df['gex_moto'], label=f'gex {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+        axs[2].plot(df['Time'],df['gi_moto'], label=f'gi {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+    
+    axs[2].set_xlabel('time (ms)')
+    axs[0].set_ylabel('gIa (nS)')
+    axs[1].set_ylabel('gex (nS)')
+    axs[2].set_ylabel('gi (nS)')
+    axs[0].legend()
+    axs[1].legend()
+    axs[2].legend()
+    plt.show()
+
+    
+
     # Mean activation dynamics - 
     fig, axs = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
     labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'mean_activation']
     for i, label in enumerate(labels):
         for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-            color_idx = j % len(color_keys)  
-            axs[i].plot(df['Time'], df[label], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[color_idx]])
+            axs[i].plot(df['Time'], df[label], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
         axs[i].set_ylabel(label)
         axs[i].legend()
 
@@ -122,6 +178,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     plt.savefig(path_fig)
     plt.show()
 
+
     # Muscle properties - for all muscles
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
     props = ['fiber_length', 'stretch', 'velocity']
@@ -129,8 +186,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
 
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
         for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-            color_idx = j % len(color_keys)
-            axs[i].plot(df['Time'], df[prop], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[color_idx]])
+            axs[i].plot(df['Time'], df[prop], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
         axs[i].set_ylabel(ylabel)
         axs[i].legend()
 
