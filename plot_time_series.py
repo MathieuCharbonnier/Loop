@@ -48,60 +48,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     fig.suptitle('Impact of stretching on the afferent firing rate')
     plt.show()
 
-    # Raster Plots
-    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
-    
-    if num_muscles == 1:
-        axs = np.expand_dims(axs, axis=1)
-
-    # Iterate over muscles and fiber types to plot spikes
-    for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
-        for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
-            # Plot individual neuron spikes
-            for neuron_id, neuron_spikes in fiber_spikes.items():
-                if neuron_spikes:  # Check if neuron_spikes is not empty
-                    axs[j, i].plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), '.', markersize=3, color='black')
-
-            # Set plot properties
-            axs[j, i].set(title=f"{muscle}_{fiber_type}", ylabel="Neuron Index")
-            axs[j, i].grid(True)
-
-    # Set common x-axis label
-    axs[-1, 0].set_xlabel("Time (s)")  # Set xlabel for the bottom-most plot
-    fig.suptitle('Spikes Raster Plot', fontsize=16)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ensure titles and labels do not overlap
-
-    # Save and display the plot
-    fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
-    plt.savefig(fig_path)
-    plt.show()
-
-    # Firing rate plots
-    fig, axs = plt.subplots(num_fiber_types, 1, figsize=(10, 10), sharex=True)
-    time = muscle_data[0]['Time'].values 
-
-    for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
-        for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
-            all_spike_times = np.concatenate(list(fiber_spikes.values()))
-            
-            if len(all_spike_times)>1:
-
-                kde = gaussian_kde(all_spike_times, bw_method=0.3)
-                firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-                axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
-            else:
-                axs[j].plot(time, np.zeros_like(time), label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
-            axs[j].set_ylabel(f'{fiber_type} firing rate (Hz)')
-            axs[j].legend()
-
-    axs[-1].set_xlabel('Time (s)')
-    fig.suptitle("Smoothed Instantaneous Firing Rate (KDE)", fontsize=14)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    path_fig = os.path.join(folder, f'Firing_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
-    plt.savefig(path_fig)
-    plt.show()
-
-    # Plot voltages
+        # Plot voltages
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
     fig.suptitle("Voltage")
     for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):  
@@ -159,7 +106,59 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     axs[2].legend()
     plt.show()
 
+    # Raster Plots
+    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
     
+    if num_muscles == 1:
+        axs = np.expand_dims(axs, axis=1)
+
+    # Iterate over muscles and fiber types to plot spikes
+    for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
+        for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
+            # Plot individual neuron spikes
+            for neuron_id, neuron_spikes in fiber_spikes.items():
+                if neuron_spikes:  # Check if neuron_spikes is not empty
+                    axs[j, i].plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), '.', markersize=3, color='black')
+
+            # Set plot properties
+            axs[j, i].set(title=f"{muscle}_{fiber_type}", ylabel="Neuron Index")
+            axs[j, i].grid(True)
+
+    # Set common x-axis label
+    axs[-1, 0].set_xlabel("Time (s)")  # Set xlabel for the bottom-most plot
+    fig.suptitle('Spikes Raster Plot', fontsize=16)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ensure titles and labels do not overlap
+
+    # Save and display the plot
+    fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    plt.savefig(fig_path)
+    plt.show()
+
+    # Firing rate plots
+    fig, axs = plt.subplots(num_fiber_types, 1, figsize=(10, 10), sharex=True)
+    time = muscle_data[0]['Time'].values 
+
+    for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
+        for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
+            all_spike_times = np.concatenate(list(fiber_spikes.values()))
+            
+            if len(all_spike_times)>1:
+
+                kde = gaussian_kde(all_spike_times, bw_method=0.3)
+                firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
+                axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
+            else:
+                axs[j].plot(time, np.zeros_like(time), label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
+            axs[j].set_ylabel(f'{fiber_type} firing rate (Hz)')
+            axs[j].legend()
+
+    axs[-1].set_xlabel('Time (s)')
+    fig.suptitle("Smoothed Instantaneous Firing Rate (KDE)", fontsize=14)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    path_fig = os.path.join(folder, f'Firing_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    plt.savefig(path_fig)
+    plt.show()
+
 
     # Mean activation dynamics - 
     fig, axs = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
