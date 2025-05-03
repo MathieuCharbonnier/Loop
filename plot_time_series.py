@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
+from brian2.units import second, hertz
 import json
 import os
 
@@ -17,7 +18,7 @@ colorblind_friendly_colors = {
 }
 color_keys = list(colorblind_friendly_colors.keys())
 
-def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited):
+def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited, T_refr):
 
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))  
@@ -147,14 +148,18 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
         for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
             all_spike_times = np.concatenate(list(fiber_spikes.values()))
-            
+            firing_rate=np.zeros_like(time)
             if len(all_spike_times)>1:
 
                 kde = gaussian_kde(all_spike_times, bw_method=0.3)
                 firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-                axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
-            else:
-                axs[j].plot(time, np.zeros_like(time), label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
+
+            axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
+            
+            if (fiber_type=="MN0"):
+                lambda_=firing_rate+eff_recruited/len(fiber_spikes)*ees_freq/hertz
+                axs[j+1].plot(time, (lambda_**(-1)+ T_refr/second)**(-1), label="theoretical MN rate {muscle}", color=colorblind_friendly_colors[color_keys[i+2]])
+
             axs[j].set_ylabel(f'{fiber_type} firing rate (Hz)')
             axs[j].legend()
 
