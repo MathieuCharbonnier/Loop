@@ -2,9 +2,10 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp
 from functools import partial
-from scipy.signal import convolve
+import joblib
+from joblib import Parallel, delayed
 
-def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87):
+def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87, n_jobs=-1):
     """
     Decode spike times to muscle activation signals using a biophysical model.
     
@@ -20,6 +21,8 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
         Initial parameters for each motoneuron containing 'u0', 'c0', 'P0', and 'a0'
     f1_l, f2_l, f3_l, f4_l, f5_l : float
         Scaling parameters for the model
+    n_jobs : int, default=-1
+        Number of parallel jobs to run. -1 means using all processors.
         
     Returns:
     --------
@@ -33,7 +36,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
         Activation signals for each motoneuron
     final_values : dict
         Final state values for each motoneuron
-    """ 
+    """
     # Define parameter values (from Table 1)
     # Model parameters as a dictionary for better maintainability
     params = {
@@ -49,108 +52,142 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
         'Ve': 90, 't_ap': 0.0014,
     }
 
-
-    def e_t_preprocessed(spikes_times, time, Ve=90, T=1.4e-3):
-
-        e_t_all = np.zeros((len(spikes_times), len(time)))
-
-        for i, spike_times_moto in enumerate(spikes_times):
-            for spike_time in spike_times_moto:
-                t_end = spike_time + T / 2
-                # Precompute sine values for the window
-                t_range = (time >= spike_time) & (time <= t_end)
-                e_t_all[i, t_range] = Ve * np.sin(2 * np.pi / T * (time[t_range] - spike_time))
-
-        return e_t_all
-
-
-    # Create ODE system functions for each stage
-    def fibre_ap_dynamics(t, u, e_t_func, a1=params['a1'], a2=params['a2'], a3=params['a3']):
-        """ODE system for fiber action potential dynamics"""
-        du_dt = u[1]
-        dv_dt = a1 * e_t_func(t) - a2 * u[0] - a3 * u[1]
-        return [du_dt, dv_dt]
+    # Pre-allocate time array only once
+    time = np.arange(0, T, dt)
+    num_motoneurons = len(spikes_times)
+    num_timesteps = len(time)
     
-    def calcium_dynamics(t, c, u_func, b1=params['b1'], b2=params['b2'], b3=params['b3']):
-        """ODE system for free calcium concentration dynamics"""
-        dc_dt = c[1]
-        dg_dt = b1 * u_func(t) - (1/f1_l) * (b2 * f2_l * c[0] + b3 * c[1])
-        return [dc_dt, dg_dt]
+    # Pre-compute sine values for window to avoid repetitive calculations
+    t_ap = params['t_ap']
+    Ve = params['Ve']
+    sin_wave_template = Ve * np.sin(2 * np.pi / t_ap * np.arange(0, t_ap/2, dt))
+    sin_wave_len = len(sin_wave_template)
     
-    def ca_troponin_dynamics(t, P, c_func, c1=params['c1'], c2=params['c2'], P0=params['P0']):
-        """ODE system for calcium-troponin binding dynamics"""
-        dP_dt = (c1/f3_l) * (P0/f4_l - P) * (c_func(t))**2 - (c2/f5_l) * P
-        return dP_dt
+    # Initialize output arrays
+    e_t_all = np.zeros((num_motoneurons, num_timesteps))
+    u_all = np.zeros((num_motoneurons, num_timesteps))
+    c_all = np.zeros((num_motoneurons, num_timesteps))
+    P_all = np.zeros((num_motoneurons, num_timesteps))
+    a_all = np.zeros((num_motoneurons, num_timesteps))
+    final_values = []
     
-    def activation_dynamics(t, a, P_func, d1=params['d1'], d2=params['d2'], d3=params['d3']):
-        """ODE system for MU activation dynamics"""
-        da_dt = d1 * P_func(t) - a / (d2 + d3 * P_func(t))
-        return da_dt
+    # Precompute e(t) for all motoneurons
+    for i, spike_times_moto in enumerate(spikes_times):
+        for spike_time in spike_times_moto:
+            idx_start = int(spike_time / dt)
+            if idx_start < num_timesteps:
+                # Calculate how many samples we can place
+                samples_to_copy = min(sin_wave_len, num_timesteps - idx_start)
+                e_t_all[i, idx_start:idx_start + samples_to_copy] = sin_wave_template[:samples_to_copy]
     
-    # Configure ODE solver
+    # Define a consolidated ODE system that computes all equations at once
+    def consolidated_ode_system(t, y, e_t_func, params, f_params):
+        """
+        Consolidated ODE system that solves all equations at once
+        y = [u, du/dt, c, dc/dt, P, a]
+        """
+        u, u_dot, c, c_dot, P, a = y
+        
+        # Extract parameters
+        a1, a2, a3 = params['a1'], params['a2'], params['a3']
+        b1, b2, b3 = params['b1'], params['b2'], params['b3']
+        c1, c2, P0 = params['c1'], params['c2'], params['P0']
+        d1, d2, d3 = params['d1'], params['d2'], params['d3']
+        f1_l, f2_l, f3_l, f4_l, f5_l = f_params
+        
+        # Get input signal at time t
+        e_t = e_t_func(t)
+        
+        # Fibre AP dynamics equations
+        du_dt = u_dot
+        du_dot_dt = a1 * e_t - a2 * u - a3 * u_dot
+        
+        # Calcium dynamics equations
+        dc_dt = c_dot
+        dc_dot_dt = b1 * u - (1/f1_l) * (b2 * f2_l * c + b3 * c_dot)
+        
+        # Calcium-troponin binding equation
+        dP_dt = (c1/f3_l) * (P0/f4_l - P) * (c**2) - (c2/f5_l) * P
+        
+        # Activation dynamics equation
+        da_dt = d1 * P - a / (d2 + d3 * P)
+        
+        return [du_dt, du_dot_dt, dc_dt, dc_dot_dt, dP_dt, da_dt]
+    
+    # Optimize solver parameters for this specific problem
     solver_kwargs = {
-        'method': 'RK45',        # Runge-Kutta 4(5)
-        'rtol': 1e-4,           # Relative tolerance
-        'atol': 1e-6,           # Absolute tolerance
-        'max_step': 1e-3,       # Maximum step size
-        'dense_output': True    # Enable dense output for efficient interpolation
+        'method': 'RK45',  
+        'rtol': 1e-3,
+        'atol': 1e-5,      
+        'max_step': 1e-2,  
+        'dense_output': True
     }
     
-
-    time = np.arange(0, T, dt)
-    # Preprocess e(t) for all motoneurons
-    e_t_all = e_t_preprocessed(spikes_times, time)
-    u_all = np.zeros((len(spikes_times), len(time)))
-    c_all = np.zeros((len(spikes_times), len(time)))
-    P_all = np.zeros((len(spikes_times), len(time)))
-    a_all = np.zeros((len(spikes_times), len(time)))
-    final_values = {i: {} for i in range(len(spikes_times))}  # Initialize final_values dictionary
-    
-    # Process each motoneuron
-    for i, e_t in enumerate(e_t_all):
-        # Create interpolation function for e(t)
-        e_t_interp = interp1d(time, e_t, kind='linear', bounds_error=False, fill_value=0.0)
-     
-        # Solve fiber AP dynamics
-        u_init = initial_params[i]['u0']
-        sol_u = solve_ivp(
-            partial(fibre_ap_dynamics, e_t_func=e_t_interp),
-            [0, T], u_init, t_eval=time, **solver_kwargs
-        )
-        final_values[i]['u0'] = sol_u.sol(T)
-        u_interp = interp1d(sol_u.t, sol_u.y[0], kind='linear', bounds_error=False, fill_value=0.0)
-      
-        # Solve calcium dynamics
-        c_init = initial_params[i]['c0']
-        sol_c = solve_ivp(
-            partial(calcium_dynamics, u_func=u_interp),
-            [0, T], c_init, t_eval=time, **solver_kwargs
-        )
-        final_values[i]['c0'] = sol_c.sol(T)
-        c_interp = interp1d(sol_c.t, sol_c.y[0], kind='linear', bounds_error=False, fill_value=0.0)
-   
-        # Solve calcium-troponin binding
-        P_init = initial_params[i]['P0'] 
-        sol_P = solve_ivp(
-            partial(ca_troponin_dynamics, c_func=c_interp),
-            [0, T], P_init, t_eval=time, **solver_kwargs
-        )
-        #final_values[i]['P0'] = sol_P.sol(T)
-        final_values[i]['P0'] = sol_P.y[:,-1]
-        P_interp = interp1d(sol_P.t, sol_P.y[0], kind='linear', bounds_error=False, fill_value=0.0)
-
-        # Solve activation dynamics
-        a_init = initial_params[i]['a0']  
-        sol_a = solve_ivp(
-            partial(activation_dynamics, P_func=P_interp),
-            [0, T], a_init, t_eval=time, **solver_kwargs
-        )
-        final_values[i]['a0'] = sol_a.sol(T)
+    # Function to process a single motoneuron
+    def process_motoneuron(i, e_t_i, initial_param_i):
+        # Create interpolator for e_t
+        e_t_interp = interp1d(time, e_t_i, kind='linear', bounds_error=False, fill_value=0.0)
         
-        # Store results
-        u_all[i, :] = sol_u.y[0]
-        c_all[i, :] = sol_c.y[0]
-        P_all[i, :] = sol_P.y[0]
-        a_all[i, :] = sol_a.y[0]
+        # Extract initial conditions
+        u_init = initial_param_i['u0']  # Assuming this is [u, du/dt]
+        c_init = initial_param_i['c0']  # Assuming this is [c, dc/dt]
+        P_init = initial_param_i['P0']  # This is a scalar
+        a_init = initial_param_i['a0']  # This is a scalar
+   
+        # Combine all initial conditions as a flat array of scalars
+        y0 = np.array([u_init[0], u_init[1], c_init[0], c_init[1], P_init, a_init], dtype=float)
+        # Pack f parameters 
+        f_params = (f1_l, f2_l, f3_l, f4_l, f5_l)
+        
+        # Solve the consolidated ODE system
+        sol = solve_ivp(
+            partial(consolidated_ode_system, e_t_func=e_t_interp, params=params, f_params=f_params),
+            [0, T], y0, t_eval=time, **solver_kwargs
+        )
+        
+        # Extract results
+        u_i = sol.y[0]
+        c_i = sol.y[2]
+        P_i = sol.y[4]
+        a_i = sol.y[5]
+        
+        # Prepare final values
+        final_vals = {
+            'u0': [sol.y[0, -1], sol.y[1, -1]],
+            'c0': [sol.y[2, -1], sol.y[3, -1]],
+            'P0': sol.y[4, -1],
+            'a0': sol.y[5, -1]
+        }
+        
+        return u_i, c_i, P_i, a_i, final_vals
+    
+    # Use parallelization to process all motoneurons
+    # Determine optimal number of jobs based on machine availability
+    n_jobs = n_jobs if n_jobs > 0 else joblib.cpu_count()
+    
+    # Cap the number of jobs at the number of motoneurons
+    n_jobs = min(n_jobs, num_motoneurons)
+    
+    # Execute in parallel with a progress bar if tqdm is available
+    try:
+        from tqdm.auto import tqdm
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_motoneuron)(i, e_t_all[i], initial_params[i]) 
+            for i in tqdm(range(num_motoneurons), desc="Processing motoneurons")
+        )
+    except ImportError:
+        # Fall back if tqdm is not available
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_motoneuron)(i, e_t_all[i], initial_params[i]) 
+            for i in range(num_motoneurons)
+        )
+    
+    # Unpack results
+    for i, (u_i, c_i, P_i, a_i, final_vals) in enumerate(results):
+        u_all[i] = u_i
+        c_all[i] = c_i
+        P_all[i] = P_i
+        a_all[i] = a_i
+        final_values.append(final_vals) 
 
     return e_t_all, u_all, c_all, P_all, a_all, final_values
