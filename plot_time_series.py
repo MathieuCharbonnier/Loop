@@ -33,18 +33,24 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     Ia_rates=10 + 0.4 * stretch + 0.86 * np.sign(velocity) * np.abs(velocity) ** 0.6
     II_rates=20 + 3.375*stretch
 
-    fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
+    fig, axs = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
     for i,muscle in enumerate(muscle_names):
-        axs[0].plot(time, Ia_rates[i], label=f'Ia rate, {muscle} ')
-        axs[1].plot(time, II_rates[i], label=f'II rate, {muscle} ')
+        axs[0].plot(time, stretch[i], label=f'Stretch, {muscle} ')
+        axs[1].plot(time, velocity[i], label=f'Velocity, {muscle} ')
+        axs[2].plot(time, Ia_rates[i], label=f'Ia rate, {muscle} ')
+        axs[3].plot(time, II_rates[i], label=f'II rate, {muscle} ')
 
-    axs[0].plot(time, np.ones_like(time) * 10, 'k--', label='Base rate')
-    axs[1].plot(time, np.ones_like(time) * 20, 'k--', label='Base rate')
-    axs[1].set_xlabel('Time (s)')
-    axs[0].set_ylabel('Ia rate (Hz)')
-    axs[1].set_ylabel('II rate (Hz)')
+    axs[2].plot(time, np.ones_like(time) * 10, 'k--', label='Base rate')
+    axs[3].plot(time, np.ones_like(time) * 20, 'k--', label='Base rate')
+    axs[3].set_xlabel('Time (s)')
+    axs[0].set_ylabel('Stretch (dimless)')
+    axs[1].set_ylabel('Velocity (s-1)')
+    axs[2].set_ylabel('Ia rate (Hz)')
+    axs[3].set_ylabel('II rate (Hz)')
     axs[0].legend()
     axs[1].legend()
+    axs[2].legend()
+    axs[3].legend()
     fig.suptitle('Impact of stretching on the afferent firing rate')
     plt.show()
 
