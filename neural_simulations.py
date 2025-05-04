@@ -6,9 +6,9 @@ from typing import Dict, List, Union, Tuple, Optional
 
 def run_flexor_extensor_neuron_simulation(stretch, velocity, 
                                           neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
-                                          gL=0.1*mS, Cm=1*uF, E_ex=0*mV, E_inh=-75*mV, 
-                                          tau_exc=0.5*ms, tau_1=1.5*ms, tau_2=2*ms, threshold_v=-55*mV, 
-                                          ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=10*ms):
+                                          gL=30*nS, Cm=0.3*nF, E_ex=0*mV, E_inh=-75*mV, 
+                                          tau_e=0.5*ms, tau_i=2*ms, threshold_v=-55*mV, 
+                                          ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=2*ms):
     """
     Run a simulation of flexor-extensor neuron dynamics.
     
@@ -36,12 +36,11 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         Excitatory reversal potential.
     E_inh : volt, optional
         Inhibitory reversal potential.
-    tau_exc : time, optional
+    tau_e : time, optional
         Excitatory time constant.
-    tau_1 : time, optional
-        First inhibitory time constant.
-    tau_2 : time, optional
-        Second inhibitory time constant.
+    tau_i : time, optional
+        Inhibitory time constant.
+
     threshold_v : volt, optional
         Voltage threshold.
     ees_freq : hertz, optional
@@ -103,25 +102,27 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
     # LIF neuron equations
     ex_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
-    Isyn = gII*(E_ex - v) :amp
-    dgII/dt = -gII / tau_exc : siemens 
+    dv/dt = (gL*(Eleaky - v) + Ipsc)/Cm : volt
+    Ipsc = gII*(E_ex - v) :amp
+    dgII/dt = -gII / tau_e : siemens
+    Vpsp=Ipsc/gL :volt
     '''
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
     Isyn = gIa*(E_ex - v) + gex*(E_ex-v) + gi*(E_inh - v) :amp
-    dgIa/dt = -gIa / tau_exc : siemens 
-    dgex/dt = -gex / tau_exc : siemens
-    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-gi)/tau_1 : siemens
-    dx/dt = -x/tau_2: siemens
+    dgIa/dt = -gIa / tau_e : siemens 
+    dgex/dt = -gex / tau_e : siemens
+    dgi/dt = (x-gi)/tau_i : siemens
+    dx/dt = -x/tau_i    : siemens
+
     '''
     inh_eq = '''
     dv/dt = (gL*(Eleaky - v)+Isyn ) / Cm : volt
     Isyn = gi*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
-    dgIa/dt = -gIa / tau_exc : siemens 
-    dgII/dt = -gII / tau_exc : siemens 
-    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-gi)/tau_1 : siemens
-    dx/dt = -x/tau_2: siemens
+    dgIa/dt = -gIa / tau_e : siemens 
+    dgII/dt = -gII / tau_e : siemens 
+    dgi/dt = (x-gi)/tau_i : siemens
+    dx/dt = -x/tau_i : siemens
     '''
     
     # Create neuron groups
@@ -144,23 +145,23 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     
     # Define neural connections
     connections = {
-        ("Ia_flexor", "moto_flexor"): {"pre": Ia[:n_Ia], "post": moto[:n_motor], "model": "gIa_post += 2.1*nS", "p": 1},
-        ("Ia_flexor", "inh_flexor"): {"pre": Ia[:n_Ia], "post": inh[:n_inh], "model": "gIa_post += 3.64*nS", "p": 1},
-        ("Ia_extensor", "moto_extensor"): {"pre": Ia[n_Ia:], "post": moto[n_motor:], "model": "gIa_post += 2.1*nS", "p": 1},
-        ("Ia_extensor", "inh_extensor"): {"pre": Ia[n_Ia:], "post": inh[n_inh:], "model": "gIa_post += 3.64*nS", "p": 1},
+        ("Ia_flexor", "moto_flexor"): {"pre": Ia[:n_Ia], "post": moto[:n_motor], "model": "gIa_post += 2*2.1*nS", "p": 1},
+        ("Ia_flexor", "inh_flexor"): {"pre": Ia[:n_Ia], "post": inh[:n_inh], "model": "gIa_post += 2*3.64*nS", "p": 1},
+        ("Ia_extensor", "moto_extensor"): {"pre": Ia[n_Ia:], "post": moto[n_motor:], "model": "gIa_post += 2*2.1*nS", "p": 1},
+        ("Ia_extensor", "inh_extensor"): {"pre": Ia[n_Ia:], "post": inh[n_inh:], "model": "gIa_post += 2*3.64*nS", "p": 1},
         
-        ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "model": "gII_post += 1.65*nS", "p": 1},
-        ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "model": "gII_post += 2.9*nS", "p": 1},
-        ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:], "model": "gII_post += 1.65*nS", "p": 1},
-        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:], "model": "gII_post += 2.9*nS", "p": 1},
+        ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "model": "gII_post += 2*1.65*nS", "p": 1},
+        ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "model": "gII_post += 2*2.19*nS", "p": 1},
+        ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:], "model": "gII_post += 2*1.65*nS", "p": 1},
+        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:], "model": "gII_post += 2*2.19*nS", "p": 1},
         
-        ("exc_flexor", "moto_flexor"): {"pre": exc[:n_exc], "post": moto[:n_motor], "model": "gex_post += 0.7*nS", "p": 0.6},
-        ("exc_extensor", "moto_extensor"): {"pre": exc[n_exc:], "post": moto[n_motor:], "model": "gex_post += 0.7*nS", "p": 0.6},
+        ("exc_flexor", "moto_flexor"): {"pre": exc[:n_exc], "post": moto[:n_motor], "model": "gex_post += 2*0.7*nS", "p": 0.6},
+        ("exc_extensor", "moto_extensor"): {"pre": exc[n_exc:], "post": moto[n_motor:], "model": "gex_post += 2*0.7*nS", "p": 0.6},
         
-        ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:], "model": "gi_post += 0.2*nS", "p": 0.6},
-        ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor], "model": "gi_post += 0.2*nS", "p": 0.6},
-        ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:], "model": "gi_post += 0.76*nS", "p": 0.5},
-        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh], "model": "gi_post += 0.76*nS", "p": 0.5}
+        ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:], "model": "gi_post += 2*0.2*nS", "p": 0.5},
+        ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor], "model": "gi_post += 2*0.2*nS", "p": 0.5},
+        ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:], "model": "gi_post += 2*0.75*nS", "p": 0.3},
+        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh], "model": "gi_post += 2*0.75*nS", "p": 0.3}
     }
     
     # Create synaptic connections
@@ -185,11 +186,11 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     mon_inh = SpikeMonitor(inh)
     mon_motoneuron = SpikeMonitor(moto)
     
-    mon_exc_flexor=StateMonitor(exc, ['v', 'gII'], n_exc/2)
+    mon_exc_flexor=StateMonitor(exc, ['v', 'gII', 'Vpsp'], n_exc/2)
     mon_inh_flexor=StateMonitor(inh, ['v','gIa','gII','gi'], n_inh/2)
     mon_moto_flexor=StateMonitor(moto, ['v','gIa','gex','gi'], n_motor/2)
     
-    mon_exc_extensor=StateMonitor(exc, ['v', 'gII'], 3*n_exc/2)
+    mon_exc_extensor=StateMonitor(exc, ['v', 'gII', 'Vpsp'], 3*n_exc/2)
     mon_inh_extensor=StateMonitor(inh, ['v','gIa','gII','gi'], 3*n_inh/2)
     mon_moto_extensor=StateMonitor(moto, ['v','gIa','gex','gi'], 3*n_motor/2)
     
@@ -240,6 +241,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     state_monitors = [ {
             'v_exc': mon_exc_flexor.v[0]/mV,
             'gII_exc': mon_exc_flexor.gII[0]/nS,
+            'Vpsp': mon_exc_flexor.Vpsp[0]/mV,
             'v_inh': mon_inh_flexor.v[0]/mV,
             'gIa_inh': mon_inh_flexor.gIa[0]/nS,
             'gII_inh': mon_inh_flexor.gII[0]/nS,
@@ -251,6 +253,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         },{
             'v_exc': mon_exc_extensor.v[0]/mV,
             'gII_exc': mon_exc_extensor.gII[0]/nS,
+            'Vpsp': mon_exc_extensor.Vpsp[0]/mV,
             'v_inh': mon_inh_extensor.v[0]/mV,
             'gIa_inh': mon_inh_extensor.gIa[0]/nS,
             'gII_inh': mon_inh_extensor.gII[0]/nS,
