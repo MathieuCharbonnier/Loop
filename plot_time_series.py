@@ -97,6 +97,15 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     plt.legend()
     plt.show()
 
+    plt.figure(figsize=(10,4))
+    plt.title("Excitatory Vpsp")
+    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
+        plt.plot(df['Time'],df['Vpsp'], label=f'Vpsp {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])  
+    plt.xlabel('time (ms)')
+    plt.ylabel('Vpsp (mV)')
+    plt.legend()
+    plt.show()
+
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
     fig.suptitle("Motoneurons Conductances")
     for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
