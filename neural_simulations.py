@@ -173,7 +173,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         w = conn_info["w"]
         p = conn_info["p"]
   
-        syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre.split('_')[0]} += w", method='exact')
+        syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
         syn.connect(p=p)
         noise_level = 0.2
         syn.w=w + noise_level * w * randn(len(syn.w))
