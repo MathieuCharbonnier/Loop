@@ -55,6 +55,16 @@ def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initi
         else:
             print(f"Initial state file not found: {initial_state}")
 
+    # Set muscles to resting state if no initial state is provided
+    else:
+        print("Setting muscles to resting state")
+        for muscle_name in muscle_names:
+            muscle = model.getMuscles().get(muscle_name)
+            # Set muscle activation to 0
+            muscle.setActivation(state, 0.0)
+                
+        model.equilibrateMuscles(state)
+
     manager = osim.Manager(model)
     manager.setIntegratorAccuracy(1e-4)
     manager.initialize(state)
