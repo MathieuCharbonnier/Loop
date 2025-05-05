@@ -118,7 +118,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     '''
     inh_eq = '''
     dv/dt = (gL*(Eleaky - v)+Isyn ) / Cm : volt
-    Isyn = gi*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
+    Isyn = ginh*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgII/dt = -gII / tau_e : siemens 
     dginh/dt = (x-ginh)/tau_i : siemens
@@ -153,7 +153,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "w":2*1.65*nS, "p": 0.9},
         ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "w":2*2.19*nS, "p": 0.9},
         ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:],"w":2*1.65*nS, "p": 0.9},
-        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:],"w": 2*2.19*nS, "p": 0.9},
+        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:],"w":2* 2.19*nS, "p": 0.9},
         
         ("exc_flexor", "moto_flexor"): {"pre": exc[:n_exc], "post": moto[:n_motor],"w":2*0.7*nS, "p": 0.6},
         ("exc_extensor", "moto_extensor"): {"pre": exc[n_exc:], "post": moto[n_motor:],"w":2*0.7*nS, "p": 0.6},
@@ -161,7 +161,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:],"w":2*0.2*nS,  "p": 0.5},
         ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor],"w":2*0.2*nS, "p": 0.5},
         ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:],"w":2*0.75*nS, "p": 0.3},
-        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh],"w": 2*0.75*nS, "p": 0.3}
+        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh],"w":2* 0.75*nS, "p": 0.3}
     }
     
     # Create synaptic connections
@@ -288,16 +288,16 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
     # Count spiking neurons
     recruited_moto_flexor = sum(1 for spikes in motor_flexor_spikes.values() if len(spikes) > 0)
-    print(f"Number of flexor recruited motoneuron: {recruited_moto_flexor}/{n_moto}")
+    print(f"Number of flexor recruited motoneuron: {recruited_moto_flexor}/{n_motor}")
     recruited_moto_extensor = sum(1 for spikes in motor_extensor_spikes.values() if len(spikes) > 0)
-    print(f"Number of extensor recruited motoneuron: {recruited_moto_extensor}/{n_moto}")
+    print(f"Number of extensor recruited motoneuron: {recruited_moto_extensor}/{n_motor}")
 
     return [result_flexor, result_extensor], final_potentials, state_monitors
 
 
 def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p=0.4,Eleaky= -70*mV,
     gL= 0.1 * mS,Cm= 1 * uF,E_ex= 0 * mV,E_inh= -75 * mV,tau_exc= 0.5 * ms,tau_inh= 3 * ms,
-    threshold_v= -55 * mV,ees_freq=0*hertz, aff_recruited=0, eff_recruited=0, T_refr=10*ms):
+    threshold_v= -55 * mV,ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=2*ms):
     """
     Run neural simulations with stretch and velocity inputs.
     
