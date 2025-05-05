@@ -190,7 +190,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     mon_inh_flexor=StateMonitor(inh, ['v','gIa','gII','ginh'], n_inh/2)
     mon_moto_flexor=StateMonitor(moto, ['v','gIa','gexc','ginh'], n_motor/2)
     
-    mon_exc_extensor=StateMonitor(exc, ['v', 'gII', 'Vpsp'], 3*n_exc/2)
+    mon_exc_extensor=StateMonitor(exc, ['v', 'gII'], 3*n_exc/2)
     mon_inh_extensor=StateMonitor(inh, ['v','gIa','gII','ginh'], 3*n_inh/2)
     mon_moto_extensor=StateMonitor(moto, ['v','gIa','gexc','ginh'], 3*n_motor/2)
     
