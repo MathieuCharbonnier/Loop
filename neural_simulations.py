@@ -7,7 +7,7 @@ from typing import Dict, List, Union, Tuple, Optional
 def run_flexor_extensor_neuron_simulation(stretch, velocity, 
                                           neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
                                           gL=30*nS, Cm=0.3*nF, E_ex=0*mV, E_inh=-75*mV, 
-                                          tau_e=0.5*ms, tau_i=2*ms, threshold_v=-55*mV, 
+                                          tau_e=0.5*ms, tau_1=5*ms,tau_2=10*ms, threshold_v=-55*mV, 
                                           ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=2*ms):
     """
     Run a simulation of flexor-extensor neuron dynamics.
@@ -102,29 +102,28 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
     # LIF neuron equations
     ex_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Ipsc)/Cm : volt
-    Ipsc = gII*(E_ex - v) :amp
+    dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
+    Isyn = gII*(E_ex - v) :amp
     dgII/dt = -gII / tau_e : siemens
-    Vpsp=Ipsc/gL :volt
     '''
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
     Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + ginh*(E_inh - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgexc/dt = -gexc / tau_e : siemens
-    dginh/dt = (x-ginh)/tau_i : siemens
-    dx/dt = -x/tau_i    : siemens
+    dginh/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-ginh)/tau_1 : siemens
+    dx/dt = -x/tau_2 :siemens   
 
     '''
     inh_eq = '''
     dv/dt = (gL*(Eleaky - v)+Isyn ) / Cm : volt
     Isyn = ginh*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
-    dgII/dt = -gII / tau_e : siemens 
-    dginh/dt = (x-ginh)/tau_i : siemens
-    dx/dt = -x/tau_i : siemens
-    '''
-    
+    dgII/dt = -gII / tau_e : siemens
+    dginh/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-ginh)/tau_1 : siemens
+    dx/dt = -x/tau_2 :siemens                                               
+    ''' 
+  
     # Create neuron groups
     inh = NeuronGroup(2*n_inh, inh_eq, threshold='v > threshold_v', 
                       reset='v = Eleaky', refractory=T_refr, method='euler')
@@ -145,23 +144,23 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     
     # Define neural connections
     connections = {
-        ("Ia_flexor", "moto_flexor"): {"pre": Ia[:n_Ia], "post": moto[:n_motor],"w":2*2.1*nS, "p": 0.9},
-        ("Ia_flexor", "inh_flexor"): {"pre": Ia[:n_Ia], "post": inh[:n_inh], "w":2*3.64*nS, "p": 0.9},
-        ("Ia_extensor", "moto_extensor"): {"pre": Ia[n_Ia:], "post": moto[n_motor:], "w": 2*2.1*nS, "p": 0.9},
-        ("Ia_extensor", "inh_extensor"): {"pre": Ia[n_Ia:], "post": inh[n_inh:], "w":2*3.64*nS, "p": 0.9},
+        ("Ia_flexor", "moto_flexor"): {"pre": Ia[:n_Ia], "post": moto[:n_motor],"w":2*2.1*nS, "p": 1},
+        ("Ia_flexor", "inh_flexor"): {"pre": Ia[:n_Ia], "post": inh[:n_inh], "w":2*3.64*nS, "p": 1},
+        ("Ia_extensor", "moto_extensor"): {"pre": Ia[n_Ia:], "post": moto[n_motor:], "w": 2*2.1*nS, "p": 1},
+        ("Ia_extensor", "inh_extensor"): {"pre": Ia[n_Ia:], "post": inh[n_inh:], "w":2*3.64*nS, "p": 1},
         
-        ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "w":2*1.65*nS, "p": 0.9},
-        ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "w":2*2.19*nS, "p": 0.9},
-        ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:],"w":2*1.65*nS, "p": 0.9},
-        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:],"w":2* 2.19*nS, "p": 0.9},
+        ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "w":2*1.65*nS, "p": 1},
+        ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "w":2*2.19*nS, "p": 1},
+        ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:],"w":2*1.65*nS, "p": 1},
+        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:],"w":2* 2.19*nS, "p": 1},
         
         ("exc_flexor", "moto_flexor"): {"pre": exc[:n_exc], "post": moto[:n_motor],"w":2*0.7*nS, "p": 0.6},
         ("exc_extensor", "moto_extensor"): {"pre": exc[n_exc:], "post": moto[n_motor:],"w":2*0.7*nS, "p": 0.6},
         
-        ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:],"w":2*0.2*nS,  "p": 0.5},
-        ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor],"w":2*0.2*nS, "p": 0.5},
-        ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:],"w":2*0.75*nS, "p": 0.3},
-        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh],"w":2* 0.75*nS, "p": 0.3}
+        ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:],"w":2*0.2*nS,  "p": 1},
+        ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor],"w":2*0.2*nS, "p": 1},
+        ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:],"w":2*0.75*nS, "p": 0.5},
+        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh],"w":2* 0.75*nS, "p": 0.5}
     }
     
     # Create synaptic connections
@@ -177,7 +176,6 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
         syn.connect(p=p)
         noise_level = 0.2
         syn.w=w + noise_level * w * randn(len(syn.w))
-          
         net.add(syn)
         synapses[key] = syn
           
@@ -188,7 +186,7 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
     mon_inh = SpikeMonitor(inh)
     mon_motoneuron = SpikeMonitor(moto)
     
-    mon_exc_flexor=StateMonitor(exc, ['v', 'gII', 'Vpsp'], n_exc/2)
+    mon_exc_flexor=StateMonitor(exc, ['v', 'gII'], n_exc/2)
     mon_inh_flexor=StateMonitor(inh, ['v','gIa','gII','ginh'], n_inh/2)
     mon_moto_flexor=StateMonitor(moto, ['v','gIa','gexc','ginh'], n_motor/2)
     
