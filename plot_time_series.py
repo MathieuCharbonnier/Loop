@@ -53,6 +53,8 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     axs[2].legend()
     axs[3].legend()
     fig.suptitle('Impact of stretching on the afferent firing rate')
+    fig_path = os.path.join(folder, f'stretch_firing_rate_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    plt.savefig(fig_path)
     plt.show()
 
         # Plot voltages
@@ -226,12 +228,12 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, Ia_recruite
     fig.suptitle("Joint Angles and Speeds", fontsize=16)
 
     for i, column in enumerate(columns_wanted):
-        axs[i, 0].plot(df['time'], df[column + '/value']*180/np.pi, label=f"{column} value", color=colorblind_friendly_colors["blue"])
+        axs[i, 0].plot(df['time'], df[column + '/value']*180/np.pi, label=f"{column} value", color=colorblind_friendly_colors["green"])
         axs[i, 0].set_ylabel("Angle (degree)")
         axs[i, 0].set_title(f"{column} - Value")
         axs[i, 0].grid(True)
 
-        axs[i, 1].plot(df['time'], df[column + '/speed']*180/np.pi, label=f"{column} speed", color=colorblind_friendly_colors["orange"])
+        axs[i, 1].plot(df['time'], df[column + '/speed']*180/np.pi, label=f"{column} speed", color=colorblind_friendly_colors["red"])
         axs[i, 1].set_ylabel("Speed (degree/s)")
         axs[i, 1].set_title(f"{column} - Speed")
         axs[i, 1].grid(True)
