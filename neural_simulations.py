@@ -4,7 +4,7 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 
 
-def run_flexor_extensor_neuron_simulation(stretch, velocity, neuron_pop, connections, dt_run, T,
+def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
                                           equation_Ia, equation_II,
                                           initial_potentials=None,noise_level = 0.2, Eleaky=-70*mV,
                                           gL=30*nS, Cm=0.3*nF, E_ex=0*mV, E_inh=-75*mV, 
@@ -67,10 +67,10 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity, neuron_pop, connect
     net = Network()
 
     # Input arrays
-    stretch_flexor_array = TimedArray(stretch[0], dt=dt_run)
-    velocity_flexor_array = TimedArray(velocity[0], dt=dt_run)
-    stretch_extensor_array = TimedArray(stretch[1], dt=dt_run)
-    velocity_extensor_array = TimedArray(velocity[1], dt=dt_run)
+    stretch_flexor_array = TimedArray(stretch_input[0], dt=dt_run)
+    velocity_flexor_array = TimedArray(velocity_input[0], dt=dt_run)
+    stretch_extensor_array = TimedArray(stretch_input[1], dt=dt_run)
+    velocity_extensor_array = TimedArray(velocity_input[1], dt=dt_run)
 
     # Extract neuron counts from dictionary
     n_Ia = neuron_pop['Ia']
@@ -160,14 +160,14 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity, neuron_pop, connect
     synapses = {}
     for (pre_name, post_name), conn_info in connections.items():
         key = f"{pre_name}_to_{post_name}"
-        pre = group_map["pre_name"]
-        post = group_map["post_name"]
-        w = conn_info["w"]
+        pre = group_map[pre_name]
+        post = group_map[post_name]
+        weight = conn_info["w"]
         p = conn_info["p"]
   
         syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
         syn.connect(p=p)
-        syn.w=np.clip(w + noise_level * w * randn(len(syn.w)), 0*nS,  np.inf*nS)
+        syn.w=np.clip(weight + noise_level * weight * randn(len(syn.w)), 0*nS,  np.inf*nS)
         net.add(syn)
         synapses[key] = syn
           
