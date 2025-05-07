@@ -6,7 +6,7 @@ from typing import Dict, List, Union, Tuple, Optional
 
 def run_flexor_extensor_neuron_simulation(stretch, velocity, neuron_pop, connections, dt_run, T,
                                           equation_Ia, equation_II,
-                                          initial_potentials=None, Eleaky=-70*mV,
+                                          initial_potentials=None,noise_level = 0.2, Eleaky=-70*mV,
                                           gL=30*nS, Cm=0.3*nF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_e=0.5*ms, tau_1=5*ms,tau_2=10*ms, threshold_v=-55*mV, 
                                           ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=2*ms):
@@ -155,39 +155,18 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity, neuron_pop, connect
     "moto_flexor": moto[:n_motor] ,
     "moto_extensor": moto[n_motor:] ,
 }
-    # Define neural connections
-    connections = {
-        ("Ia_flexor", "moto_flexor"): {"w":2*2.1*nS, "p": 0.7},
-        ("Ia_flexor", "inh_flexor"): {"w":2*3.64*nS, "p": 0.7},
-        ("Ia_extensor", "moto_extensor"): { "w": 2*2.1*nS, "p": 0.7},
-        ("Ia_extensor", "inh_extensor"): {"w":2*3.64*nS, "p": 0.7},
-        
-        ("II_flexor", "exc_flexor"): {"w":2*1.65*nS, "p": 0.7},
-        ("II_flexor", "inh_flexor"): {"w":2*2.19*nS, "p": 0.7},
-        ("II_extensor", "exc_extensor"): {"w":2*1.65*nS, "p": 0.7},
-        ("II_extensor", "inh_extensor"): {"w":2* 2.19*nS, "p": 0.7},
-        
-        ("exc_flexor", "moto_flexor"): {"w":2*0.7*nS, "p": 0.5},
-        ("exc_extensor", "moto_extensor"): {"w":2*0.7*nS, "p": 0.5},
-        
-        ("inh_flexor", "moto_extensor"): {"w":2*0.2*nS,  "p": 0.7},
-        ("inh_extensor", "moto_flexor"): {"w":2*0.2*nS, "p": 0.7},
-        ("inh_flexor", "inh_extensor"): {"w":2*0.75*nS, "p": 0.4},
-        ("inh_extensor", "inh_flexor"): {"w":2* 0.75*nS, "p": 0.4}
-    }
     
     # Create synaptic connections
     synapses = {}
     for (pre_name, post_name), conn_info in connections.items():
         key = f"{pre_name}_to_{post_name}"
-        pre = conn_info["pre"]
-        post = conn_info["post"]
+        pre = group_map["pre_name"]
+        post = group_map["post_name"]
         w = conn_info["w"]
         p = conn_info["p"]
   
         syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
         syn.connect(p=p)
-        noise_level = 0.2
         syn.w=np.clip(w + noise_level * w * randn(len(syn.w)), 0*nS,  np.inf*nS)
         net.add(syn)
         synapses[key] = syn
