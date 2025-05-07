@@ -4,8 +4,9 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 
 
-def run_flexor_extensor_neuron_simulation(stretch, velocity, 
-                                          neuron_pop, dt_run, T, initial_potentials=None, Eleaky=-70*mV,
+def run_flexor_extensor_neuron_simulation(stretch, velocity, neuron_pop, connections, dt_run, T,
+                                          equation_Ia, equation_II,
+                                          initial_potentials=None, Eleaky=-70*mV,
                                           gL=30*nS, Cm=0.3*nF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_e=0.5*ms, tau_1=5*ms,tau_2=10*ms, threshold_v=-55*mV, 
                                           ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=2*ms):
@@ -80,19 +81,19 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
     # Afferent neuron equations
 
-    ia_eq = '''
+    ia_eq = f'''
     is_flexor = (i < n_Ia) : boolean
-    stretch_array = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
-    velocity_array = velocity_flexor_array(t) * int(is_flexor) + velocity_extensor_array(t) * int(not is_flexor) : 1
+    stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
+    velocity = velocity_flexor_array(t) * int(is_flexor) + velocity_extensor_array(t) * int(not is_flexor) : 1
     is_ees = ((is_flexor and i < Ia_recruited) or (not is_flexor and i < n_Ia + Ia_recruited)) : boolean
-    rate = 10*hertz + 0.4*hertz*stretch_array + 0.86*hertz*sign(velocity_array)*abs(velocity_array)**0.6 + ees_freq * int(is_ees) : Hz
+    rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
  
-    ii_eq = '''
+    ii_eq = f'''
     is_flexor = (i < n_II) : boolean
-    stretch_array = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
+    stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
     is_ees = ((is_flexor and i < II_recruited) or (not is_flexor and i < n_II + II_recruited)) : boolean
-    rate = 20*hertz + 3.375*hertz*stretch_array + ees_freq * int(is_ees) : Hz
+    rate = ({equation_II})*hertz+ ees_freq * int(is_ees) : Hz
     '''
     
     # Create afferent neurons
@@ -141,26 +142,38 @@ def run_flexor_extensor_neuron_simulation(stretch, velocity,
 
     # Add neuron groups to the network
     net.add([inh, exc, moto])
-    
+                                            
+    group_map = {
+    "Ia_flexor":  Ia[:n_Ia]   ,
+    "Ia_extensor": Ia[n_Ia:]  ,
+    "II_flexor":   II[:n_II]   ,
+    "II_extensor":  II[n_II:] ,
+    "exc_flexor":   exc[:n_exc]  ,
+    "exc_extensor": exc[n_exc:] ,
+    "inh_flexor":    inh[:n_inh],
+    "inh_extensor": inh[n_inh:] ,
+    "moto_flexor": moto[:n_motor] ,
+    "moto_extensor": moto[n_motor:] ,
+}
     # Define neural connections
     connections = {
-        ("Ia_flexor", "moto_flexor"): {"pre": Ia[:n_Ia], "post": moto[:n_motor],"w":2*2.1*nS, "p": 0.7},
-        ("Ia_flexor", "inh_flexor"): {"pre": Ia[:n_Ia], "post": inh[:n_inh], "w":2*3.64*nS, "p": 0.7},
-        ("Ia_extensor", "moto_extensor"): {"pre": Ia[n_Ia:], "post": moto[n_motor:], "w": 2*2.1*nS, "p": 0.7},
-        ("Ia_extensor", "inh_extensor"): {"pre": Ia[n_Ia:], "post": inh[n_inh:], "w":2*3.64*nS, "p": 0.7},
+        ("Ia_flexor", "moto_flexor"): {"w":2*2.1*nS, "p": 0.7},
+        ("Ia_flexor", "inh_flexor"): {"w":2*3.64*nS, "p": 0.7},
+        ("Ia_extensor", "moto_extensor"): { "w": 2*2.1*nS, "p": 0.7},
+        ("Ia_extensor", "inh_extensor"): {"w":2*3.64*nS, "p": 0.7},
         
-        ("II_flexor", "exc_flexor"): {"pre": II[:n_II], "post": exc[:n_exc], "w":2*1.65*nS, "p": 0.7},
-        ("II_flexor", "inh_flexor"): {"pre": II[:n_II], "post": inh[:n_inh], "w":2*2.19*nS, "p": 0.7},
-        ("II_extensor", "exc_extensor"): {"pre": II[n_II:], "post": exc[n_exc:],"w":2*1.65*nS, "p": 0.7},
-        ("II_extensor", "inh_extensor"): {"pre": II[n_II:], "post": inh[n_inh:],"w":2* 2.19*nS, "p": 0.7},
+        ("II_flexor", "exc_flexor"): {"w":2*1.65*nS, "p": 0.7},
+        ("II_flexor", "inh_flexor"): {"w":2*2.19*nS, "p": 0.7},
+        ("II_extensor", "exc_extensor"): {"w":2*1.65*nS, "p": 0.7},
+        ("II_extensor", "inh_extensor"): {"w":2* 2.19*nS, "p": 0.7},
         
-        ("exc_flexor", "moto_flexor"): {"pre": exc[:n_exc], "post": moto[:n_motor],"w":2*0.7*nS, "p": 0.5},
-        ("exc_extensor", "moto_extensor"): {"pre": exc[n_exc:], "post": moto[n_motor:],"w":2*0.7*nS, "p": 0.5},
+        ("exc_flexor", "moto_flexor"): {"w":2*0.7*nS, "p": 0.5},
+        ("exc_extensor", "moto_extensor"): {"w":2*0.7*nS, "p": 0.5},
         
-        ("inh_flexor", "moto_extensor"): {"pre": inh[:n_inh], "post": moto[n_motor:],"w":2*0.2*nS,  "p": 0.7},
-        ("inh_extensor", "moto_flexor"): {"pre": inh[n_inh:], "post": moto[:n_motor],"w":2*0.2*nS, "p": 0.7},
-        ("inh_flexor", "inh_extensor"): {"pre": inh[:n_inh], "post": inh[n_inh:],"w":2*0.75*nS, "p": 0.4},
-        ("inh_extensor", "inh_flexor"): {"pre": inh[n_inh:], "post": inh[:n_inh],"w":2* 0.75*nS, "p": 0.4}
+        ("inh_flexor", "moto_extensor"): {"w":2*0.2*nS,  "p": 0.7},
+        ("inh_extensor", "moto_flexor"): {"w":2*0.2*nS, "p": 0.7},
+        ("inh_flexor", "inh_extensor"): {"w":2*0.75*nS, "p": 0.4},
+        ("inh_extensor", "inh_flexor"): {"w":2* 0.75*nS, "p": 0.4}
     }
     
     # Create synaptic connections
