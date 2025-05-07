@@ -210,7 +210,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     plt.savefig(path_fig)
     plt.show()
 
-def read_sto(filepath):
+def read_sto(filepath, columns):
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
@@ -221,7 +221,9 @@ def read_sto(filepath):
 
     df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
     df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
-    return df
+    cols = ['time']+[f"{c}/{suffix}" for c in columns for suffix in ("value", "speed")]
+
+    return df[cols]
   
 
 def plot_joint_angle_from_sto_file(df, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
