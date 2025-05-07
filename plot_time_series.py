@@ -210,9 +210,7 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     plt.savefig(path_fig)
     plt.show()
 
-
-
-def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+def read_sto(filepath):
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
@@ -223,6 +221,11 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, Ia_recruite
 
     df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
     df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
+    return df
+  
+
+def plot_joint_angle_from_sto_file(df, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+
 
     fig, axs = plt.subplots(len(columns_wanted), 2, figsize=(12, 10), sharex=True)
     fig.suptitle("Joint Angles and Speeds", fontsize=16)
@@ -247,17 +250,8 @@ def plot_joint_angle_from_sto_file(filepath, columns_wanted, folder, Ia_recruite
     plt.show()
 
 
-def plot_act_length_from_sto_file(filepath, muscle_names, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
-    with open(filepath, 'r') as file:
-        lines = file.readlines()
-
-    for i, line in enumerate(lines):
-        if 'endheader' in line.lower():
-            data_start_idx = i + 1
-            break
-
-    df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
-    df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
+def plot_act_length_from_sto_file(df, muscle_names, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+  
 
     fig, axs = plt.subplots(len(muscle_names), 2, figsize=(12, 10), sharex=True)
     fig.suptitle("Activations and fiber lengths", fontsize=16)
