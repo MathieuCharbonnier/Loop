@@ -16,7 +16,7 @@ from plot_time_series import plot_times_series,read_sto, plot_joint_angle_from_s
 from neural_simulations import run_neural_simulations, run_flexor_extensor_neuron_simulation
 from activation import decode_spikes_to_activation
 
-def close_loop(NUM_ITERATIONS, EES_PARAMS, MUSCLE_NAMES_STR, plot=True):
+def closed_loop(NUM_ITERATIONS, EES_PARAMS, MUSCLE_NAMES_STR, plot=True):
   """
   Neuromuscular Simulation Pipeline
 
