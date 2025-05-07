@@ -16,7 +16,8 @@ from plot_time_series import plot_times_series,read_sto, plot_joint_angle_from_s
 from neural_simulations import run_neural_simulations, run_flexor_extensor_neuron_simulation
 from activation import decode_spikes_to_activation
 
-def closed_loop(NUM_ITERATIONS, EES_PARAMS, MUSCLE_NAMES_STR, plot=True):
+
+def closed_loop(NUM_ITERATIONS,EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_Ia, equation_II, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, plots=True):
   """
   Neuromuscular Simulation Pipeline
 
@@ -113,13 +114,13 @@ def closed_loop(NUM_ITERATIONS, EES_PARAMS, MUSCLE_NAMES_STR, plot=True):
       # Run neural simulation based on muscle count
       if NUM_MUSCLES == 1:
           all_spikes, final_potentials = run_neural_simulations(
-              stretch, velocity, NEURON_COUNTS, TIME_STEP, REACTION_TIME,initial_potentials
-              **EES_PARAMS, **BIOPHYSICAL_PARAMS
+              stretch, velocity, NEURON_COUNTS,CONNECTIONS, TIME_STEP, REACTION_TIME,equation_Ia, equation_II,
+              initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
       else:  # NUM_MUSCLES == 2
           all_spikes,  final_potentials, state_monitors, recruited = run_flexor_extensor_neuron_simulation(
-              stretch, velocity, NEURON_COUNTS, TIME_STEP, REACTION_TIME, initial_potentials,
-              **EES_PARAMS, **BIOPHYSICAL_PARAMS
+              stretch, velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, equation_Ia, equation_II,
+              initial_potentials,**EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
       initial_potentials['exc']=final_potentials['exc']
       initial_potentials['inh']=final_potentials['inh']
@@ -269,21 +270,40 @@ def closed_loop(NUM_ITERATIONS, EES_PARAMS, MUSCLE_NAMES_STR, plot=True):
       combined_df = pd.concat(muscle_data[muscle_idx], ignore_index=True)
 
       # Add time column as first column
-      combined_df['Time'] = np.arange(len(combined_df)) * (TIME_STEP/second)
+      time=np.arange(len(combined_df)) * (TIME_STEP/second)
+      combined_df['Time'] = time
       combined_df = combined_df[['Time'] + [col for col in combined_df.columns if col != 'Time']]
 
-      Ia_rate_sum= 10*hertz + 0.4*hertz*stretch_array + 0.86*hertz*sign(velocity_array)*abs(velocity_array)**0.6 + ees_freq * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
-      combined_df['Ia_FR']=1/((1/Ia_rate)+T_ref)
-      II_rate_sum= 20*hertz + 3.375*hertz*stretch_array + ees_freq * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-      combined_df['II_FR']=1/((1/II_rate)+T_ref)
-      all_spike_times = np.concatenate(list(spikes_data[muscle_name]['MN'].values()))
+      Ia_rate = eval(equation_Ia, {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, {
+        "stretch": combined_df['stretch'].values,
+        "velocity": combined_df['velocity'].values
+      })
+      Ia_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
+      combined_df['Ia_FR']=1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+
+      II_rate= eval(equation_II, {"__builtins__": {}}, {
+        "stretch": combined_df['stretch'].values,
+        "velocity": combined_df['velocity'].values
+      })
+      II_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
+      combined_df['II_FR']=1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+      all_spike_times = np.concatenate(list(spike_data[muscle_name]['MN'].values()))
       firing_rate=np.zeros_like(time)
       if len(all_spike_times)>1:
           kde = gaussian_kde(all_spike_times, bw_method=0.3)
           firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
       combined_df['MN_FR']=firing_rate
-      combined_df['recruited_MN']=
-
+      time_bins = np.arange(0, len(combined_df) * (TIME_STEP/second), REACTION_TIME)
+      
+      recruitment = []
+      # Loop over time bins
+      for t in time_bins:
+          recruited_neurons = sum(
+            1 for spikes in spike_data[muscle_name]['MN'].values() if any((t<s <= t+REACTION_TIME)  for s in spikes)
+          )
+          ratio = (recruited_neurons / NEURON_COUNTS['motor']) 
+          recruitment.append(ratio)
+      combined_df['recruited_MN'] = np.interp(time, time_bins,recruitment)
 
       # Store dataframe for plotting
       muscle_dataframes.append(combined_df)
