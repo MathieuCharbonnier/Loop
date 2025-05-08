@@ -284,7 +284,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
   
             if (fiber_type=="MN0"):
                 lambda_=firing_rate+EES_PARAMS['eff_recruited']/len(fiber_spikes)*EES_PARAMS['ees_freq']/hertz
-                combined_df['MN_FR_theoretical']=lambda_**(-1)+ BIOPHYSICAL_PARAMS['T_refr']/second)**(-1)
+                combined_df['MN_FR_theoretical']=(lambda_**(-1)+ BIOPHYSICAL_PARAMS['T_refr']/second)**(-1)
 
       combined_df['recruited_MN'] = np.interp(time, range(0,NUM_ITERATIONS)*REACTION_TIME/second, recruited_motoneurons[muscle_idx])
 
