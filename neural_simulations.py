@@ -5,7 +5,7 @@ from typing import Dict, List, Union, Tuple, Optional
 
 
 def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
-                                          equation_Ia, equation_II,
+                                          equation_Ia, equation_II, seed_run,
                                           initial_potentials=None,noise_level = 0.2, Eleaky=-70*mV,
                                           gL=30*nS, Cm=0.3*nF, E_ex=0*mV, E_inh=-75*mV, 
                                           tau_e=0.5*ms, tau_1=5*ms,tau_2=10*ms, threshold_v=-55*mV, 
@@ -60,8 +60,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
         and a dictionary with final membrane potentials.
     """
     # Set up random seeds for reproducibility
-    np.random.seed(42)
-    seed(42)
+    np.random.seed(seed_run)
+    seed(seed_run)
     defaultclock.dt = dt_run
 
     net = Network()
