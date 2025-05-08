@@ -17,28 +17,19 @@ from neural_simulations import run_neural_simulations, run_flexor_extensor_neuro
 from activation import decode_spikes_to_activation
 
 
-def closed_loop(NUM_ITERATIONS,EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_Ia, equation_II, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, plots=True):
+def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_Ia, equation_II, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR,seed=42, plots=True):
   """
   Neuromuscular Simulation Pipeline
 
   This script runs a neuromuscular simulation that integrates:
-  1. Neural spike generation
+  1. EES stimulation
   2. Spike-to-activation decoding
   3. Muscle length/velocity simulation via OpenSim
+  4. Proprioceptive feedback
 
   The pipeline iteratively simulates neural activity and muscle dynamics,
   passing information between these components to create a closed-loop system.
   """
-
-  # =============================================================================
-  # Configuration Parameters
-  # =============================================================================
-
-  # Time parameters
-  REACTION_TIME = 40 * ms  # Duration of each simulation iteration
-  TIME_STEP = 0.1 * ms     # Simulation time step
-
-
   # Muscle configuration
   MUSCLE_NAMES = MUSCLE_NAMES_STR.split(",")
   NUM_MUSCLES = len(MUSCLE_NAMES)
@@ -58,9 +49,17 @@ def closed_loop(NUM_ITERATIONS,EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_I
 
   initial_potentials = {
       "exc": BIOPHYSICAL_PARAMS['Eleaky'],
-      "inh": BIOPHYSICAL_PARAMS['Eleaky'],
       "moto": BIOPHYSICAL_PARAMS['Eleaky']
   }
+  if NUM_MUSCLES == 2:
+      initial_potentials["inh"] = BIOPHYSICAL_PARAMS['Eleaky']
+
+  neuron_types = ["Ia", "II", "exc"]
+  if NUM_MUSCLES == 2:
+      neuron_types.append("inh")
+  if EES_PARAMS["ees_freq"] > 0 and EES_PARAMS["eff_recruited"] > 0:
+      neuron_types.append("MN0")
+  neuron_types.append("MN")
 
   # Initialize parameters for each motoneuron
   initial_params = [
@@ -76,11 +75,6 @@ def closed_loop(NUM_ITERATIONS,EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_I
   muscle_data = [[] for _ in range(NUM_MUSCLES)]
   resting_lengths = [None] * NUM_MUSCLES
 
-  # Structure to store spike data for all muscles and neuron types
-  neuron_types = ["Ia", "II", "inh", "exc"]
-  if EES_PARAMS["ees_freq"] > 0 and EES_PARAMS["eff_recruited"] > 0:
-      neuron_types.append("MN0")
-  neuron_types.append("MN")
 
   spike_data = {
       muscle_name: {
@@ -114,17 +108,15 @@ def closed_loop(NUM_ITERATIONS,EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_I
       # Run neural simulation based on muscle count
       if NUM_MUSCLES == 1:
           all_spikes, final_potentials = run_neural_simulations(
-              stretch, velocity, NEURON_COUNTS,CONNECTIONS, TIME_STEP, REACTION_TIME,equation_Ia, equation_II,
+              stretch, velocity, NEURON_COUNTS,CONNECTIONS, TIME_STEP, REACTION_TIME,equation_Ia, equation_II,seed,
               initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
       else:  # NUM_MUSCLES == 2
           all_spikes,  final_potentials, state_monitors, recruited = run_flexor_extensor_neuron_simulation(
-              stretch, velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, equation_Ia, equation_II,
+              stretch, velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, equation_Ia, equation_II,seed,
               initial_potentials,**EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
-      initial_potentials['exc']=final_potentials['exc']
-      initial_potentials['inh']=final_potentials['inh']
-      initial_potentials['moto']=final_potentials['moto']
+      initial_potentials.update(final_potentials)
 
       # Store spike times for visualization
       for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
@@ -217,19 +209,7 @@ def closed_loop(NUM_ITERATIONS,EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_I
 
                   # Create batch data for current iteration
                   batch_data = {
-                      'v_exc': state_monitors[muscle_idx]['v_exc'],
-                      'gII_exc': state_monitors[muscle_idx]['gII_exc'],
-                      'IPSP_exc': state_monitors[muscle_idx]['IPSP_exc'],
-                      'v_inh': state_monitors[muscle_idx]['v_inh'],
-                      'gIa_inh': state_monitors[muscle_idx]['gII_inh'],
-                      'gII_inh': state_monitors[muscle_idx]['gII_inh'],
-                      'gi_inh': state_monitors[muscle_idx]['gi_inh'],
-                      'IPSP_inh': state_monitors[muscle_idx]['IPSP_inh'],
-                      'v_moto': state_monitors[muscle_idx]['v_moto'],
-                      'gIa_moto': state_monitors[muscle_idx]['gIa_moto'],
-                      'gex_moto': state_monitors[muscle_idx]['gex_moto'],
-                      'gi_moto': state_monitors[muscle_idx]['gi_moto'],
-                      'IPSP_moto': state_monitors[muscle_idx]['IPSP_moto'],
+                      **state_monitors[muscle_idx],
                       'mean_e': mean_e[muscle_idx],
                       'mean_u': mean_u[muscle_idx],
                       'mean_c': mean_c[muscle_idx],
@@ -374,6 +354,6 @@ def closed_loop(NUM_ITERATIONS,EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_I
   if plots:
       # Generate plots for joint angles
       pja(joints_df, JOINT_COLUMNS, RESULTS_DIR, **EES_PARAMS)
-
-
+  
   return spike_data, muscle_dataframes, joints_df
+
