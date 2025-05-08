@@ -18,46 +18,45 @@ colorblind_friendly_colors = {
 }
 color_keys = list(colorblind_friendly_colors.keys())
 
-def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited, T_refr):
+def raster_plots(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq ):
 
+    # Raster Plots
     num_muscles = len(spikes)
-    num_fiber_types = len(next(iter(spikes.values())))  
+    num_fiber_types = len(next(iter(spikes.values())))
+    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
     
-    time = muscle_data[0]['Time'].values
-    stretch=np.zeros((num_muscles, len(time)))
-    velocity=np.zeros((num_muscles, len(time)))
-    for i,muscle in enumerate(muscle_names):
-        stretch_init = np.append(initial_stretch[i], muscle_data[i]['stretch'].values)
-        stretch_init = stretch_init[:len(time)] 
-        stretch[i]=stretch_init
-        velocity[i] = np.gradient(stretch_init, time)
-    Ia_rates=10 + 0.4 * stretch + 0.86 * np.sign(velocity) * np.abs(velocity) ** 0.6
-    II_rates=20 + 3.375*stretch
+    if num_muscles == 1:
+        axs = np.expand_dims(axs, axis=1)
 
-    fig, axs = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
-    for i,muscle in enumerate(muscle_names):
-        axs[0].plot(time, stretch[i], label=f'Stretch, {muscle} ')
-        axs[1].plot(time, velocity[i], label=f'Velocity, {muscle} ')
-        axs[2].plot(time, Ia_rates[i], label=f'Ia rate, {muscle} ')
-        axs[3].plot(time, II_rates[i], label=f'II rate, {muscle} ')
+    # Iterate over muscles and fiber types to plot spikes
+    for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
+        for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
+            # Plot individual neuron spikes
+            for neuron_id, neuron_spikes in fiber_spikes.items():
+                if neuron_spikes:  # Check if neuron_spikes is not empty
+                    axs[j, i].plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), '.', markersize=3, color='black')
 
-    axs[2].plot(time, np.ones_like(time) * 10, 'k--', label='Base rate')
-    axs[3].plot(time, np.ones_like(time) * 20, 'k--', label='Base rate')
-    axs[3].set_xlabel('Time (s)')
-    axs[0].set_ylabel('Stretch (dimless)')
-    axs[1].set_ylabel('Velocity (s-1)')
-    axs[2].set_ylabel('Ia rate (Hz)')
-    axs[3].set_ylabel('II rate (Hz)')
-    axs[0].legend()
-    axs[1].legend()
-    axs[2].legend()
-    axs[3].legend()
-    fig.suptitle('Impact of stretching on the afferent firing rate')
-    fig_path = os.path.join(folder, f'stretch_firing_rate_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+            # Set plot properties
+            axs[j, i].set(title=f"{muscle}_{fiber_type}", ylabel="Neuron Index")
+            axs[j, i].grid(True)
+
+    # Set common x-axis label
+    axs[-1, 0].set_xlabel("Time (s)")  # Set xlabel for the bottom-most plot
+    fig.suptitle('Spikes Raster Plot', fontsize=16)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ensure titles and labels do not overlap
+
+    # Save and display the plot
+    fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
 
-        # Plot voltages
+def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited, T_refr):
+
+  
+    
+    time = muscle_data[0]['Time'].values
+
+    # Plot voltages
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
     fig.suptitle("Voltage")
     for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):  
@@ -111,43 +110,39 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     axs[0].set_ylabel('gIa (nS)')
     axs[1].set_ylabel('gex (nS)')
     axs[2].set_ylabel('gi (nS)')
+
     axs[0].legend()
     axs[1].legend()
     axs[2].legend()
-    plt.show()
-
-    # Raster Plots
-    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
-    
-    if num_muscles == 1:
-        axs = np.expand_dims(axs, axis=1)
-
-    # Iterate over muscles and fiber types to plot spikes
-    for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
-        for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
-            # Plot individual neuron spikes
-            for neuron_id, neuron_spikes in fiber_spikes.items():
-                if neuron_spikes:  # Check if neuron_spikes is not empty
-                    axs[j, i].plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), '.', markersize=3, color='black')
-
-            # Set plot properties
-            axs[j, i].set(title=f"{muscle}_{fiber_type}", ylabel="Neuron Index")
-            axs[j, i].grid(True)
-
-    # Set common x-axis label
-    axs[-1, 0].set_xlabel("Time (s)")  # Set xlabel for the bottom-most plot
-    fig.suptitle('Spikes Raster Plot', fontsize=16)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ensure titles and labels do not overlap
-
-    # Save and display the plot
-    fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
-    plt.savefig(fig_path)
     plt.show()
 
     # Firing rate plots
     fig, axs = plt.subplots(num_fiber_types, 1, figsize=(10, 10), sharex=True)
     time = muscle_data[0]['Time'].values 
 
+        #plot
+    fig, axs = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
+    for i,muscle in enumerate(muscle_names):
+        axs[0].plot(time, stretch[i], label=f'Stretch, {muscle} ')
+        axs[1].plot(time, velocity[i], label=f'Velocity, {muscle} ')
+        axs[2].plot(time, Ia_rates[i], label=f'Ia rate, {muscle} ')
+        axs[3].plot(time, II_rates[i], label=f'II rate, {muscle} ')
+
+    axs[2].plot(time, np.ones_like(time) * 10, 'k--', label='Base rate')
+    axs[3].plot(time, np.ones_like(time) * 20, 'k--', label='Base rate')
+    axs[3].set_xlabel('Time (s)')
+    axs[0].set_ylabel('Stretch (dimless)')
+    axs[1].set_ylabel('Velocity (s-1)')
+    axs[2].set_ylabel('Ia rate (Hz)')
+    axs[3].set_ylabel('II rate (Hz)')
+    axs[0].legend()
+    axs[1].legend()
+    axs[2].legend()
+    axs[3].legend()
+    fig.suptitle('Impact of stretching on the afferent firing rate')
+    fig_path = os.path.join(folder, f'stretch_firing_rate_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    plt.savefig(fig_path)
+    plt.show()
     for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
         for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
             all_spike_times = np.concatenate(list(fiber_spikes.values()))
@@ -210,22 +205,8 @@ def plot_times_series(initial_stretch,spikes, muscle_data, muscle_names, folder,
     plt.savefig(path_fig)
     plt.show()
 
-def read_sto(filepath, columns):
-    with open(filepath, 'r') as file:
-        lines = file.readlines()
 
-    for i, line in enumerate(lines):
-        if 'endheader' in line.lower():
-            data_start_idx = i + 1
-            break
-
-    df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
-    df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
-    cols = ['time']+[f"{c}/{suffix}" for c in columns for suffix in ("value", "speed")]
-
-    return df[cols]
   
-
 def plot_joint_angle_from_sto_file(df, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
 
 
