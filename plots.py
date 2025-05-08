@@ -18,7 +18,7 @@ colorblind_friendly_colors = {
 }
 color_keys = list(colorblind_friendly_colors.keys())
 
-def raster_plots(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq ):
+def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq ):
 
     # Raster Plots
     num_muscles = len(spikes)
@@ -50,7 +50,7 @@ def raster_plots(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_
     plt.savefig(fig_path)
     plt.show()
 
-def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited, T_refr):
+def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited):
 
     # Plot voltages
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
@@ -69,21 +69,22 @@ def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited
     plt.show()
 
     # Plot conductances
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-    fig.suptitle("Inhibitory Conductances")
-    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-        axs[0].plot(df['Time'],df['gIa_inh'], label=f'gIa {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        axs[1].plot(df['Time'],df['gII_inh'], label=f'gII {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        axs[2].plot(df['Time'],df['gi_inh'], label=f'gi {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-    
-    axs[2].set_xlabel('time (ms)')
-    axs[0].set_ylabel('gIa (nS)')
-    axs[1].set_ylabel('gII (nS)')
-    axs[2].set_ylabel('gi (nS)')
-    axs[0].legend()
-    axs[1].legend()
-    axs[2].legend()
-    plt.show()
+    if (len(muscle_names)==2):
+        fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+        fig.suptitle("Inhibitory Conductances")
+        for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
+            axs[0].plot(df['Time'],df['gIa_inh'], label=f'gIa {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+            axs[1].plot(df['Time'],df['gII_inh'], label=f'gII {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+            axs[2].plot(df['Time'],df['gi_inh'], label=f'gi {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+        
+        axs[2].set_xlabel('time (ms)')
+        axs[0].set_ylabel('gIa (nS)')
+        axs[1].set_ylabel('gII (nS)')
+        axs[2].set_ylabel('gi (nS)')
+        axs[0].legend()
+        axs[1].legend()
+        axs[2].legend()
+        plt.show()
 
     plt.figure(figsize=(10,4))
     plt.title("Excitatory Conductances")
@@ -113,14 +114,20 @@ def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited
     plt.show()
 
     # Firing rate plots
-    firing_rates_columns=['Ia_FR_theoretical', 'Ia_FR_monitored',
-     'II_FR_theoretical', 'II_FR_monitored',
-     'exc_FR_monitored', 'inh_FR_monitored', 
-     'MN0_FR_Monitored','MN_FR_theoretical','MN_FR_monitored', 'MN_recruited']
+    firing_rates_columns=[col for col in muscle_data[0].columns if "FR" in col]
     fig, axs = plt.subplots(len(firing_rates_columns), 1, figsize=(10, 10), sharex=True)
-    time = muscle_data[0]['Time'].values 
+    time = muscle_data[0]['Time'].values
 
- 
+    for i, col in enumerate(firing_rates_columns):
+        ax = axs[i]
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel(f"{col} (Hertz)")
+        
+        # Plot data for each muscle
+        for idx, muscle_name in enumerate(muscle_names):
+            t = muscle_data[idx]['Time']
+            y = muscle_data[idx][col]
+            ax.plot(t, y, label=muscle_name)
 
     axs[-1].set_xlabel('Time (s)')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -166,10 +173,26 @@ def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited
     plt.show()
 
 
+def read_sto(filepath, columns):
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+
+    for i, line in enumerate(lines):
+        if 'endheader' in line.lower():
+            data_start_idx = i + 1
+            break
+
+    df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
+    df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
+    cols = ['time']+[f"{c}/{suffix}" for c in columns for suffix in ("value", "speed")]
+
+    return df[cols]
+
+
   
-def plot_joints(df, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+def plot_joints(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
 
-
+    df=read_sto(filepath, columns_wanted)
     fig, axs = plt.subplots(len(columns_wanted), 2, figsize=(12, 10), sharex=True)
     fig.suptitle("Joint Angles and Speeds", fontsize=16)
 
@@ -193,9 +216,9 @@ def plot_joints(df, columns_wanted, folder, Ia_recruited, II_recruited, eff_recr
     plt.show()
 
 
-def plot_act_length_from_sto_file(df, muscle_names, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+def plot_act_length (filepath, muscle_names, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
   
-
+    df=read_sto(filepath, columns_wanted)
     fig, axs = plt.subplots(len(muscle_names), 2, figsize=(12, 10), sharex=True)
     fig.suptitle("Activations and fiber lengths", fontsize=16)
 
