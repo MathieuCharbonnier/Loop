@@ -52,10 +52,6 @@ def raster_plots(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_
 
 def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited, T_refr):
 
-  
-    
-    time = muscle_data[0]['Time'].values
-
     # Plot voltages
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
     fig.suptitle("Voltage")
@@ -117,52 +113,16 @@ def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited
     plt.show()
 
     # Firing rate plots
-    fig, axs = plt.subplots(num_fiber_types, 1, figsize=(10, 10), sharex=True)
+    firing_rates_columns=['Ia_FR_theoretical', 'Ia_FR_monitored',
+     'II_FR_theoretical', 'II_FR_monitored',
+     'exc_FR_monitored', 'inh_FR_monitored', 
+     'MN0_FR_Monitored','MN_FR_theoretical','MN_FR_monitored', 'MN_recruited']
+    fig, axs = plt.subplots(len(firing_rates_columns), 1, figsize=(10, 10), sharex=True)
     time = muscle_data[0]['Time'].values 
 
-        #plot
-    fig, axs = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
-    for i,muscle in enumerate(muscle_names):
-        axs[0].plot(time, stretch[i], label=f'Stretch, {muscle} ')
-        axs[1].plot(time, velocity[i], label=f'Velocity, {muscle} ')
-        axs[2].plot(time, Ia_rates[i], label=f'Ia rate, {muscle} ')
-        axs[3].plot(time, II_rates[i], label=f'II rate, {muscle} ')
-
-    axs[2].plot(time, np.ones_like(time) * 10, 'k--', label='Base rate')
-    axs[3].plot(time, np.ones_like(time) * 20, 'k--', label='Base rate')
-    axs[3].set_xlabel('Time (s)')
-    axs[0].set_ylabel('Stretch (dimless)')
-    axs[1].set_ylabel('Velocity (s-1)')
-    axs[2].set_ylabel('Ia rate (Hz)')
-    axs[3].set_ylabel('II rate (Hz)')
-    axs[0].legend()
-    axs[1].legend()
-    axs[2].legend()
-    axs[3].legend()
-    fig.suptitle('Impact of stretching on the afferent firing rate')
-    fig_path = os.path.join(folder, f'stretch_firing_rate_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
-    plt.savefig(fig_path)
-    plt.show()
-    for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
-        for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
-            all_spike_times = np.concatenate(list(fiber_spikes.values()))
-            firing_rate=np.zeros_like(time)
-            if len(all_spike_times)>1:
-
-                kde = gaussian_kde(all_spike_times, bw_method=0.3)
-                firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-
-            axs[j].plot(time, firing_rate, label=f"{muscle}", color=colorblind_friendly_colors[color_keys[i]])
-            
-            if (fiber_type=="MN0"):
-                lambda_=firing_rate+eff_recruited/len(fiber_spikes)*ees_freq/hertz
-                axs[j+1].plot(time, (lambda_**(-1)+ T_refr/second)**(-1), label="theoretical MN rate {muscle}", color=colorblind_friendly_colors[color_keys[i+2]])
-
-            axs[j].set_ylabel(f'{fiber_type} firing rate (Hz)')
-            axs[j].legend()
+ 
 
     axs[-1].set_xlabel('Time (s)')
-    fig.suptitle("Smoothed Instantaneous Firing Rate (KDE)", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     path_fig = os.path.join(folder, f'Firing_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
@@ -207,7 +167,7 @@ def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited
 
 
   
-def plot_joint_angle_from_sto_file(df, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+def plot_joints(df, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
 
 
     fig, axs = plt.subplots(len(columns_wanted), 2, figsize=(12, 10), sharex=True)
