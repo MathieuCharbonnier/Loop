@@ -12,12 +12,11 @@ from scipy.interpolate import interp1d
 from collections import defaultdict
 from scipy.stats import gaussian_kde
 
-from plot_time_series import plot_times_series,read_sto, plot_joint_angle_from_sto_file as pja
 from neural_simulations import run_neural_simulations, run_flexor_extensor_neuron_simulation
 from activation import decode_spikes_to_activation
 
 
-def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_Ia, equation_II, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR,seed=42):
+def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_Ia, equation_II, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR,sto_path, seed=42):
   """
   Neuromuscular Simulation Pipeline
 
@@ -256,7 +255,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
 
       #Compute all firing rate:
       #first calculate initial stretch
-      stretch_init = np.append(stretch0[i], combined_df['stretch'].values)
+      stretch_init = np.append(stretch0[muscle_idx], combined_df['stretch'].values)
       stretch_init = stretch_init[:len(time)]
       velocity_init = np.gradient(stretch_init, time)
       Ia_rate = eval(equation_Ia, {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, {
@@ -299,13 +298,6 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
   # ======================================================================================================
 
   # Create full simulation STO file for visualization
-  complete_sto_name = f'All_opensim_' \
-                    f'Ia_{EES_PARAMS["Ia_recruited"]}_' \
-                    f'II_{EES_PARAMS["II_recruited"]}_' \
-                    f'Moto_{EES_PARAMS["eff_recruited"]}_' \
-                    f'Freq_{EES_PARAMS["ees_freq"]}.sto'
-  complete_sto_path = os.path.join(RESULTS_DIR, complete_sto_name)
-
   # Create temporary file for activation data
   with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_file:
       input_path = input_file.name
@@ -325,7 +317,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
           '--T', str(REACTION_TIME/second * NUM_ITERATIONS),
           '--muscle', MUSCLE_NAMES_STR,
           '--activation', input_path,
-          '--output_all', complete_sto_path
+          '--output_all', sto_path
       ]
 
       # Run OpenSim simulation for complete trajectory
@@ -339,30 +331,5 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       # Clean up temporary file
       os.unlink(input_path)
 
-  # Define joint angles of interest
-  JOINT_COLUMNS = [
-      #"hip_flexion_r",
-      #"hip_adduction_r",
-      #"hip_rotation_r",
-      "knee_angle_r",
-      "ankle_angle_r",
-  ]
-  def read_sto(filepath, columns):
-    with open(filepath, 'r') as file:
-        lines = file.readlines()
-
-    for i, line in enumerate(lines):
-        if 'endheader' in line.lower():
-            data_start_idx = i + 1
-            break
-
-    df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
-    df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
-    cols = ['time']+[f"{c}/{suffix}" for c in columns for suffix in ("value", "speed")]
-
-    return df[cols]
-  joints_df=read_sto(complete_sto_path, JOINT_COLUMNS)
-
-  
-  return spike_data, muscle_dataframes, joints_df
+  return spike_data, muscle_dataframes
 
