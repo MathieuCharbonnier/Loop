@@ -17,7 +17,7 @@ from neural_simulations import run_neural_simulations, run_flexor_extensor_neuro
 from activation import decode_spikes_to_activation
 
 
-def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_Ia, equation_II, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR,seed=42, plots=True):
+def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,equation_Ia, equation_II, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR,seed=42):
   """
   Neuromuscular Simulation Pipeline
 
@@ -83,10 +83,10 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       }
       for muscle_name in MUSCLE_NAMES
   }
-
-  # Create results directory
-  RESULTS_DIR = 'results'
-  os.makedirs(RESULTS_DIR, exist_ok=True)
+  recruited_motoneurons=np.zeros((NUM_MUSCLES, NUM_ITERATIONS))
+  # Create directory to save STO FILE
+  STO_DIR = 'Sto'
+  os.makedirs(STO_DIR, exist_ok=True)
 
   # Use temporary file for state management across iterations
   state_file = None
@@ -117,7 +117,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
               initial_potentials,**EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
       initial_potentials.update(final_potentials)
-
+      recruited_motoneurons[:,iteration]=recruited
       # Store spike times for visualization
       for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
           muscle_spikes = all_spikes[muscle_idx]
@@ -238,7 +238,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
           os.unlink(output_path)
 
   # =============================================================================
-  # Combine Results
+  # Combine Results and Compute Firing rates
   # =============================================================================
 
   muscle_dataframes = []
@@ -254,46 +254,43 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       combined_df['Time'] = time
       combined_df = combined_df[['Time'] + [col for col in combined_df.columns if col != 'Time']]
 
+      #Compute all firing rate:
+      #first calculate initial stretch
+      stretch_init = np.append(stretch0[i], combined_df['stretch'].values)
+      stretch_init = stretch_init[:len(time)]
+      velocity_init = np.gradient(stretch_init, time)
       Ia_rate = eval(equation_Ia, {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, {
-        "stretch": combined_df['stretch'].values,
-        "velocity": combined_df['velocity'].values
+        "stretch": stretch_init,
+        "velocity": velocity_init
       })
       Ia_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
-      combined_df['Ia_FR']=1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+      combined_df['Ia_FR_theoretical']=1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
       II_rate= eval(equation_II, {"__builtins__": {}}, {
-        "stretch": combined_df['stretch'].values,
-        "velocity": combined_df['velocity'].values
+        "stretch": stretch_init,
+        "velocity": velocity_init
       })
       II_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-      combined_df['II_FR']=1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
-      all_spike_times = np.concatenate(list(spike_data[muscle_name]['MN'].values()))
-      firing_rate=np.zeros_like(time)
-      if len(all_spike_times)>1:
-          kde = gaussian_kde(all_spike_times, bw_method=0.3)
-          firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-      combined_df['MN_FR']=firing_rate
-      time_bins = np.arange(0, len(combined_df) * (TIME_STEP/second), REACTION_TIME)
-      
-      recruitment = []
-      # Loop over time bins
-      for t in time_bins:
-          recruited_neurons = sum(
-            1 for spikes in spike_data[muscle_name]['MN'].values() if any((t<s <= t+REACTION_TIME)  for s in spikes)
-          )
-          ratio = (recruited_neurons / NEURON_COUNTS['motor']) 
-          recruitment.append(ratio)
-      combined_df['recruited_MN'] = np.interp(time, time_bins,recruitment)
+      combined_df['II_FR_theoretical']=1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+
+      for j, (fiber_type, fiber_spikes) in enumerate(spike_data[muscle_name].items()):
+
+            all_spike_times = np.concatenate(list(fiber_spikes.values()))
+            firing_rate=np.zeros_like(time)
+            if len(all_spike_times)>1:
+                kde = gaussian_kde(all_spike_times, bw_method=0.3)
+                firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
+            combined_df[f'{fiber_type}_FR_monitored']=firing_rate
+  
+            if (fiber_type=="MN0"):
+                lambda_=firing_rate+EES_PARAMS['eff_recruited']/len(fiber_spikes)*EES_PARAMS['ees_freq']/hertz
+                combined_df['MN_FR_theoretical']=lambda_**(-1)+ BIOPHYSICAL_PARAMS['T_refr']/second)**(-1)
+
+      combined_df['recruited_MN'] = np.interp(time, range(0,NUM_ITERATIONS)*REACTION_TIME/second, recruited_motoneurons[muscle_idx])
 
       # Store dataframe for plotting
       muscle_dataframes.append(combined_df)
 
-  # =============================================================================
-  # Generate Plots
-  # =============================================================================
-  if plots:
-      # Generate time series plots
-      plot_times_series(stretch0,spike_data, muscle_dataframes, MUSCLE_NAMES, RESULTS_DIR, **EES_PARAMS, T_refr=BIOPHYSICAL_PARAMS['T_refr'])
 
   # ====================================================================================================
   # Run Complete Muscle Simulation for:
@@ -350,10 +347,22 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       "knee_angle_r",
       "ankle_angle_r",
   ]
+  def read_sto(filepath, columns):
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+
+    for i, line in enumerate(lines):
+        if 'endheader' in line.lower():
+            data_start_idx = i + 1
+            break
+
+    df = pd.read_csv(filepath, sep='\t', skiprows=data_start_idx)
+    df.columns = ["/".join(col.split("/")[-2:]) for col in df.columns]
+    cols = ['time']+[f"{c}/{suffix}" for c in columns for suffix in ("value", "speed")]
+
+    return df[cols]
   joints_df=read_sto(complete_sto_path, JOINT_COLUMNS)
-  if plots:
-      # Generate plots for joint angles
-      pja(joints_df, JOINT_COLUMNS, RESULTS_DIR, **EES_PARAMS)
+
   
   return spike_data, muscle_dataframes, joints_df
 
