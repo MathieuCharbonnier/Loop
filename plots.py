@@ -115,20 +115,20 @@ def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited
 
     # Firing rate plots
     firing_rates_columns=[col for col in muscle_data[0].columns if "FR" in col]
-    fig, axs = plt.subplots(len(firing_rates_columns), 1, figsize=(10, 10), sharex=True)
+    fig, axs = plt.subplots(len(firing_rates_columns), 1, figsize=(10, 15), sharex=True)
     time = muscle_data[0]['Time'].values
 
     for i, col in enumerate(firing_rates_columns):
         ax = axs[i]
         ax.set_xlabel("Time (s)")
-        ax.set_ylabel(f"{col} (Hertz)")
-        
+        ax.set_ylabel("FR (Hertz)")
+        ax.set_title(col)
         # Plot data for each muscle
         for idx, muscle_name in enumerate(muscle_names):
             t = muscle_data[idx]['Time']
             y = muscle_data[idx][col]
             ax.plot(t, y, label=muscle_name)
-
+        ax.legend()
     axs[-1].set_xlabel('Time (s)')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     path_fig = os.path.join(folder, f'Firing_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
@@ -152,7 +152,6 @@ def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited
     path_fig = os.path.join(folder, f'Activation_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
-
 
     # Muscle properties - for all muscles
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
