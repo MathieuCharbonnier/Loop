@@ -29,11 +29,11 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
                 if neuron_spikes:
                     axs[j, i].plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), '.', markersize=3, color='black')
             axs[j, i].set(title=f"{muscle}_{fiber_type}", ylabel="Neuron Index")
-            axs[j, i].tick_params(labelsize=10)
+            axs[j, i].tick_params(labelsize=11)
             axs[j, i].grid(True)
 
-    axs[-1, 0].set_xlabel("Time (s)", fontsize=12, fontweight='bold')
-    fig.suptitle('Spikes Raster Plot', fontsize=16, fontweight='bold')
+    axs[-1, 0].set_xlabel("Time (s)", fontsize=11)
+    fig.suptitle('Spikes Raster Plot', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
@@ -51,15 +51,15 @@ def plot_neural_dynamic(muscle_data, muscle_names, folder, ees_freq, Ia_recruite
 
     for i, (col, ylabel) in enumerate(columns):
         ax = axs[i]
-        ax.set_title(col, fontsize=12, fontweight='bold')
+        ax.set_title(col, fontsize=12)
         ax.set_ylabel(ylabel, fontsize=11)
         for idx, muscle_name in enumerate(muscle_names):
             ax.plot(muscle_data[idx]['Time'], muscle_data[idx][col], label=muscle_name)
         ax.legend(fontsize=10)
-        ax.tick_params(labelsize=10)
+        ax.tick_params(labelsize=11)
 
-    axs[-1].set_xlabel('Time (s)', fontsize=12, fontweight='bold')
-    fig.suptitle('Neural Dynamics', fontsize=16, fontweight='bold')
+    axs[-1].set_xlabel('Time (s)', fontsize=11)
+    fig.suptitle('Neural Dynamics', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     path_fig = os.path.join(folder, f'Dynamic_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
@@ -75,11 +75,11 @@ def plot_activation(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, I
         for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
             axs[i].plot(df['Time'], df[label], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
         axs[i].set_ylabel(label, fontsize=11)
-        axs[i].legend(fontsize=10)
-        axs[i].tick_params(labelsize=10)
+        axs[i].legend(fontsize=11)
+        axs[i].tick_params(labelsize=11)
 
-    axs[-1].set_xlabel('Time (s)', fontsize=12, fontweight='bold')
-    fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=16, fontweight='bold')
+    axs[-1].set_xlabel('Time (s)', fontsize=11)
+    fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     path_fig = os.path.join(folder, f'Activation_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
@@ -96,11 +96,11 @@ def plot_muscle_length(muscle_data, muscle_names, folder, ees_freq, Ia_recruited
         for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
             axs[i].plot(df['Time'], df[prop], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
         axs[i].set_ylabel(ylabel, fontsize=11)
-        axs[i].legend(fontsize=10)
+        axs[i].legend(fontsize=11)
         axs[i].tick_params(labelsize=10)
 
-    axs[-1].set_xlabel('Time (s)', fontsize=12, fontweight='bold')
-    fig.suptitle("Muscle Properties: Muscle Comparison", fontsize=16, fontweight='bold')
+    axs[-1].set_xlabel('Time (s)', fontsize=11)
+    fig.suptitle("Muscles Properties", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     path_fig = os.path.join(folder, f'Muscle_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
