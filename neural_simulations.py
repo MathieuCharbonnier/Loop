@@ -6,7 +6,7 @@ from typing import Dict, List, Union, Tuple, Optional
 
 def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
                                           equation_Ia, equation_II, seed_run,initial_potentials, 
-                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_1,tau_2,threshold_v, T_refr,
+                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_i,threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
     Run a simulation of flexor-extensor neuron dynamics.
@@ -41,10 +41,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
         Inhibitory reversal potential.
     tau_e : time
         Excitatory time constant.
-    tau_1 : time
-        first Inhibitory time constant.
-    tau_2 : time
-        second Inhibitory time constant.
+    tau_i : time
+        Inhibitory time constant.
     threshold_v : volt
         Voltage threshold.
     ees_freq : hertz
@@ -110,11 +108,11 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     '''
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + ginh*(E_inh - v) :amp
+    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + gi*(E_inh - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgexc/dt = -gexc / tau_e : siemens
-    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*ginh-gi)/tau_1 : siemens
-    dginh/dt = -ginh/tau_2 :siemens   
+    dgi/dt = (ginh-gi)/tau_i : siemens
+    dginh/dt = -ginh/tau_i :siemens   
 
     '''
     inh_eq = '''
@@ -122,8 +120,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     Isyn = gi*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgII/dt = -gII / tau_e : siemens
-    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*ginh-gi)/tau_1 : siemens
-    dginh/dt = -ginh/tau_2 :siemens                                               
+    dgi/dt = (ginh-gi)/tau_i : siemens
+    dginh/dt = -ginh/tau_i :siemens                                           
     ''' 
   
     # Create neuron groups
