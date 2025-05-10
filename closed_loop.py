@@ -79,7 +79,6 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       }
       for muscle_name in MUSCLE_NAMES
   }
-  recruited_motoneurons=np.zeros((NUM_MUSCLES, NUM_ITERATIONS))
   # Create directory to save STO FILE
   STO_DIR = 'Sto'
   os.makedirs(STO_DIR, exist_ok=True)
@@ -113,7 +112,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
               initial_potentials,**EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
       initial_potentials.update(final_potentials)
-      recruited_motoneurons[:,iteration]=recruited
+
       # Store spike times for visualization
       for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
           muscle_spikes = all_spikes[muscle_idx]
@@ -260,14 +259,14 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
         "velocity": velocity_init
       })
       Ia_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
-      combined_df['Ia_FR']=1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+      combined_df['Ia_rate']=1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
       II_rate= eval(equation_II, {"__builtins__": {}}, {
         "stretch": stretch_init,
         "velocity": velocity_init
       })
       II_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-      combined_df['II_FR']=1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+      combined_df['II_rate']=1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
       all_spike_times = np.concatenate(list(spike_data[muscle_name]['MN'].values()))
       firing_rate=np.zeros_like(time)
