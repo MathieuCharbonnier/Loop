@@ -6,7 +6,7 @@ from typing import Dict, List, Union, Tuple, Optional
 
 def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
                                           equation_Ia, equation_II, seed_run,initial_potentials, 
-                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_i,threshold_v, T_refr,
+                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_1,tau_2,threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
     Run a simulation of flexor-extensor neuron dynamics.
@@ -41,8 +41,10 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
         Inhibitory reversal potential.
     tau_e : time
         Excitatory time constant.
-    tau_i : time
-        Inhibitory time constant.
+    tau_1 : time
+        first Inhibitory time constant.
+    tau_2 : time
+        second Inhibitory time constant.
     threshold_v : volt
         Voltage threshold.
     ees_freq : hertz
@@ -108,20 +110,20 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     '''
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + gi*(E_inh - v) :amp
+    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + ginh*(E_inh - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgexc/dt = -gexc / tau_e : siemens
-    dgi/dt = (ginh-gi)/tau_i : siemens
-    dginh/dt = -ginh/tau_i :siemens   
+    dginh/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-ginh)/tau_1 : siemens
+    dx/dt = -x/tau_2 :siemens   
 
     '''
     inh_eq = '''
     dv/dt = (gL*(Eleaky - v)+Isyn ) / Cm : volt
-    Isyn = gi*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
+    Isyn = ginh*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgII/dt = -gII / tau_e : siemens
-    dgi/dt = (ginh-gi)/tau_i : siemens
-    dginh/dt = -ginh/tau_i :siemens                                           
+    dginh/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-ginh)/tau_1 : siemens
+    dx/dt = -x/tau_2 :siemens                                               
     ''' 
   
     # Create neuron groups
@@ -166,7 +168,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
   
         syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
         syn.connect(p=p)
-        syn.w=weight
+        syn.w=np.clip(weight + 0.2 * weight * randn(len(syn.w)), 0*nS,  np.inf*nS)
         net.add(syn)
         synapses[key] = syn
           
