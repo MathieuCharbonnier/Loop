@@ -4,12 +4,10 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 
 
-def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
-                                          equation_Ia, equation_II, seed_run,
-                                          initial_potentials=None,noise_level = 0.2, Eleaky=-70*mV,
-                                          gL=30*nS, Cm=0.3*nF, E_ex=0*mV, E_inh=-75*mV, 
-                                          tau_e=0.5*ms, tau_1=5*ms,tau_2=10*ms, threshold_v=-55*mV, 
-                                          ees_freq=0*hertz, Ia_recruited=0, II_recruited=0, eff_recruited=0, T_refr=2*ms):
+def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,T_refr 
+                                          equation_Ia, equation_II, seed_run,initial_potentials, 
+                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_1,tau_2,threshold_v, 
+                                          ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
     Run a simulation of flexor-extensor neuron dynamics.
     
@@ -21,43 +19,46 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
         Velocity inputs for flexor [0] and extensor [1].
     neuron_pop : dict
         Dictionary with counts of different neuron populations ('Ia', 'II', 'motor', 'exc', 'inh').
+    connections: dict
+        Dictionnary with the weights and probability of connection all synapse of the network
     dt_run : time
         Simulation time step.
     T : time
         Total simulation time.
-    initial_potentials : dict, optional
-        Initial membrane potentials for neuron groups.
-    Eleaky : volt, optional
-        Leaky potential.
-    gL : siemens, optional
-        Leak conductance.
-    Cm : farad, optional
-        Membrane capacitance.
-    E_ex : volt, optional
-        Excitatory reversal potential.
-    E_inh : volt, optional
-        Inhibitory reversal potential.
-    tau_e : time, optional
-        Excitatory time constant.
-    tau_i : time, optional
-        Inhibitory time constant.
-
-    threshold_v : volt, optional
-        Voltage threshold.
-    ees_freq : hertz, optional
-        EES frequency.
-    aff_recruited : int, optional
-        Number of afferent neurons recruited.
-    eff_recruited : float, optional
-        Number of efferent neurons recruited.
-    T_refr : time, optional
+    T_refr : time
         Refractory period.
-    
+    initial_potentials : dict
+        Initial membrane potentials for neuron groups.
+    Eleaky : volt
+        Leaky potential.
+    gL : siemens
+        Leak conductance.
+    Cm : farad
+        Membrane capacitance.
+    E_ex : volt
+        Excitatory reversal potential.
+    E_inh : volt
+        Inhibitory reversal potential.
+    tau_e : time
+        Excitatory time constant.
+    tau_1 : time
+        first Inhibitory time constant.
+    tau_2 : time
+        second Inhibitory time constant.
+    threshold_v : volt
+        Voltage threshold.
+    ees_freq : hertz
+        EES frequency.
+    aff_recruited : int
+        Number of afferent neurons recruited.
+    eff_recruited : int
+        Number of efferent neurons recruited.
+
     Returns:
     -------
     tuple
         Tuple containing a list of dictionaries with spike train data for flexor and extensor pathways,
-        and a dictionary with final membrane potentials.
+        a dictionary with final membrane potentials and post_synapstic current recorded in interesting neurons type.
     """
     # Set up random seeds for reproducibility
     np.random.seed(seed_run)
@@ -112,17 +113,17 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + ginh*(E_inh - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgexc/dt = -gexc / tau_e : siemens
-    dginh/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-ginh)/tau_1 : siemens
-    dx/dt = -x/tau_2 :siemens   
+    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*ginh-gi)/tau_1 : siemens
+    dginh/dt = -ginh/tau_2 :siemens   
 
     '''
     inh_eq = '''
     dv/dt = (gL*(Eleaky - v)+Isyn ) / Cm : volt
-    Isyn = ginh*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
+    Isyn = gi*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgII/dt = -gII / tau_e : siemens
-    dginh/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*x-ginh)/tau_1 : siemens
-    dx/dt = -x/tau_2 :siemens                                               
+    dgi/dt = ((tau_2 / tau_1) ** (tau_1 / (tau_2 - tau_1))*ginh-gi)/tau_1 : siemens
+    dginh/dt = -ginh/tau_2 :siemens                                               
     ''' 
   
     # Create neuron groups
@@ -167,7 +168,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
   
         syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
         syn.connect(p=p)
-        syn.w=np.clip(weight + noise_level * weight * randn(len(syn.w)), 0*nS,  np.inf*nS)
+        syn.w=weigth
         net.add(syn)
         synapses[key] = syn
           
@@ -178,20 +179,17 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     mon_inh = SpikeMonitor(inh)
     mon_motoneuron = SpikeMonitor(moto)
     
-    mon_exc_flexor=StateMonitor(exc, ['v', 'gII','Isyn'], n_exc/2)
-    mon_inh_flexor=StateMonitor(inh, ['v','gIa','gII','ginh', 'Isyn'], n_inh/2)
-    mon_moto_flexor=StateMonitor(moto, ['v','gIa','gexc','ginh', 'Isyn'], n_motor/2)
+    mon_inh_flexor=StateMonitor(inh, ['Isyn'], n_inh/2)
+    mon_moto_flexor=StateMonitor(moto, ['Isyn'], n_motor/2)
     
-    mon_exc_extensor=StateMonitor(exc, ['v', 'gII', 'Isyn'], 3*n_exc/2)
-    mon_inh_extensor=StateMonitor(inh, ['v','gIa','gII','ginh','Isyn'], 3*n_inh/2)
-    mon_moto_extensor=StateMonitor(moto, ['v','gIa','gexc','ginh', 'Isyn'], 3*n_motor/2)
+    mon_inh_extensor=StateMonitor(inh, ['Isyn'], 3*n_inh/2)
+    mon_moto_extensor=StateMonitor(moto, ['Isyn'], 3*n_motor/2)
     
     
     # Add all monitors to the network
     monitors = [
         mon_Ia, mon_II, mon_exc, mon_inh, mon_motoneuron, 
-        mon_exc_flexor, mon_inh_flexor, mon_moto_flexor,
-        mon_exc_extensor, mon_inh_extensor, mon_moto_extensor
+        mon_inh_flexor, mon_moto_flexor, mon_inh_extensor, mon_moto_extensor
     ]
                  
     net.add(monitors)
@@ -237,32 +235,10 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     } 
     # Store state monitors for plotting
     state_monitors = [ {
-            'v_exc': mon_exc_flexor.v[0]/mV,
-            'gII_exc': mon_exc_flexor.gII[0]/nS,
-            'IPSP_exc': mon_exc_flexor.Isyn[0]/nA,
-            'v_inh': mon_inh_flexor.v[0]/mV,
-            'gIa_inh': mon_inh_flexor.gIa[0]/nS,
-            'gII_inh': mon_inh_flexor.gII[0]/nS,
-            'gi_inh': mon_inh_flexor.ginh[0]/nS,
             'IPSP_inh': mon_inh_flexor.Isyn[0]/nA,
-            'v_moto': mon_moto_flexor.v[0]/mV,
-            'gIa_moto': mon_moto_flexor.gIa[0]/nS,
-            'gex_moto': mon_moto_flexor.gexc[0]/nS,
-            'gi_moto': mon_moto_flexor.ginh[0]/nS,
             'IPSP_moto':mon_moto_flexor.Isyn[0]/nA
         },{
-            'v_exc': mon_exc_extensor.v[0]/mV,
-            'gII_exc': mon_exc_extensor.gII[0]/nS,
-            'IPSP_exc': mon_exc_extensor.Isyn[0]/nA,
-            'v_inh': mon_inh_extensor.v[0]/mV,
-            'gIa_inh': mon_inh_extensor.gIa[0]/nS,
-            'gII_inh': mon_inh_extensor.gII[0]/nS,
-            'gi_inh': mon_inh_extensor.ginh[0]/nS,
             'IPSP_inh': mon_inh_extensor.Isyn[0]/nA,
-            'v_moto': mon_moto_extensor.v[0]/mV,
-            'gIa_moto': mon_moto_extensor.gIa[0]/nS,
-            'gex_moto': mon_moto_extensor.gexc[0]/nS,
-            'gi_moto': mon_moto_extensor.ginh[0]/nS,
             'IPSP_moto': mon_moto_extensor.Isyn[0]/nA,
         }
     ]
@@ -287,7 +263,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     result_extensor["MN"]=motor_extensor_spikes
 
 
-    return [result_flexor, result_extensor], final_potentials, state_monitors, [recruited_moto_flexor, recruited_moto_extensor]
+    return [result_flexor, result_extensor], final_potentials, state_monitors
 
 
 def run_neural_simulations(stretch, velocity, neuron_pop, dt_run, T, w=500*uS, p=0.4,Eleaky= -70*mV,
