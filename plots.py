@@ -1,11 +1,7 @@
-import argparse
-from jinja2.runtime import F
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
 from brian2.units import second, hertz
-import json
 import os
 
 # Colorblind-friendly palette
@@ -18,159 +14,98 @@ colorblind_friendly_colors = {
 }
 color_keys = list(colorblind_friendly_colors.keys())
 
-def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq ):
 
-    # Raster Plots
+def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))
-    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(10, 10), sharex=True)
-    
+    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(12, 10), sharex=True)
+
     if num_muscles == 1:
         axs = np.expand_dims(axs, axis=1)
 
-    # Iterate over muscles and fiber types to plot spikes
     for i, (muscle, spikes_muscle) in enumerate(spikes.items()):
         for j, (fiber_type, fiber_spikes) in enumerate(spikes_muscle.items()):
-            # Plot individual neuron spikes
             for neuron_id, neuron_spikes in fiber_spikes.items():
-                if neuron_spikes:  # Check if neuron_spikes is not empty
+                if neuron_spikes:
                     axs[j, i].plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), '.', markersize=3, color='black')
-
-            # Set plot properties
             axs[j, i].set(title=f"{muscle}_{fiber_type}", ylabel="Neuron Index")
+            axs[j, i].tick_params(labelsize=10)
             axs[j, i].grid(True)
 
-    # Set common x-axis label
-    axs[-1, 0].set_xlabel("Time (s)")  # Set xlabel for the bottom-most plot
-    fig.suptitle('Spikes Raster Plot', fontsize=16)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ensure titles and labels do not overlap
+    axs[-1, 0].set_xlabel("Time (s)", fontsize=12, fontweight='bold')
+    fig.suptitle('Spikes Raster Plot', fontsize=16, fontweight='bold')
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    # Save and display the plot
     fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
 
-def plot_times_series( muscle_data, muscle_names, folder, ees_freq, Ia_recruited,II_recruited, eff_recruited):
 
-    # Plot voltages
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-    fig.suptitle("Voltage")
-    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):  
-            axs[0].plot(df['Time'], df['v_exc'], label=f' exc {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-            axs[1].plot(df['Time'], df['v_inh'], label=f' inh {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-            axs[2].plot(df['Time'], df['v_moto'], label=f' moto {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-    axs[2].set_xlabel('time (ms)')
-    axs[0].set_ylabel('v exc (mV)')
-    axs[1].set_ylabel('v inh (mV)')
-    axs[2].set_ylabel('v moto (mV)')
-    axs[0].legend()
-    axs[1].legend()
-    axs[2].legend()
-    plt.show()
+def plot_neural_dynamic(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    rate_columns = [(col, "FR (Hz)") for col in muscle_data[0].columns if "rate" in col]
+    IPSP_columns = [(col, "IPSP (nA)") for col in muscle_data[0].columns if "IPSP" in col]
+    columns = rate_columns + IPSP_columns + [("MN_FR", "FR (Hz)")]
 
-    # Plot conductances
-    if (len(muscle_names)==2):
-        fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-        fig.suptitle("Inhibitory Conductances")
-        for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-            axs[0].plot(df['Time'],df['gIa_inh'], label=f'gIa {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-            axs[1].plot(df['Time'],df['gII_inh'], label=f'gII {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-            axs[2].plot(df['Time'],df['gi_inh'], label=f'gi {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        
-        axs[2].set_xlabel('time (ms)')
-        axs[0].set_ylabel('gIa (nS)')
-        axs[1].set_ylabel('gII (nS)')
-        axs[2].set_ylabel('gi (nS)')
-        axs[0].legend()
-        axs[1].legend()
-        axs[2].legend()
-        plt.show()
-
-    plt.figure(figsize=(10,4))
-    plt.title("Excitatory Conductances")
-    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-        plt.plot(df['Time'],df['gII_exc'], label=f'gII {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])  
-    plt.xlabel('time (ms)')
-    plt.ylabel('gII (nS)')
-    plt.legend()
-    plt.show()
-
-    
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-    fig.suptitle("Motoneurons Conductances")
-    for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-        axs[0].plot(df['Time'],df['gIa_moto'], label=f'gIa {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        axs[1].plot(df['Time'],df['gex_moto'], label=f'gex {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        axs[2].plot(df['Time'],df['gi_moto'], label=f'gi {muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-    
-    axs[2].set_xlabel('time (ms)')
-    axs[0].set_ylabel('gIa (nS)')
-    axs[1].set_ylabel('gex (nS)')
-    axs[2].set_ylabel('gi (nS)')
-
-    axs[0].legend()
-    axs[1].legend()
-    axs[2].legend()
-    plt.show()
-
-    # Firing rate plots
-    firing_rates_columns=[col for col in muscle_data[0].columns if "FR" in col]
-    fig, axs = plt.subplots(len(firing_rates_columns), 1, figsize=(10, 15), sharex=True)
+    fig, axs = plt.subplots(len(columns), 1, figsize=(12, 15), sharex=True)
     time = muscle_data[0]['Time'].values
 
-    for i, col in enumerate(firing_rates_columns):
+    for i, (col, ylabel) in enumerate(columns):
         ax = axs[i]
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("FR (Hertz)")
-        ax.set_title(col)
-        # Plot data for each muscle
+        ax.set_title(col, fontsize=12, fontweight='bold')
+        ax.set_ylabel(ylabel, fontsize=11)
         for idx, muscle_name in enumerate(muscle_names):
-            t = muscle_data[idx]['Time']
-            y = muscle_data[idx][col]
-            ax.plot(t, y, label=muscle_name)
-        ax.legend()
-    axs[-1].set_xlabel('Time (s)')
+            ax.plot(muscle_data[idx]['Time'], muscle_data[idx][col], label=muscle_name)
+        ax.legend(fontsize=10)
+        ax.tick_params(labelsize=10)
+
+    axs[-1].set_xlabel('Time (s)', fontsize=12, fontweight='bold')
+    fig.suptitle('Neural Dynamics', fontsize=16, fontweight='bold')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    path_fig = os.path.join(folder, f'Firing_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+
+    path_fig = os.path.join(folder, f'Dynamic_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
 
-    # Mean activation dynamics - 
-    fig, axs = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
+def plot_activation(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    fig, axs = plt.subplots(5, 1, figsize=(12, 12), sharex=True)
     labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'mean_activation']
+
     for i, label in enumerate(labels):
         for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
             axs[i].plot(df['Time'], df[label], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        axs[i].set_ylabel(label)
-        axs[i].legend()
+        axs[i].set_ylabel(label, fontsize=11)
+        axs[i].legend(fontsize=10)
+        axs[i].tick_params(labelsize=10)
 
-
-    axs[-1].set_xlabel('Time (s)')
-    fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=14)
+    axs[-1].set_xlabel('Time (s)', fontsize=12, fontweight='bold')
+    fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=16, fontweight='bold')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+
     path_fig = os.path.join(folder, f'Activation_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
-    # Muscle properties - for all muscles
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+
+def plot_muscle_length(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
     props = ['fiber_length', 'stretch', 'velocity']
-    ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s-1)']
+    ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
 
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
         for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
             axs[i].plot(df['Time'], df[prop], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        axs[i].set_ylabel(ylabel)
-        axs[i].legend()
+        axs[i].set_ylabel(ylabel, fontsize=11)
+        axs[i].legend(fontsize=10)
+        axs[i].tick_params(labelsize=10)
 
-    axs[-1].set_xlabel('Time (s)')
-    fig.suptitle("Muscle Properties: Muscle Comparison", fontsize=14)
+    axs[-1].set_xlabel('Time (s)', fontsize=12, fontweight='bold')
+    fig.suptitle("Muscle Properties: Muscle Comparison", fontsize=16, fontweight='bold')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+
     path_fig = os.path.join(folder, f'Muscle_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
-
 
 def read_sto(filepath, columns):
     with open(filepath, 'r') as file:
