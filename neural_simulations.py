@@ -4,9 +4,9 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 
 
-def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,T_refr 
+def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
                                           equation_Ia, equation_II, seed_run,initial_potentials, 
-                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_1,tau_2,threshold_v, 
+                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_1,tau_2,threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
     Run a simulation of flexor-extensor neuron dynamics.
@@ -168,7 +168,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
   
         syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
         syn.connect(p=p)
-        syn.w=weigth
+        syn.w=weight
         net.add(syn)
         synapses[key] = syn
           
