@@ -6,9 +6,6 @@ import subprocess
 import tempfile
 import json
 import matplotlib.pyplot as plt
-from scipy.signal import find_peaks
-from scipy.integrate import solve_ivp
-from scipy.interpolate import interp1d
 from collections import defaultdict
 from scipy.stats import gaussian_kde
 
@@ -111,7 +108,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
               initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
       else:  # NUM_MUSCLES == 2
-          all_spikes,  final_potentials, state_monitors, recruited = run_flexor_extensor_neuron_simulation(
+          all_spikes,  final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
               stretch, velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, equation_Ia, equation_II,seed,
               initial_potentials,**EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
@@ -263,29 +260,22 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
         "velocity": velocity_init
       })
       Ia_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
-      combined_df['Ia_FR_theoretical']=1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+      combined_df['Ia_FR']=1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
       II_rate= eval(equation_II, {"__builtins__": {}}, {
         "stretch": stretch_init,
         "velocity": velocity_init
       })
       II_rate+= EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-      combined_df['II_FR_theoretical']=1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+      combined_df['II_FR']=1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
-      for j, (fiber_type, fiber_spikes) in enumerate(spike_data[muscle_name].items()):
-
-            all_spike_times = np.concatenate(list(fiber_spikes.values()))
-            firing_rate=np.zeros_like(time)
-            if len(all_spike_times)>1:
-                kde = gaussian_kde(all_spike_times, bw_method=0.3)
-                firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-            combined_df[f'{fiber_type}_FR_monitored']=firing_rate
+      all_spike_times = np.concatenate(list(spike_data[muscle_name]['MN'].values()))
+      firing_rate=np.zeros_like(time)
+      if len(all_spike_times)>1:
+          kde = gaussian_kde(all_spike_times, bw_method=0.3)
+          firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
+      combined_df['MN_FR']=firing_rate
   
-            if (fiber_type=="MN0"):
-                lambda_=firing_rate+EES_PARAMS['eff_recruited']/len(fiber_spikes)*EES_PARAMS['ees_freq']/hertz
-                combined_df['MN_FR_theoretical']=(lambda_**(-1)+ BIOPHYSICAL_PARAMS['T_refr']/second)**(-1)
-
-      combined_df['recruited_MN'] = np.interp(time, range(0,NUM_ITERATIONS)*REACTION_TIME/second, recruited_motoneurons[muscle_idx])
 
       # Store dataframe for plotting
       muscle_dataframes.append(combined_df)
