@@ -4,6 +4,212 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 
 
+def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
+                                          equation_Ia, equation_II, seed_run,initial_potentials, 
+                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_i,threshold_v, T_refr,
+                                          ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    """
+    Run a simulation of flexor-extensor neuron dynamics.
+    
+    Parameters:
+    ----------
+    stretch : list of arrays
+        Stretch inputs.
+    velocity : list of arrays
+        Velocity inputs.
+    neuron_pop : dict
+        Dictionary with counts of different neuron populations ('Ia', 'II', 'motor', 'exc', 'inh').
+    connections: dict
+        Dictionnary with the weights and probability of connection all synapse of the network
+    dt_run : time
+        Simulation time step.
+    T : time
+        Total simulation time.
+    T_refr : time
+        Refractory period.
+    initial_potentials : dict
+        Initial membrane potentials for neuron groups.
+    Eleaky : volt
+        Leaky potential.
+    gL : siemens
+        Leak conductance.
+    Cm : farad
+        Membrane capacitance.
+    E_ex : volt
+        Excitatory reversal potential.
+    E_inh : volt
+        Inhibitory reversal potential.
+    tau_e : time
+        Excitatory time constant.
+    tau_i : time
+        Inhibitory time constant.
+    threshold_v : volt
+        Voltage threshold.
+    ees_freq : hertz
+        EES frequency.
+    aff_recruited : int
+        Number of afferent neurons recruited.
+    eff_recruited : int
+        Number of efferent neurons recruited.
+
+    Returns:
+    -------
+    tuple
+        Tuple containing a list of dictionaries with spike train data for flexor and extensor pathways,
+        a dictionary with final membrane potentials and post_synapstic current recorded in interesting neurons type.
+    """
+    # Set up random seeds for reproducibility
+    np.random.seed(seed_run)
+    seed(seed_run)
+    defaultclock.dt = dt_run
+
+    net = Network()
+
+    # Input arrays
+    stretch = TimedArray(stretch_input[0], dt=dt_run)
+    velocity = TimedArray(velocity_input[0], dt=dt_run)
+
+    # Extract neuron counts from dictionary
+    n_Ia = neuron_pop['Ia']
+    n_II = neuron_pop['II']
+    n_exc = neuron_pop['exc']
+    n_motor = neuron_pop['motor']  
+
+    # Afferent neuron equations
+
+    ia_eq = f'''
+    is_ees = ( i < Ia_recruited): boolean
+    rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
+    '''
+ 
+    ii_eq = f'''
+    is_ees= (i < II_recruited) : boolean
+    rate = ({equation_II})*hertz+ ees_freq * int(is_ees) : Hz
+    '''
+    
+    # Create afferent neurons
+    Ia = NeuronGroup(n_Ia, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
+    II = NeuronGroup(n_II, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
+    net.add([Ia, II])
+
+    # LIF neuron equations
+    ex_eq = '''
+    dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
+    Isyn = gII*(E_ex - v) :amp
+    dgII/dt = -gII / tau_e : siemens
+    '''
+    mn_eq = '''
+    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
+    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) :amp
+    dgIa/dt = -gIa / tau_e : siemens 
+    dgexc/dt = -gexc / tau_e : siemens  
+    '''
+ 
+    # Create neuron groups
+  
+    exc = NeuronGroup(n_exc, ex_eq, threshold='v > threshold_v', 
+                      reset='v = Eleaky', refractory=T_refr, method='euler')
+                                         
+    moto = NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
+                       reset='v = Eleaky', refractory=T_refr, method='euler')
+                       
+    # Initialize membrane potentials
+    exc.v = initial_potentials['exc']
+    moto.v = initial_potentials['moto']
+
+    # Add neuron groups to the network
+    net.add([exc, moto])
+                                            
+    group_map = {
+    "Ia":  Ia[:] ,
+    "II":   II[:] ,
+    "exc":   exc[:]  ,
+    "moto": moto[:] 
+}
+    
+    # Create synaptic connections
+    synapses = {}
+    for (pre_name, post_name), conn_info in connections.items():
+        key = f"{pre_name}_to_{post_name}"
+        pre = group_map[pre_name]
+        post = group_map[post_name]
+        weight = conn_info["w"]
+        p = conn_info["p"]
+  
+        syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
+        syn.connect(p=p)
+        syn.w=np.clip(weight + 0.2 * weight * randn(len(syn.w)), 0*nS,  np.inf*nS)
+        net.add(syn)
+        synapses[key] = syn
+          
+    # Setup monitors
+    mon_Ia = SpikeMonitor(Ia)
+    mon_II = SpikeMonitor(II)
+    mon_exc = SpikeMonitor(exc)
+    mon_motoneuron = SpikeMonitor(moto)
+    
+    mon_moto=StateMonitor(moto, ['Isyn'], n_motor/2)
+    
+    
+    # Add all monitors to the network
+    monitors = [
+        mon_Ia, mon_II, mon_exc, mon_motoneuron,mon_moto
+    ]
+                 
+    net.add(monitors)
+    
+    # Variables for EES monitors
+    mon_ees_moto = None
+                                            
+    # Handle EES stimulation if enabled
+    if ees_freq > 0 and eff_recruited > 0:
+        ees_motoneuron = PoissonGroup(N=eff_recruited, rates=ees_freq)
+        mon_ees_moto = SpikeMonitor(ees_motoneuron)
+        net.add([ees_motoneuron, mon_ees_moto])
+
+    # Run simulation
+    net.run(T)
+    
+    # Extract motoneuron spikes
+    motor_spikes =mon_motoneuron.spike_trains()
+ 
+    if ees_freq > 0 and eff_recruited > 0:
+        ees_spikes = mon_ees_moto.spike_trains()
+        before_motor_spikes=motor_flexor_spikes.copy()
+        motor_spikes = process_motoneuron_spikes(
+        neuron_pop, motor_spikes, ees_spikes, T_refr)
+       
+    # Count spiking neurons
+    recruited_moto = sum(1 for spikes in motor_spikes.values() if len(spikes) > 0)
+    print(f"Number of recruited motoneuron: {recruited_moto}/{n_motor}")
+
+
+    # Final membrane potentials
+    final_potentials = {
+        'exc': exc.v[:],
+        'moto': moto.v[:]
+    } 
+    # Store state monitors for plotting
+    state_monitors = [ {
+            'IPSP_moto':mon_moto_flexor.Isyn[0]/nA
+        }
+    ]
+    result = {
+        "Ia": {i: mon_Ia.spike_trains()[i] for i in range(n_Ia)},
+        "II": {i: mon_II.spike_trains()[i] for i in range(n_II)},
+        "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc)},
+    }
+    if ees_freq > 0 and eff_recruited > 0:
+        result_flexor["MN0"] = before_motor_flexor_spikes
+        result_extensor["MN0"] = before_motor_extensor_spikes
+
+    result_flexor["MN"]= motor_flexor_spikes
+    result_extensor["MN"]=motor_extensor_spikes
+
+
+    return [result], final_potentials, state_monitors
+
+
 def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
                                           equation_Ia, equation_II, seed_run,initial_potentials, 
                                           Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_i,threshold_v, T_refr,
