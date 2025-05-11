@@ -232,10 +232,143 @@ def EES_stim_analysis(
     
     print(f"Simulation and plotting complete! All plots saved to '{save_dir}' directory.")
     
-    # Return activities if co-activation analysis was performed
+    #  co-activition analysis if we have 2 muscles 
     if num_muscles == 2:
-        return activities
-    return None
+        # ===== Flexor-Extensor Activation Analysis =====
+        print("\nPerforming flexor-extensor activation analysis...")
+        
+        # Define activation threshold
+        activation_threshold = 0.1  # Threshold to consider a muscle as "active"
+        
+        flexor_idx = 0  # tib_ant_r (tibialis anterior - flexor)
+        extensor_idx = 1  # med_gas_r (medial gastrocnemius - extensor)
+        
+        
+        # Calculate grid layout (e.g., 2 rows if there are more than 3 frequencies)
+        n_cols = 2  # or choose based on space
+        n_rows = math.ceil(len(EES_freq) / n_cols)
+        
+        # Create scatter plot grid with multiple rows
+        fig_scatter, axs_scatter = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 5 * n_rows))
+        fig_scatter.suptitle("Flexor vs Extensor Activity", fontsize=16)
+        
+        # Ensure axs_scatter is 2D array
+        axs_scatter = np.atleast_2d(axs_scatter)
+        
+        # Create a figure for coactivation metrics
+        fig_coact, axs_coact = plt.subplots(1, 2, figsize=(15, 6))
+        fig_coact.suptitle("Coactivation Analysis", fontsize=16)
+        
+        # Create a figure for activation time analysis
+        fig_time, axs_time = plt.subplots(1, 2, figsize=(15, 6))
+        fig_time.suptitle("Muscle Activation Time Analysis", fontsize=16)
+        
+        # Arrays to store metrics across frequencies
+        min_coactivation = np.zeros(len(EES_freq))
+        product_coactivation = np.zeros(len(EES_freq))
+        flexor_active_time = np.zeros(len(EES_freq))
+        extensor_active_time = np.zeros(len(EES_freq))
+        total_time = main_data[0]['Time'].iloc[-1] # Total time in seconds
+        
+        # Analyze each frequency
+        for i, freq in enumerate(EES_freq):
+            # Get flexor and extensor activation data
+            flexor_activation = activities[flexor_idx, i, :]
+            extensor_activation = activities[extensor_idx, i, :]
+            time_array = main_data[0]['Time']
+            
+            # Calculate time step for integration
+            dt = time_array[1] - time_array[0] if len(time_array) > 1 else 0.001
+            
+            # 1. Flexor vs Extensor Scatter Plot
+            row = i // n_cols
+            col = i % n_cols
+            ax = axs_scatter[row, col]
+        
+            # Plot scatter
+            ax.scatter(flexor_activation, extensor_activation, alpha=0.6, s=10)
+            ax.set_xlabel("Flexor Activation")
+            ax.set_ylabel("Extensor Activation")
+            ax.set_title(f"EES Freq: {freq:.1f} Hz")
+            ax.grid(True, linestyle='--', alpha=0.7)
+        
+            # Diagonal reference line
+            max_val = max(np.max(flexor_activation), np.max(extensor_activation))
+            ax.plot([0, max_val], [0, max_val], 'r--', alpha=0.5)
+            
+            # 2. Calculate coactivation metrics
+            # Minimum-based coactivation: integral(min(flexor, extensor)dt)/total_time
+            min_coact = np.sum(np.minimum(flexor_activation, extensor_activation)) * dt / total_time
+            min_coactivation[i] = min_coact
+            
+            # Product-based coactivation: integral(flexor*extensor dt)/total_time
+            prod_coact = np.sum(flexor_activation * extensor_activation) * dt / total_time
+            product_coactivation[i] = prod_coact
+            
+            # 3. Calculate activation time (time above threshold)
+            flexor_active = np.sum(flexor_activation > activation_threshold) * dt / total_time
+            extensor_active = np.sum(extensor_activation > activation_threshold) * dt / total_time
+            
+            flexor_active_time[i] = flexor_active
+            extensor_active_time[i] = extensor_active
+        
+        # Plot coactivation metrics vs frequency
+        axs_coact[0].plot(EES_freq, min_coactivation, 'o-', linewidth=2)
+        axs_coact[0].set_xlabel("EES Frequency (Hz)")
+        axs_coact[0].set_ylabel("Min-based Coactivation")
+        axs_coact[0].set_title("Coactivation: min(flexor, extensor)")
+        axs_coact[0].grid(True)
+        
+        axs_coact[1].plot(EES_freq, product_coactivation, 'o-', linewidth=2, color='orange')
+        axs_coact[1].set_xlabel("EES Frequency (Hz)")
+        axs_coact[1].set_ylabel("Product-based Coactivation")
+        axs_coact[1].set_title("Coactivation: flexor * extensor")
+        axs_coact[1].grid(True)
+        
+        # Plot activation time metrics vs frequency
+        axs_time[0].plot(EES_freq, flexor_active_time, 'o-', linewidth=2, color='blue', label='Flexor')
+        axs_time[0].plot(EES_freq, extensor_active_time, 'o-', linewidth=2, color='green', label='Extensor')
+        axs_time[0].set_xlabel("EES Frequency (Hz)")
+        axs_time[0].set_ylabel("Fraction of Time Active")
+        axs_time[0].set_title(f"Time Active (threshold = {activation_threshold})")
+        axs_time[0].legend()
+        axs_time[0].grid(True)
+        
+        # Plot activation time ratio (flexor/extensor)
+        ratio = np.divide(flexor_active_time, extensor_active_time, 
+                         out=np.ones_like(flexor_active_time), 
+                         where=extensor_active_time!=0)
+        axs_time[1].plot(EES_freq, ratio, 'o-', linewidth=2, color='purple')
+        axs_time[1].axhline(y=1.0, color='r', linestyle='--', alpha=0.5)  # Reference line at ratio=1
+        axs_time[1].set_xlabel("EES Frequency (Hz)")
+        axs_time[1].set_ylabel("Flexor/Extensor Ratio")
+        axs_time[1].set_title("Balance of Activation")
+        axs_time[1].grid(True)
+        
+        # Hide any unused subplots
+        for j in range(i + 1, n_rows * n_cols):
+            row = j // n_cols
+            col = j % n_cols
+            axs_scatter[row, col].axis('off')
+        
+        # Adjust layout for all figures
+        for fig in [fig_scatter, fig_coact, fig_time]:
+            fig.tight_layout()
+            fig.subplots_adjust(top=0.9)
+        
+        # Save these new figures
+        for fig, name in zip([fig_scatter, fig_coact, fig_time], 
+                            ["flexor_vs_extensor", "coactivation_metrics", "activation_time"]):
+            filename = f"{name}_{min(EES_freq):.0f}to{max(EES_freq):.0f}Hz_{timestamp}_{seed}.png"
+            filepath = os.path.join(save_dir, filename)
+            fig.savefig(filepath, dpi=300, bbox_inches='tight')
+            print(f"Saved analysis plot: {filename}")
+        
+        # Display all figures
+        plt.show()
+
+        print("Flexor-extensor activation analysis complete!")
+
 
 
 # Example usage for the three scenarios:
@@ -264,8 +397,8 @@ def analyze_afferent_effects(afferent_range, ees_freq, II_recruited, eff_recruit
     """Analyze the effects of varying afferent recruitment (either Ia or II)."""
     base_params = {
         'ees_freq': ees_freq,
-        'Ia_recruited': II_recruited if afferent_type == 'II' else 0.5,  # Default
-        'II_recruited': II_recruited if afferent_type != 'II' else 0.5,  # Default
+        'Ia_recruited': II_recruited if afferent_type == 'II' else 0,  # Default
+        'II_recruited': II_recruited if afferent_type != 'II' else 0,  # Default
         'eff_recruited': eff_recruited
     }
     
@@ -287,7 +420,7 @@ def analyze_efferent_effects(efferent_range, ees_freq, Ia_recruited, II_recruite
         'ees_freq': ees_freq,
         'Ia_recruited': Ia_recruited,
         'II_recruited': II_recruited,
-        'eff_recruited': 0.5  # Default value, will be overridden
+        'eff_recruited': 0  # Default value, will be overridden
     }
     
     vary_param = {
