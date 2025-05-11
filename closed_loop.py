@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from scipy.stats import gaussian_kde
 
-from neural_simulations import run_neural_simulations, run_flexor_extensor_neuron_simulation
+from neural_simulations import run_one_muscle_neuron_simulation, run_flexor_extensor_neuron_simulation
 from activation import decode_spikes_to_activation
 
 
@@ -79,9 +79,6 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       }
       for muscle_name in MUSCLE_NAMES
   }
-  # Create directory to save STO FILE
-  STO_DIR = 'Sto'
-  os.makedirs(STO_DIR, exist_ok=True)
 
   # Use temporary file for state management across iterations
   state_file = None
@@ -102,7 +99,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
 
       # Run neural simulation based on muscle count
       if NUM_MUSCLES == 1:
-          all_spikes, final_potentials = run_neural_simulations(
+          all_spikes, final_potentials, state_monitors = run_one_muscle_neuron_simulation(
               stretch, velocity, NEURON_COUNTS,CONNECTIONS, TIME_STEP, REACTION_TIME,equation_Ia, equation_II,seed,
               initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
           )
