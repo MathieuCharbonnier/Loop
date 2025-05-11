@@ -30,6 +30,7 @@ def EES_stim_analysis(
     import matplotlib.pyplot as plt
     from datetime import datetime
     from closed_loop import closed_loop
+    from plots import read_sto
 
     # Create a directory for saving plots if it doesn't exist
     save_dir = "stimulation_analysis"
@@ -39,7 +40,7 @@ def EES_stim_analysis(
     
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    muscles_names = MUSCLE_NAMES_STR.split(',')
+    muscles_names = MUSCLES_STR.split(',')
     num_muscles = len(muscles_names)
     
     # Define a custom color palette for muscles
@@ -75,7 +76,7 @@ def EES_stim_analysis(
     figs = {}
     axs_dict = {}
     for var in time_series_to_plot:
-        fig, axs = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True)
+        fig, axs = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True, sharey=True)
         if n_rows == 1:
             axs = [axs]  # Ensure axs is always a list
         figs[var] = fig
@@ -95,7 +96,7 @@ def EES_stim_analysis(
         
         # Create a descriptive name for the output file
         param_str_parts = []
-        for key in ['Ia_recruited', 'II_recruited', 'eff_recruited', 'ees_freq']:
+        for key in ['aff_recruited', 'eff_recruited', 'ees_freq']:
             
             param_str_parts.append(f"{key}_{current_params[key]}")
         
@@ -105,9 +106,9 @@ def EES_stim_analysis(
     
         # --- Run simulation ---
         spikes, main_data = closed_loop(
-            NUM_ITERATIONS, REACTION_TIME, TIME_STEP, current_params, NEURON_COUNTS, CONNECTIONS,
+            N_ITERATIONS, REACTION_TIME, TIME_STEP, current_params, NEURON_COUNTS, CONNECTIONS,
             equation_Ia, equation_II, BIOPHYSICAL_PARAMS,
-            MUSCLE_NAMES_STR, sto_path, seed=seed
+            MUSCLES_STR, sto_path, seed=seed
         )
         
         # Get time length for preallocation on first iteration
@@ -121,11 +122,10 @@ def EES_stim_analysis(
             ax = axs_dict[var][i]
             
             # Set title with parameter information
-            value_display = f"{value} Hz" if param_name == 'ees_freq' else f"{value}"
-            ax.set_title(f"{param_label}: {value_display}, "
-                        f"Ia: {current_params['Ia_recruited']}, "
-                        f"II: {current_params['II_recruited']}, "
-                        f"Motoneurons: {current_params['eff_recruited']}", 
+            ax.set_title(f"{param_label}: {value}, "
+                        #f"Ia: {current_params['Ia_recruited']}, "
+                        #f"II: {current_params['II_recruited']}, "
+                        #f"Motoneurons: {current_params['eff_recruited']}", 
                         fontweight='bold')
             
             ax.set_xlabel("Time (s)", fontweight='bold')
@@ -155,7 +155,7 @@ def EES_stim_analysis(
                                        '.', markersize=4, color=color)
                         
                         # Add a label for this muscle at its position
-                        ax.text(0.01, 10, muscle_name, 
+                        ax.text(0.01, 0.5, muscle_name, 
                                transform=ax.get_xaxis_transform(), color=color,
                                fontweight='bold', verticalalignment='center')
                 
@@ -382,7 +382,7 @@ def analyze_frequency_effects(freq_range, aff_recruited, eff_recruited, **kwargs
     vary_param = {
         'param_name': 'ees_freq',
         'values': freq_range,
-        'label': 'EES Frequency (Hz)'
+        'label': 'EES Frequency '
     }
     
     return EES_stim_analysis(base_params, vary_param, **kwargs)
@@ -418,7 +418,7 @@ def analyze_efferent_effects(efferent_range, ees_freq, aff_recruited, **kwargs):
     vary_param = {
         'param_name': 'eff_recruited',
         'values': efferent_range,
-        'label': 'Motoneuron Recruitment (%)'
+        'label': 'Motoneuron Recruitment '
     }
     
     return EES_stim_analysis(base_params, vary_param, **kwargs)
