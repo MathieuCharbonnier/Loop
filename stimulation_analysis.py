@@ -1,3 +1,12 @@
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+from datetime import datetime
+from closed_loop import closed_loop
+from plots import read_sto
+
+
 def EES_stim_analysis(
     param_dict,
     vary_param,
@@ -25,12 +34,7 @@ def EES_stim_analysis(
         Format: {'param_name': [values_to_test], 'label': 'Display Label'}
         Example: {'param_name': 'ees_freq', 'values': [10, 20, 30], 'label': 'EES Frequency (Hz)'}
     """
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from datetime import datetime
-    from closed_loop import closed_loop
-    from plots import read_sto
+
 
     # Create a directory for saving plots if it doesn't exist
     save_dir = "stimulation_analysis"
