@@ -6,7 +6,7 @@ from typing import Dict, List, Union, Tuple, Optional
 
 def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
                                           equation_Ia, equation_II, seed_run,initial_potentials, 
-                                          Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_i,threshold_v, T_refr,
+                                          Eleaky,gL, Cm, E_ex, tau_e,threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
     Run a simulation of flexor-extensor neuron dynamics.
@@ -66,8 +66,8 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     net = Network()
 
     # Input arrays
-    stretch = TimedArray(stretch_input[0], dt=dt_run)
-    velocity = TimedArray(velocity_input[0], dt=dt_run)
+    stretch_array = TimedArray(stretch_input[0], dt=dt_run)
+    velocity_array = TimedArray(velocity_input[0], dt=dt_run)
 
     # Extract neuron counts from dictionary
     n_Ia = neuron_pop['Ia']
@@ -79,11 +79,15 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
 
     ia_eq = f'''
     is_ees = ( i < Ia_recruited): boolean
+    stretch = stretch_array(t):1
+    velocity= velocity_array(t):1
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
  
     ii_eq = f'''
     is_ees= (i < II_recruited) : boolean
+    stretch = stretch_array(t):1
+    velocity= velocity_array(t):1
     rate = ({equation_II})*hertz+ ees_freq * int(is_ees) : Hz
     '''
     
@@ -175,7 +179,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
  
     if ees_freq > 0 and eff_recruited > 0:
         ees_spikes = mon_ees_moto.spike_trains()
-        before_motor_spikes=motor_flexor_spikes.copy()
+        before_motor_spikes=motor_spikes.copy()
         motor_spikes = process_motoneuron_spikes(
         neuron_pop, motor_spikes, ees_spikes, T_refr)
        
@@ -191,7 +195,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     } 
     # Store state monitors for plotting
     state_monitors = [ {
-            'IPSP_moto':mon_moto_flexor.Isyn[0]/nA
+            'IPSP_moto':mon_moto.Isyn[0]/nA
         }
     ]
     result = {
@@ -200,11 +204,9 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
         "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc)},
     }
     if ees_freq > 0 and eff_recruited > 0:
-        result_flexor["MN0"] = before_motor_flexor_spikes
-        result_extensor["MN0"] = before_motor_extensor_spikes
+        result["MN0"] = before_motor_spikes
 
-    result_flexor["MN"]= motor_flexor_spikes
-    result_extensor["MN"]=motor_extensor_spikes
+    result["MN"]= motor_spikes
 
 
     return [result], final_potentials, state_monitors
