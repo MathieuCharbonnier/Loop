@@ -96,7 +96,7 @@ def EES_stim_analysis(
         
         # Create a descriptive name for the output file
         param_str_parts = []
-        for key in ['aff_recruited', 'eff_recruited', 'ees_freq']:
+        for key in current_params.keys():
             
             param_str_parts.append(f"{key}_{current_params[key]}")
         
