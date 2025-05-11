@@ -1,7 +1,7 @@
 def EES_stim_analysis(
     param_dict,
     vary_param,
-    NUM_ITERATIONS,
+    N_ITERATIONS,
     REACTION_TIME, 
     TIME_STEP, 
     NEURON_COUNTS, 
@@ -9,8 +9,7 @@ def EES_stim_analysis(
     equation_Ia, 
     equation_II, 
     BIOPHYSICAL_PARAMS, 
-    MUSCLE_NAMES_STR,
-    sto_path_base, 
+    MUSCLES_STR,
     seed=42
 ):
     """
@@ -31,12 +30,13 @@ def EES_stim_analysis(
     import matplotlib.pyplot as plt
     from datetime import datetime
     from closed_loop import closed_loop
-    
+
     # Create a directory for saving plots if it doesn't exist
-    save_dir = "parameter_analysis"
+    save_dir = "stimulation_analysis"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         print(f"Created directory '{save_dir}' for saving plots")
+    
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     muscles_names = MUSCLE_NAMES_STR.split(',')
@@ -96,10 +96,8 @@ def EES_stim_analysis(
         # Create a descriptive name for the output file
         param_str_parts = []
         for key in ['Ia_recruited', 'II_recruited', 'eff_recruited', 'ees_freq']:
-            if key == 'ees_freq':
-                param_str_parts.append(f"{key}_{current_params[key]}")
-            else:
-                param_str_parts.append(f"{key}_{current_params[key]}")
+            
+            param_str_parts.append(f"{key}_{current_params[key]}")
         
         param_str = '_'.join(param_str_parts)
         sto_name = f'All_opensim_{param_str}_{timestamp}_{seed}.sto'
@@ -372,15 +370,12 @@ def EES_stim_analysis(
 
 
 
-# Example usage for the three scenarios:
-
 # 1. Varying EES frequency with fixed afferent and efferent recruitment
-def analyze_frequency_effects(freq_range, Ia_recruited, II_recruited, eff_recruited, **kwargs):
+def analyze_frequency_effects(freq_range, aff_recruited, eff_recruited, **kwargs):
     """Analyze the effects of varying EES frequency."""
     base_params = {
         'ees_freq': 20,  # Default value, will be overridden
-        'Ia_recruited': Ia_recruited,
-        'II_recruited': II_recruited,
+        'aff_recruited': aff_recruited,
         'eff_recruited': eff_recruited
     }
     
@@ -394,33 +389,29 @@ def analyze_frequency_effects(freq_range, Ia_recruited, II_recruited, eff_recrui
 
 
 # 2. Varying afferent recruitment with fixed EES frequency and efferent recruitment
-def analyze_afferent_effects(afferent_range, ees_freq, II_recruited, eff_recruited, afferent_type='Ia', **kwargs):
-    """Analyze the effects of varying afferent recruitment (either Ia or II)."""
+def analyze_afferent_effects(afferent_range, ees_freq, eff_recruited, **kwargs):
+    """Analyze the effects of varying afferent recruitment (assume symmetric recruitment here)."""
     base_params = {
         'ees_freq': ees_freq,
-        'Ia_recruited': II_recruited if afferent_type == 'II' else 0,  # Default
-        'II_recruited': II_recruited if afferent_type != 'II' else 0,  # Default
+        'aff_recruited': 0,
         'eff_recruited': eff_recruited
     }
     
-    param_name = f'{afferent_type}_recruited'
-    
     vary_param = {
-        'param_name': param_name,
+        'param_name': 'aff_recruited',
         'values': afferent_range,
-        'label': f'{afferent_type} Fiber Recruitment (%)'
+        'label': f'Afferent Fiber Recruitment '
     }
     
     return EES_stim_analysis(base_params, vary_param, **kwargs)
 
 
 # 3. Varying efferent recruitment with fixed EES frequency and afferent recruitment
-def analyze_efferent_effects(efferent_range, ees_freq, Ia_recruited, II_recruited, **kwargs):
+def analyze_efferent_effects(efferent_range, ees_freq, aff_recruited, **kwargs):
     """Analyze the effects of varying efferent (motoneuron) recruitment."""
     base_params = {
         'ees_freq': ees_freq,
-        'Ia_recruited': Ia_recruited,
-        'II_recruited': II_recruited,
+        'aff_recruited': aff_recruited,
         'eff_recruited': 0  # Default value, will be overridden
     }
     
