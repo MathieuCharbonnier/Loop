@@ -30,6 +30,7 @@ def EES_stim_analysis(
     import numpy as np
     import matplotlib.pyplot as plt
     from datetime import datetime
+    from closed_loop import closed_loop
     
     # Create a directory for saving plots if it doesn't exist
     save_dir = "parameter_analysis"
