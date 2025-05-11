@@ -159,7 +159,7 @@ def EES_stim_analysis(
                                        '.', markersize=4, color=color)
                         
                         # Add a label for this muscle at its position
-                        ax.text(0.01, 0.5, muscle_name, 
+                        ax.text(0.01+ idx*0.9, 1.05, muscle_name, 
                                transform=ax.get_xaxis_transform(), color=color,
                                fontweight='bold', verticalalignment='center')
                 
