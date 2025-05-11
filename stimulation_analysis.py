@@ -122,7 +122,7 @@ def EES_stim_analysis(
             ax = axs_dict[var][i]
             
             # Set title with parameter information
-            ax.set_title(f"{param_label}: {value}, "
+            ax.set_title(f"{param_label}: {value} ",
                         #f"Ia: {current_params['Ia_recruited']}, "
                         #f"II: {current_params['II_recruited']}, "
                         #f"Motoneurons: {current_params['eff_recruited']}", 
