@@ -42,9 +42,9 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
 
 
 def plot_neural_dynamic(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
-    rate_columns = [(col, "FR (Hz)") for col in muscle_data[0].columns if "rate" in col]
+    rate_columns = [(col, "FR (Hz)") for col in ["Ia_rate", "II_rate"]]
     IPSP_columns = [(col, "IPSP (nA)") for col in muscle_data[0].columns if "IPSP" in col]
-    columns = rate_columns + IPSP_columns + [("MN_FR", "FR (Hz)")]
+    columns = rate_columns + IPSP_columns + [("MN_rate", "FR (Hz)")]
 
     fig, axs = plt.subplots(len(columns), 1, figsize=(12, 15), sharex=True)
     time = muscle_data[0]['Time'].values
@@ -69,7 +69,7 @@ def plot_neural_dynamic(muscle_data, muscle_names, folder, ees_freq, Ia_recruite
 
 def plot_activation(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
     fig, axs = plt.subplots(5, 1, figsize=(12, 12), sharex=True)
-    labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'mean_activation']
+    labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'Activation']
 
     for i, label in enumerate(labels):
         for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
@@ -89,7 +89,7 @@ def plot_activation(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, I
 
 def plot_muscle_length(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
     fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
-    props = ['fiber_length', 'stretch', 'velocity']
+    props = ['Fiber_length', 'Stretch', 'Velocity']
     ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
 
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
