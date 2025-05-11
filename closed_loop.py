@@ -206,10 +206,10 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
                       'mean_u': mean_u[muscle_idx],
                       'mean_c': mean_c[muscle_idx],
                       'mean_P': mean_P[muscle_idx],
-                      'mean_activation': mean_activation[muscle_idx],
-                      'fiber_length': fiber_lengths[muscle_idx],
-                      'stretch': stretch[muscle_idx],
-                      'velocity': velocity[muscle_idx]
+                      'Activation': mean_activation[muscle_idx],
+                      'Fiber_length': fiber_lengths[muscle_idx],
+                      'Stretch': stretch[muscle_idx],
+                      'Velocity': velocity[muscle_idx]
                   }
 
                   # Store batch data for this muscle
@@ -248,7 +248,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
 
       #Compute all firing rate:
       #first calculate initial stretch
-      stretch_init = np.append(stretch0[muscle_idx], combined_df['stretch'].values)
+      stretch_init = np.append(stretch0[muscle_idx], combined_df['Stretch'].values)
       stretch_init = stretch_init[:len(time)]
       velocity_init = np.gradient(stretch_init, time)
       Ia_rate = eval(equation_Ia, {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, {
@@ -270,7 +270,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       if len(all_spike_times)>1:
           kde = gaussian_kde(all_spike_times, bw_method=0.3)
           firing_rate = kde(time) * len(all_spike_times) / len(fiber_spikes)
-      combined_df['MN_FR']=firing_rate
+      combined_df['MN_rate']=firing_rate
   
 
       # Store dataframe for plotting
@@ -291,7 +291,7 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       # Save muscle activations without time column
       activations_array = np.zeros((NUM_MUSCLES, len((muscle_dataframes[0]))))
       for i in range(NUM_MUSCLES):
-          activations_array[i]=muscle_dataframes[i]['mean_activation'].T.to_numpy()
+          activations_array[i]=muscle_dataframes[i]['Activation'].T.to_numpy()
 
       np.save(input_path, activations_array)
 
