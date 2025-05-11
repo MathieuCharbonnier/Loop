@@ -6,7 +6,6 @@ from datetime import datetime
 from closed_loop import closed_loop
 from plots import read_sto
 
-
 def EES_stim_analysis(
     param_dict,
     vary_param,
@@ -34,7 +33,13 @@ def EES_stim_analysis(
         Format: {'param_name': [values_to_test], 'label': 'Display Label'}
         Example: {'param_name': 'ees_freq', 'values': [10, 20, 30], 'label': 'EES Frequency (Hz)'}
     """
-
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import math
+    from datetime import datetime
+    from closed_loop import closed_loop
+    from plots import read_sto
 
     # Create a directory for saving plots if it doesn't exist
     save_dir = "stimulation_analysis"
@@ -246,10 +251,9 @@ def EES_stim_analysis(
         flexor_idx = 0  # tib_ant_r (tibialis anterior - flexor)
         extensor_idx = 1  # med_gas_r (medial gastrocnemius - extensor)
         
-        
-        # Calculate grid layout (e.g., 2 rows if there are more than 3 frequencies)
+        # Calculate grid layout (e.g., 2 rows if there are more than 3 parameter values)
         n_cols = 2  # or choose based on space
-        n_rows = math.ceil(len(EES_freq) / n_cols)
+        n_rows = math.ceil(len(param_values) / n_cols)
         
         # Create scatter plot grid with multiple rows
         fig_scatter, axs_scatter = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 5 * n_rows))
@@ -266,15 +270,15 @@ def EES_stim_analysis(
         fig_time, axs_time = plt.subplots(1, 2, figsize=(15, 6))
         fig_time.suptitle("Muscle Activation Time Analysis", fontsize=16)
         
-        # Arrays to store metrics across frequencies
-        min_coactivation = np.zeros(len(EES_freq))
-        product_coactivation = np.zeros(len(EES_freq))
-        flexor_active_time = np.zeros(len(EES_freq))
-        extensor_active_time = np.zeros(len(EES_freq))
-        total_time = main_data[0]['Time'].iloc[-1] # Total time in seconds
+        # Arrays to store metrics across parameter values
+        min_coactivation = np.zeros(len(param_values))
+        product_coactivation = np.zeros(len(param_values))
+        flexor_active_time = np.zeros(len(param_values))
+        extensor_active_time = np.zeros(len(param_values))
+        total_time = main_data[0]['Time'].iloc[-1] if hasattr(main_data[0]['Time'], 'iloc') else main_data[0]['Time'][-1]
         
-        # Analyze each frequency
-        for i, freq in enumerate(EES_freq):
+        # Analyze each parameter value
+        for i, value in enumerate(param_values):
             # Get flexor and extensor activation data
             flexor_activation = activities[flexor_idx, i, :]
             extensor_activation = activities[extensor_idx, i, :]
@@ -292,7 +296,7 @@ def EES_stim_analysis(
             ax.scatter(flexor_activation, extensor_activation, alpha=0.6, s=10)
             ax.set_xlabel("Flexor Activation")
             ax.set_ylabel("Extensor Activation")
-            ax.set_title(f"EES Freq: {freq:.1f} Hz")
+            ax.set_title(f"{param_label}: {value}")
             ax.grid(True, linestyle='--', alpha=0.7)
         
             # Diagonal reference line
@@ -315,23 +319,23 @@ def EES_stim_analysis(
             flexor_active_time[i] = flexor_active
             extensor_active_time[i] = extensor_active
         
-        # Plot coactivation metrics vs frequency
-        axs_coact[0].plot(EES_freq, min_coactivation, 'o-', linewidth=2)
-        axs_coact[0].set_xlabel("EES Frequency (Hz)")
+        # Plot coactivation metrics vs parameter value
+        axs_coact[0].plot(param_values, min_coactivation, 'o-', linewidth=2)
+        axs_coact[0].set_xlabel(param_label)
         axs_coact[0].set_ylabel("Min-based Coactivation")
         axs_coact[0].set_title("Coactivation: min(flexor, extensor)")
         axs_coact[0].grid(True)
         
-        axs_coact[1].plot(EES_freq, product_coactivation, 'o-', linewidth=2, color='orange')
-        axs_coact[1].set_xlabel("EES Frequency (Hz)")
+        axs_coact[1].plot(param_values, product_coactivation, 'o-', linewidth=2, color='orange')
+        axs_coact[1].set_xlabel(param_label)
         axs_coact[1].set_ylabel("Product-based Coactivation")
         axs_coact[1].set_title("Coactivation: flexor * extensor")
         axs_coact[1].grid(True)
         
-        # Plot activation time metrics vs frequency
-        axs_time[0].plot(EES_freq, flexor_active_time, 'o-', linewidth=2, color='blue', label='Flexor')
-        axs_time[0].plot(EES_freq, extensor_active_time, 'o-', linewidth=2, color='green', label='Extensor')
-        axs_time[0].set_xlabel("EES Frequency (Hz)")
+        # Plot activation time metrics vs parameter value
+        axs_time[0].plot(param_values, flexor_active_time, 'o-', linewidth=2, color='blue', label='Flexor')
+        axs_time[0].plot(param_values, extensor_active_time, 'o-', linewidth=2, color='green', label='Extensor')
+        axs_time[0].set_xlabel(param_label)
         axs_time[0].set_ylabel("Fraction of Time Active")
         axs_time[0].set_title(f"Time Active (threshold = {activation_threshold})")
         axs_time[0].legend()
@@ -341,15 +345,15 @@ def EES_stim_analysis(
         ratio = np.divide(flexor_active_time, extensor_active_time, 
                          out=np.ones_like(flexor_active_time), 
                          where=extensor_active_time!=0)
-        axs_time[1].plot(EES_freq, ratio, 'o-', linewidth=2, color='purple')
+        axs_time[1].plot(param_values, ratio, 'o-', linewidth=2, color='purple')
         axs_time[1].axhline(y=1.0, color='r', linestyle='--', alpha=0.5)  # Reference line at ratio=1
-        axs_time[1].set_xlabel("EES Frequency (Hz)")
+        axs_time[1].set_xlabel(param_label)
         axs_time[1].set_ylabel("Flexor/Extensor Ratio")
         axs_time[1].set_title("Balance of Activation")
         axs_time[1].grid(True)
         
         # Hide any unused subplots
-        for j in range(i + 1, n_rows * n_cols):
+        for j in range(len(param_values), n_rows * n_cols):
             row = j // n_cols
             col = j % n_cols
             axs_scatter[row, col].axis('off')
@@ -362,7 +366,7 @@ def EES_stim_analysis(
         # Save these new figures
         for fig, name in zip([fig_scatter, fig_coact, fig_time], 
                             ["flexor_vs_extensor", "coactivation_metrics", "activation_time"]):
-            filename = f"{name}_{min(EES_freq):.0f}to{max(EES_freq):.0f}Hz_{timestamp}_{seed}.png"
+            filename = f"{name}_{param_name}_{min(param_values)}to{max(param_values)}_{timestamp}_{seed}.png"
             filepath = os.path.join(save_dir, filename)
             fig.savefig(filepath, dpi=300, bbox_inches='tight')
             print(f"Saved analysis plot: {filename}")
@@ -371,7 +375,6 @@ def EES_stim_analysis(
         plt.show()
 
         print("Flexor-extensor activation analysis complete!")
-
 
 
 # 1. Varying EES frequency with fixed afferent and efferent recruitment
