@@ -35,10 +35,10 @@ def closed_loop(NUM_ITERATIONS,REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUN
       raise ValueError("This pipeline supports only 1 or 2 muscles!")
     
   #for symmetric afferent recruitment 
-  if 'aff_recruited' in EES_params:
-    value = EES_params.pop('aff_recruited')
-    EES_params['Ia_recruited'] = value
-    EES_params['II_recruited'] = value
+  if 'aff_recruited' in EES_PARAMS:
+    value = EES_PARAMS.pop('aff_recruited')
+    EES_PARAMS['Ia_recruited'] = value
+    EES_PARAMS['II_recruited'] = value
 
 
   # =============================================================================
