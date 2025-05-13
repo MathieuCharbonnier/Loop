@@ -5,7 +5,7 @@ from typing import Dict, List, Union, Tuple, Optional
 
 
 def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
-                                          equation_Ia, equation_II, seed_run,initial_potentials, 
+                                          spindle_model, seed_run,initial_potentials, 
                                           Eleaky,gL, Cm, E_ex, tau_e,threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
@@ -27,6 +27,8 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
         Total simulation time.
     T_refr : time
         Refractory period.
+    Spindle_model: dict
+        equations that relate afferent firing rate with stretch or joint
     initial_potentials : dict
         Initial membrane potentials for neuron groups.
     Eleaky : volt
@@ -76,14 +78,14 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     n_motor = neuron_pop['motor']  
 
     # Afferent neuron equations
-
+    equation_Ia=spindle_model['Ia']
     ia_eq = f'''
     is_ees = ( i < Ia_recruited): boolean
     stretch = stretch_array(t):1
     velocity= velocity_array(t):1
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
- 
+    equation_II=spindle_model['II']
     ii_eq = f'''
     is_ees= (i < II_recruited) : boolean
     stretch = stretch_array(t):1
