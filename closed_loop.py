@@ -12,9 +12,10 @@ from scipy.stats import gaussian_kde
 from neural_simulations import run_one_muscle_neuron_simulation, run_flexor_extensor_neuron_simulation
 from activation import decode_spikes_to_activation
 
+
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, sto_path, 
-           initial_perturbation=None, seed=42):
+           torque=None,torque_coordinate=None, seed=42):
   """
   Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -100,14 +101,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
   # Initial Perturbation Phase (if configured)
   # =============================================================================
   
-  if initial_perturbation is not None :
-      print("Applying initial perturbation to simulate dorsiflexion...")
-      
-      target_muscles = initial_perturbation.get('target_muscles')
-      equation_perturbation=initial_perturbation.get('equation')
-      time_array = np.arange(0, REACTION_TIME, TIME_STEP)
-      perturbation_activation = eval(equation_perturbation, {"np": np}, {"t": time_array})
-      
+  if torque is not None :
+      print("Applying initial perturbation ...")
+
       # Run OpenSim simulation with perturbation activations
       with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_file, \
           tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as output_file, \
@@ -118,16 +114,16 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
           new_state_path = new_state_file.name
 
           # Save perturbation activations to temporary file
-          np.save(input_path, perturbation_activation)
+          np.save(input_path, torque)
 
           # Build command for OpenSim muscle simulation
           cmd = [
               'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
               '--dt', str(TIME_STEP/second),
-              '--T', str(REACTION_TIME),
-              '--muscles', target_muscles,
-              '--muscles_recorded', MUSCLE_NAMES_STR,
-              '--activation', input_path,
+              '--T', str(REACTION_TIME/second),
+              '--muscles', MUSCLE_NAMES_STR,
+              '--torque_coords', torque_coordinate,
+              '--torque_values', input_path,
               '--output_stretch', output_path,
               '--output_final_state', new_state_path
           ]
@@ -151,10 +147,10 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
               state_file = new_state_path
           else:
               print(f"Warning: Perturbation simulation failed. STDERR: {process.stderr}")
-              # Clean up
-              os.unlink(input_path)
-              os.unlink(output_path)
-              os.unlink(new_state_path)
+           # Clean up
+           os.unlink(input_path)
+           os.unlink(output_path)
+           os.unlink(new_state_path)
 
   # =============================================================================
   # Main Simulation Loop
@@ -166,8 +162,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
   print("Number II fibers recruited by EES : " + str(EES_PARAMS['II_recruited'])+ " / "+str(NEURON_COUNTS['II']))
   print("Number Efferent fibers recruited by EES : " + str(EES_PARAMS['eff_recruited'])+" / "+str(NEURON_COUNTS['motor']))
   
-  if dorsiflexion_params is not None:
-      print("Initial dorsiflexion applied to trigger clonus.")
 
   for iteration in range(NUM_ITERATIONS):
       print(f"--- Iteration {iteration+1} of {NUM_ITERATIONS} ---")
@@ -240,10 +234,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
               'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
               '--dt', str(TIME_STEP/second),
               '--T', str(REACTION_TIME/second),
-              '--muscles_target', MUSCLE_NAMES_STR,
+              '--muscles', MUSCLE_NAMES_STR,
               '--activation', input_path,
               '--output_stretch', output_path,
-              '--muscles_recorded', MUSCLE_NAMES_STR,
               '--output_final_state', new_state_path
           ]
 
@@ -324,14 +317,14 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
       stretch_init = np.append(stretch0[muscle_idx], combined_df['Stretch'].values)
       stretch_init = stretch_init[:len(time)]
       velocity_init = np.gradient(stretch_init, time)
-      Ia_rate = eval(equation_Ia, {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, {
+      Ia_rate = eval(SPINDLE_MODEL['Ia'], {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, {
         "stretch": stretch_init,
         "velocity": velocity_init
       })
       Ia_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
       combined_df['Ia_rate'] = 1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
-      II_rate = eval(equation_II, {"__builtins__": {}}, {
+      II_rate = eval(SPINDLE_MODEL['II'], {"__builtins__": {}}, {
         "stretch": stretch_init,
         "velocity": velocity_init
       })
@@ -371,7 +364,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
           'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
           '--dt', str(TIME_STEP/second),
           '--T', str(REACTION_TIME/second * NUM_ITERATIONS),
-          '--muscles_target', MUSCLE_NAMES_STR,
+          '--muscles', MUSCLE_NAMES_STR,
           '--activation', input_path,
           '--output_all', sto_path
       ]
