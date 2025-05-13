@@ -227,9 +227,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
               '--dt', str(TIME_STEP/second),
               '--T', str(REACTION_TIME/second),
               '--muscles_target', MUSCLE_NAMES_STR,
-              '--muscles_recorded', MUSCLE_NAMES_STR,
               '--activation', input_path,
               '--output_stretch', output_path,
+              '--muscles_recorded', MUSCLE_NAMES_STR,
               '--output_final_state', new_state_path
           ]
 
@@ -358,7 +358,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
           '--dt', str(TIME_STEP/second),
           '--T', str(REACTION_TIME/second * NUM_ITERATIONS),
           '--muscles_target', MUSCLE_NAMES_STR,
-          '--muscles_recorded', MUSCLE_NAMES_STR,
           '--activation', input_path,
           '--output_all', sto_path
       ]
