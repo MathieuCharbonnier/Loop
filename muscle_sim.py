@@ -74,23 +74,16 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
                 torque_function.addPoint(t, float(torque))
             
             # Create a prescribed force to apply the torque
-            prescribed_force = osim.PrescribedForce(model.getBodySet().get("tibia_r"))
-            prescribed_force.setName(f"Torque_{coord_name}")
+            prescribed_force = osim.PrescribedForce(f"Torque_{coord_name}",model.getBodySet().get("tibia_r"))
+            # Set torque functions: (fx, fy, fz)
+
+            # Use osim.Constant(0.0) for unused axes
+            fx = osim.Constant(0.0)
+            fy = osim.Constant(0.0)
+            fz = torque_function 
+
+            prescribed_force.setTorqueFunctions(fx, fy, fz)
             
-            # Set torque function (this applies a pure torque)
-            prescribed_force.prescribeTorqueX(osim.Constant(0.0))
-            prescribed_force.prescribeTorqueY(osim.Constant(0.0))
-            
-            # For ankle dorsiflexion, typically apply torque around Z-axis
-            # For ankle_angle_r, positive torque creates dorsiflexion
-            if coord_name == "ankle_angle_r":
-                prescribed_force.prescribeTorqueZ(torque_function)
-            else:
-                # Default to Z-axis, but this should be customized based on the coordinate
-                prescribed_force.prescribeTorqueZ(torque_function)
-            
-            # Forces need to be enabled
-            prescribed_force.setAppliesForce(True)
             model.addForce(prescribed_force)
 
     # Add muscle reporter to record fiber lengths
