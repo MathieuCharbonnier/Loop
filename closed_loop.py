@@ -14,8 +14,8 @@ from activation import decode_spikes_to_activation
 
 
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,
-           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, sto_path, 
-           torque=None,torque_coordinate=None, seed=42):
+           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, associated_joint, sto_path, 
+           torque=None, seed=42):
   """
   Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -56,6 +56,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
   # Initialize arrays to store muscle stretch and velocity
   stretch = np.zeros((NUM_MUSCLES, int(REACTION_TIME/TIME_STEP)))
   velocity = np.zeros((NUM_MUSCLES, int(REACTION_TIME/TIME_STEP)))
+  time_points = np.arange(0, REACTION_TIME/second, TIME_STEP/second)
   stretch0 = stretch.copy()
   
   initial_potentials = {
@@ -107,11 +108,11 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
       # Run OpenSim simulation with perturbation activations
       with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_file, \
           tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as output_file, \
-          tempfile.NamedTemporaryFile(suffix='.json', delete=False) as new_state_file:
+          tempfile.NamedTemporaryFile(suffix='.json', delete=False) as initial_state_file:
 
           input_path = input_file.name
           output_path = output_file.name
-          new_state_path = new_state_file.name
+          initial_state_path = initial_state_file.name
 
           # Save perturbation activations to temporary file
           np.save(input_path, torque)
@@ -122,10 +123,10 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
               '--dt', str(TIME_STEP/second),
               '--T', str(REACTION_TIME/second),
               '--muscles', MUSCLE_NAMES_STR,
-              '--torque_coords', torque_coordinate,
+              '--joint', associated_joint,
               '--torque_values', input_path,
               '--output_stretch', output_path,
-              '--output_final_state', new_state_path
+              '--output_final_state', initial_state_path
           ]
 
           # Run OpenSim simulation for perturbation
@@ -134,6 +135,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
           if process.returncode == 0 and os.path.getsize(output_path) > 0:
               # Load muscle lengths from perturbation simulation
               fiber_lengths = np.load(output_path)
+              # Remove the last value as it will be included in the next iteration
+              fiber_lengths = fiber_lengths[:, :-1]
               
               # Set resting lengths based on initial position
               for muscle_idx in range(NUM_MUSCLES):
@@ -144,14 +147,14 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                   velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
           
               # Use the final state file from perturbation as initial state for main simulation
-              state_file = new_state_path
+              state_file = initial_state_path
           else:
               print(f"Warning: Perturbation simulation failed. STDERR: {process.stderr}")
-           # Clean up
-           os.unlink(input_path)
-           os.unlink(output_path)
-           os.unlink(new_state_path)
-
+              os.unlink(initial_state_path)
+          # Clean up
+          os.unlink(input_path)
+          os.unlink(output_path)
+          
   # =============================================================================
   # Main Simulation Loop
   # =============================================================================
@@ -159,7 +162,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
   print("Start Simulation :")
   print("EES frequency : " + str(EES_PARAMS['ees_freq']))
   print("Number Ia fibers recruited by EES: " + str(EES_PARAMS['Ia_recruited'])+ " / "+str(NEURON_COUNTS['Ia']))
-  print("Number II fibers recruited by EES : " + str(EES_PARAMS['II_recruited'])+ " / "+str(NEURON_COUNTS['II']))
+  if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
+      print("Number II fibers recruited by EES : " + str(EES_PARAMS['II_recruited'])+ " / "+str(NEURON_COUNTS['II']))
   print("Number Efferent fibers recruited by EES : " + str(EES_PARAMS['eff_recruited'])+" / "+str(NEURON_COUNTS['motor']))
   
 
@@ -262,7 +266,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
 
                   # Calculate stretch and velocity for next iteration
                   stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
-                  time_points = np.arange(0, REACTION_TIME/second, TIME_STEP/second)
                   velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
 
                   # Create batch data for current iteration
@@ -284,8 +287,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
               error_msg = f'Error in iteration {iteration+1}. STDERR: {process.stderr}'
               raise RuntimeError(error_msg)
 
-          # Clean up the old state file if it exists
-          if state_file is not None and state_file != new_state_path:
+          # Clean up the old state file if it exists (don't delete the initial file in the first iteration, need it to do the entire simulation opensim at the end)
+          if iteration>0 and state_file is not None and state_file != new_state_path:
               os.unlink(state_file)
 
           # Update state file for next iteration
@@ -324,12 +327,13 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
       Ia_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
       combined_df['Ia_rate'] = 1/((1/Ia_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
-      II_rate = eval(SPINDLE_MODEL['II'], {"__builtins__": {}}, {
-        "stretch": stretch_init,
-        "velocity": velocity_init
-      })
-      II_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-      combined_df['II_rate'] = 1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
+      if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
+          II_rate = eval(SPINDLE_MODEL['II'], {"__builtins__": {}}, {
+            "stretch": stretch_init,
+            "velocity": velocity_init
+          })
+          II_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
+          combined_df['II_rate'] = 1/((1/II_rate)+BIOPHYSICAL_PARAMS['T_refr']/second)
 
       all_spike_times = np.concatenate(list(spike_data[muscle_name]['MN'].values())) if spike_data[muscle_name]['MN'] else []
       firing_rate = np.zeros_like(time)
@@ -368,6 +372,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
           '--activation', input_path,
           '--output_all', sto_path
       ]
+      if torque is not None:
+        cmd += ['--initial_state', initial_state_path]
+
 
       # Run OpenSim simulation for complete trajectory
       process = subprocess.run(cmd, capture_output=True, text=True)
@@ -377,7 +384,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
       if process.stderr.strip():
           print(f"STDERR: {process.stderr}")
 
-      # Clean up temporary file
+      # Clean up temporary files
       os.unlink(input_path)
+      os.unlink(initial_state_path)
 
   return spike_data, muscle_dataframes
