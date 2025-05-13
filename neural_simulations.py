@@ -85,12 +85,17 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     '''
     Ia = NeuronGroup(n_Ia, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
     net.add([Ia])
+
+    group_map = {
+    "Ia":  Ia[:] ,
+    }
                                             
-    #If II is specify in the spindle model, then the network contain II and excitatory neurons  (not monosynaptic network)                                    
+    #If II is specify in the spindle model, then the network contain II and excitatory neurons                                    
     if 'II' in spindle_model and 'II' in neuron_pop and 'exc' in neuron_pop:
       
         n_II = neuron_pop['II']
         n_exc = neuron_pop['exc']
+
         equation_II=spindle_model['II']
         ii_eq = f'''
         is_ees= (i < II_recruited) : boolean
@@ -99,7 +104,8 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
         rate = ({equation_II})*hertz+ ees_freq * int(is_ees) : Hz
         '''
         II = NeuronGroup(n_II, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-
+        group_map["II"]=II[:] ,
+  
         # LIF neuron equations
         ex_eq = '''
         dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
@@ -109,31 +115,36 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
         exc = NeuronGroup(n_exc, ex_eq, threshold='v > threshold_v', 
                       reset='v = Eleaky', refractory=T_refr, method='euler')
         exc.v = initial_potentials['exc']
+        group_map['exc']=exc[:]
         net.add([II, exc])
-      
-    mn_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) :amp
-    dgIa/dt = -gIa / tau_e : siemens 
-    dgexc/dt = -gexc / tau_e : siemens  
-    '''
+        
+        mn_eq = '''
+        dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
+        Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) :amp
+        dgIa/dt = -gIa / tau_e : siemens 
+        dgexc/dt = -gexc / tau_e : siemens  
+        '''
                                       
-    moto = NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
+        moto = NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
                        reset='v = Eleaky', refractory=T_refr, method='euler')
-                       
-    # Initialize membrane potentials
-    
-    moto.v = initial_potentials['moto']
+        moto.v = initial_potentials['moto']
+        net.add([moto])
+        group_map["moto"]= moto[:] 
 
-    # Add neuron groups to the network
-    net.add([moto])
-                                            
-    group_map = {
-    "Ia":  Ia[:] ,
-    "II":   II[:] ,
-    "exc":   exc[:]  ,
-    "moto": moto[:] 
-}
+    else:# Monosynaptic Reflex
+                
+        mn_eq = '''
+        dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
+        Isyn = gIa*(E_ex - v)  :amp
+        dgIa/dt = -gIa / tau_e : siemens 
+        '''
+                                      
+        moto = NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
+                       reset='v = Eleaky', refractory=T_refr, method='euler')
+                      
+        moto.v = initial_potentials['moto']
+        net.add([moto])
+        group_map["moto"]= moto[:] 
     
     # Create synaptic connections
     synapses = {}
@@ -196,7 +207,6 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
 
     # Final membrane potentials
     final_potentials = {
-        'exc': exc.v[:],
         'moto': moto.v[:]
     } 
     # Store state monitors for plotting
@@ -207,9 +217,12 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     result = {
         "Ia": mon_Ia.spike_trains()
     }
+
     if 'II' in spindle_model and 'II' in neuron_pop and 'exc' in neuron_pop:
         result['II']=mon_II.spike_trains()
         result['exc']= mon_exc.spike_trains()
+        final_potentials['exc']=exc.v[:]
+        
     
     if ees_freq > 0 and eff_recruited > 0:
         result["MN0"] = before_motor_spikes
