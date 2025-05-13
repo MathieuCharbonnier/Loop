@@ -87,8 +87,8 @@ def plot_activation(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, I
     plt.show()
 
 
-def plot_mouvement(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
-    fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+def plot_mouvement(muscle_data,muscle_names, joint_value, joint_name folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
     props = ['Fiber_length', 'Stretch', 'Velocity']
     ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
 
@@ -98,7 +98,8 @@ def plot_mouvement(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II
         axs[i].set_ylabel(ylabel, fontsize=11)
         axs[i].legend(fontsize=11)
         axs[i].tick_params(labelsize=10)
-
+    axs[-1].plot(muscle_data[0]['Time'], joint_value, label=joint_name)
+    axs[-1].set_ylabel("angle (degree)", fontsize=11)
     axs[-1].set_xlabel('Time (s)', fontsize=11)
     fig.suptitle("Mouvement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -121,57 +122,30 @@ def read_sto(filepath, columns):
     cols = ['time']+[f"{c}/{suffix}" for c in columns for suffix in ("value", "speed")]
 
     return df[cols]
-
-
-  
+ 
 def plot_from_sto(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq, title=None):
 
-    df=read_sto(filepath, columns_wanted)
-    fig, axs = plt.subplots(len(columns_wanted), 2, figsize=(12, 10), sharex=True)
+    df=read_sto(filepath, columns_wanted.keys())
+    fig, axs = plt.subplots(len(columns_wanted), 1, figsize=(10, 3*len(columns_wanted), sharex=True)
     if title is not None:
         fig.suptitle(title, fontsize=16)
 
-    for i, column in enumerate(columns_wanted):
-        axs[i, 0].plot(df['time'], df[column + '/value']*180/np.pi, label=f"{column} value", color=colorblind_friendly_colors["green"])
-        axs[i, 0].set_ylabel("Angle (degree)")
-        axs[i, 0].set_title(f"{column} - Value")
-        axs[i, 0].grid(True)
-
-        axs[i, 1].plot(df['time'], df[column + '/speed']*180/np.pi, label=f"{column} speed", color=colorblind_friendly_colors["red"])
-        axs[i, 1].set_ylabel("Speed (degree/s)")
-        axs[i, 1].set_title(f"{column} - Speed")
-        axs[i, 1].grid(True)
+    for i, (name_df, name_label) in enumerate(columns_wanted):
+        axs[i].plot(df['time'], df[name_df], label=f"name_label", color=colorblind_friendly_colors["green"])
+        axs[i].set_ylabel(name_label)
+        axs[i].grid(True)
 
     for ax in axs[-1, :]:
         ax.set_xlabel("Time (s)")
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    fig_path = os.path.join(folder, f'Joint_angles_and_speed_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    fig_path = os.path.join(folder, f'Supplement_sto_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
 
 
-def plot_act_length (filepath, muscle_names, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
   
-    df=read_sto(filepath, columns_wanted)
-    fig, axs = plt.subplots(len(muscle_names), 2, figsize=(12, 10), sharex=True)
-    fig.suptitle("Activations and fiber lengths", fontsize=16)
-
-    for i, muscle_name in enumerate(muscle_names):
-        axs[i, 1].plot(df['time'], df[muscle_name + '/fiber_length'], label=f"{muscle_name}", color=colorblind_friendly_colors["blue"])
-        axs[i, 1].set_ylabel("L (m)")
-        axs[i, 1].set_title("Fiber length")
-        axs[i, 1].legend()
-        axs[i, 1].grid(True)
-
-        axs[i, 0].plot(df['time'], df[muscle_name + '/activation'], label=f"{muscle_name} ", color=colorblind_friendly_colors["orange"])
-        axs[i, 0].set_ylabel("a (dimless)")
-        axs[i, 0].set_title("Activation")
-        axs[i, 0].legend()
-        axs[i, 0].grid(True)
-
-    for ax in axs[-1, :]:
-        ax.set_xlabel("Time (s)")
+    
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     fig_path = os.path.join(folder, f'act_length_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
