@@ -33,13 +33,6 @@ def EES_stim_analysis(
         Format: {'param_name': [values_to_test], 'label': 'Display Label'}
         Example: {'param_name': 'ees_freq', 'values': [10, 20, 30], 'label': 'EES Frequency (Hz)'}
     """
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import math
-    from datetime import datetime
-    from closed_loop import closed_loop
-    from plots import read_sto
 
     # Create a directory for saving plots if it doesn't exist
     save_dir = "stimulation_analysis"
@@ -140,6 +133,7 @@ def EES_stim_analysis(
             ax.set_xlabel("Time (s)", fontweight='bold')
             if "rate" in var:
                 ax.set_ylabel(var.replace('_', ' ').title() + " (hertz)", fontweight='bold')
+            
             else:
                 ax.set_ylabel(var.replace('_', ' ').title() + " (dimless)", fontweight='bold')
             
@@ -149,7 +143,8 @@ def EES_stim_analysis(
             if var == 'Joints':
                 joints = read_sto(sto_path, ['ankle_angle_r'])
                 ax.plot(joints['time'], joints['ankle_angle_r/value']*180/np.pi, color='darkred', 
-                       label='Ankle Angle (degree)', linewidth=2.5)
+                       label='Ankle Angle', linewidth=2.5)
+                ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
     
             elif var == 'Raster_MN':
                 # Add different colors for each muscle in the raster plot
