@@ -15,7 +15,7 @@ from activation import decode_spikes_to_activation
 
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, associated_joint, sto_path, 
-           torque=None, seed=42):
+           torque=None, seed=42, csv_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -54,11 +54,17 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         External torque to apply at each time step
     seed : int, optional
         Random seed for simulation reproducibility (default: 42)
+    csv_path : str, optional
+        Path to save the combined data CSV file (default: None, will use sto_path with .csv extension)
     """
     # Muscle configuration
     MUSCLE_NAMES = MUSCLE_NAMES_STR.split(",")
     NUM_MUSCLES = len(MUSCLE_NAMES)
     nb_points = int(REACTION_TIME/TIME_STEP)
+    
+    # Set default CSV path if not provided
+    if csv_path is None:
+        csv_path = os.path.splitext(sto_path)[0] + '.csv'
     
     # Validate muscle count
     if NUM_MUSCLES > 2:
@@ -111,6 +117,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     state_file = None
     joints_all = []
     
+    # Store torque values if provided
+    torque_values = []
+    
     # =============================================================================
     # Main Simulation Loop
     # =============================================================================
@@ -153,7 +162,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     '--joint_name', associated_joint,
                     '--activation', input_activation_path,
                     '--output_stretch', output_stretch_path,
-                    '--output_joint', output_joint_path,  # Fixed missing comma
+                    '--output_joint', output_joint_path,
                     '--output_final_state', new_state_path
                 ]
 
@@ -162,11 +171,15 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     cmd += ['--initial_state', state_file]
                 
                 # Add torque if provided
+                current_torque = None
                 if torque is not None:
                     start_idx = iteration * nb_points
                     end_idx = (iteration + 1) * nb_points
-                    np.save(input_torque_path, torque[start_idx:end_idx])
+                    current_torque = torque[start_idx:end_idx]
+                    np.save(input_torque_path, current_torque)
                     cmd += ['--torque', input_torque_path]
+                    # Store torque values for dataframe
+                    torque_values.append(current_torque)
 
                 # Run OpenSim simulation
                 process = subprocess.run(cmd, capture_output=True, text=True)
@@ -179,7 +192,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     
                     # Remove the last value as it will be included in the next iteration
                     fiber_lengths = fiber_lengths[:, :-1]
-                    joints_all.append(joints[:, :-1])
+                    joints = joints[:, :-1]
+                    joints_all.append(joints)
 
                     if resting_lengths[0] is None:
                         resting_lengths = fiber_lengths[:, 0]
@@ -266,19 +280,30 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     # Save final state for next iteration
                     initial_params[muscle_idx] = final_values
 
-                    # Create batch data for current iteration
+                    # Create batch data for current iteration including joint data and torque if available
                     batch_data = {
-                        'Fiber_length': fiber_lengths[muscle_idx],
-                        'Stretch': stretch[muscle_idx],
-                        'Velocity': velocity[muscle_idx],
-                        **state_monitors[muscle_idx],  # Fixed syntax error (missing comma)
-                        'mean_e': mean_e[muscle_idx],
-                        'mean_u': mean_u[muscle_idx],
-                        'mean_c': mean_c[muscle_idx],
-                        'mean_P': mean_P[muscle_idx],
-                        'Activation': mean_activation[muscle_idx],
+                        'Time': time_points + iteration * REACTION_TIME/second,
+                        f'Fiber_length_{MUSCLE_NAMES[muscle_idx]}': fiber_lengths[muscle_idx],
+                        f'Stretch_{MUSCLE_NAMES[muscle_idx]}': stretch[muscle_idx],
+                        f'Velocity_{MUSCLE_NAMES[muscle_idx]}': velocity[muscle_idx],
+                        f'mean_e_{MUSCLE_NAMES[muscle_idx]}': mean_e[muscle_idx],
+                        f'mean_u_{MUSCLE_NAMES[muscle_idx]}': mean_u[muscle_idx],
+                        f'mean_c_{MUSCLE_NAMES[muscle_idx]}': mean_c[muscle_idx],
+                        f'mean_P_{MUSCLE_NAMES[muscle_idx]}': mean_P[muscle_idx],
+                        f'Activation_{MUSCLE_NAMES[muscle_idx]}': mean_activation[muscle_idx],
                     }
-
+                    
+                    # Add state monitor data with muscle name as suffix
+                    for key, value in state_monitors[muscle_idx].items():
+                        batch_data[f'{key}_{MUSCLE_NAMES[muscle_idx]}'] = value
+                    
+                    # Add joint data
+                    batch_data[f'Joint_{associated_joint}'] = joints[0]
+                    
+                    # Add torque data if available
+                    if current_torque is not None:
+                        batch_data['Torque'] = current_torque
+                    
                     # Store batch data for this muscle
                     muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
 
@@ -290,26 +315,44 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     # Combine Results and Compute Firing rates
     # =============================================================================
 
-    muscle_dataframes = []
-
-    # Process and save data for each muscle
+    # Create a single dataframe with all muscle data
+    all_data_dfs = []
+    
+    # Process data for each muscle
     for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
         # Skip muscles with no data
         if not muscle_data[muscle_idx]:
-            muscle_dataframes.append(None)
             continue
-
+            
         # Combine all iteration data for this muscle
-        combined_df = pd.concat(muscle_data[muscle_idx], ignore_index=True)
+        all_data_dfs.append(pd.concat(muscle_data[muscle_idx], ignore_index=True))
 
-        # Add time column as first column
-        time = np.arange(len(combined_df)) * (TIME_STEP/second)
-        combined_df['Time'] = time
-        combined_df = combined_df[['Time'] + [col for col in combined_df.columns if col != 'Time']]
-
-        # Compute firing rate for Ia afferents
-        stretch_values = combined_df['Stretch'].values
-        velocity_values = combined_df['Velocity'].values
+    # Ensure we have some data to work with
+    if not all_data_dfs:
+        print("No data generated during simulation.")
+        return spike_data, None, joints_all
+    
+    # Combine all muscle data into a single dataframe
+    if len(all_data_dfs) > 1:
+        # If we have multiple muscles, merge on Time
+        combined_df = pd.merge(all_data_dfs[0], all_data_dfs[1], on='Time', how='outer')
+    else:
+        # If only one muscle, use that dataframe
+        combined_df = all_data_dfs[0]
+    
+    # Move Time column to be the first column
+    combined_df = combined_df[['Time'] + [col for col in combined_df.columns if col != 'Time']]
+    
+    # Compute firing rates for each muscle and add to dataframe
+    for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
+        # Skip muscles with no data
+        if not muscle_data[muscle_idx]:
+            continue
+            
+        # Extract stretch and velocity values for this muscle
+        stretch_values = combined_df[f'Stretch_{muscle_name}'].values
+        velocity_values = combined_df[f'Velocity_{muscle_name}'].values
+        time = combined_df['Time'].values
         
         # Compute Ia firing rate using spindle model
         Ia_rate = eval(SPINDLE_MODEL['Ia'], 
@@ -318,7 +361,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         
         # Add EES contribution
         Ia_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
-        combined_df['Ia_rate'] = 1/((1/Ia_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
+        combined_df[f'Ia_rate_{muscle_name}'] = 1/((1/Ia_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
 
         # Compute II firing rate if applicable
         if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
@@ -326,7 +369,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                           {"__builtins__": {}}, 
                           {"stretch": stretch_values, "velocity": velocity_values})
             II_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-            combined_df['II_rate'] = 1/((1/II_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
+            combined_df[f'II_rate_{muscle_name}'] = 1/((1/II_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
 
         # Calculate motoneuron firing rate using KDE
         mn_spikes = spike_data[muscle_name].get('MN', {})
@@ -336,10 +379,11 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         if len(all_spike_times) > 1:
             kde = gaussian_kde(all_spike_times, bw_method=0.3)
             firing_rate = kde(time) * len(all_spike_times) / max(len(mn_spikes), 1)
-        combined_df['MN_rate'] = firing_rate
-    
-        # Store dataframe for plotting
-        muscle_dataframes.append(combined_df)
+        combined_df[f'MN_rate_{muscle_name}'] = firing_rate
+
+    # Save the combined dataframe to CSV
+    combined_df.to_csv(csv_path, index=False)
+    print(f"Saved combined data to {csv_path}")
 
     # ====================================================================================================
     # Run Complete Muscle Simulation for visualization of the dynamic on opensim
@@ -356,9 +400,10 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         total_time_points = nb_points * NUM_ITERATIONS
         activations_array = np.zeros((NUM_MUSCLES, total_time_points))
         
-        for i in range(NUM_MUSCLES):
-            if muscle_dataframes[i] is not None:
-                activations_array[i] = muscle_dataframes[i]['Activation'].values
+        for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
+            # Extract activations from combined dataframe
+            if f'Activation_{muscle_name}' in combined_df.columns:
+                activations_array[muscle_idx] = combined_df[f'Activation_{muscle_name}'].values
 
         np.save(input_activation_path, activations_array)
 
@@ -391,4 +436,4 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         os.unlink(input_activation_path)
         os.unlink(input_joint_path)
 
-    return spike_data, muscle_dataframes, joints_all
+    return spike_data, combined_df, joints_all
