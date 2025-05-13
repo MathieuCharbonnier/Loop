@@ -15,7 +15,7 @@ from activation import decode_spikes_to_activation
 
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, associated_joint, sto_path, 
-           torque=None, seed=42):
+           torque, seed=42):
   """
   Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -53,12 +53,10 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
   # Initialization
   # =============================================================================
 
-  # Initialize arrays to store muscle stretch and velocity
-  stretch = np.zeros((NUM_MUSCLES, int(REACTION_TIME/TIME_STEP)))
-  velocity = np.zeros((NUM_MUSCLES, int(REACTION_TIME/TIME_STEP)))
+  # Initialize muscle activation
+  activations = np.zeros((NUM_MUSCLES, int(REACTION_TIME/TIME_STEP)))
   time_points = np.arange(0, REACTION_TIME/second, TIME_STEP/second)
-  stretch0 = stretch.copy()
-  
+
   initial_potentials = {
       "exc": BIOPHYSICAL_PARAMS['Eleaky'],
       "moto": BIOPHYSICAL_PARAMS['Eleaky']
@@ -66,12 +64,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
   if NUM_MUSCLES == 2:
       initial_potentials["inh"] = BIOPHYSICAL_PARAMS['Eleaky']
 
-  neuron_types = ["Ia", "II", "exc"]
-  if NUM_MUSCLES == 2:
-      neuron_types.append("inh")
-  if EES_PARAMS["ees_freq"] > 0 and EES_PARAMS["eff_recruited"] > 0:
-      neuron_types.append("MN0")
-  neuron_types.append("MN")
+  neuron_types = NEURON_COUNTS.keys()
 
   # Initialize parameters for each motoneuron
   initial_params = [
@@ -98,63 +91,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
   # Use temporary file for state management across iterations
   state_file = None
   
-  # =============================================================================
-  # Initial Perturbation Phase (if configured)
-  # =============================================================================
-  
-  if torque is not None :
-      print("Applying initial perturbation ...")
-
-      # Run OpenSim simulation with perturbation activations
-      with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_file, \
-          tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as output_file, \
-          tempfile.NamedTemporaryFile(suffix='.json', delete=False) as initial_state_file:
-
-          input_path = input_file.name
-          output_path = output_file.name
-          initial_state_path = initial_state_file.name
-
-          # Save perturbation activations to temporary file
-          np.save(input_path, torque)
-
-          # Build command for OpenSim muscle simulation
-          cmd = [
-              'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
-              '--dt', str(TIME_STEP/second),
-              '--T', str(REACTION_TIME/second),
-              '--muscles', MUSCLE_NAMES_STR,
-              '--joint', associated_joint,
-              '--torque_values', input_path,
-              '--output_stretch', output_path,
-              '--output_final_state', initial_state_path
-          ]
-
-          # Run OpenSim simulation for perturbation
-          process = subprocess.run(cmd, capture_output=True, text=True)
-
-          if process.returncode == 0 and os.path.getsize(output_path) > 0:
-              # Load muscle lengths from perturbation simulation
-              fiber_lengths = np.load(output_path)
-              # Remove the last value as it will be included in the next iteration
-              fiber_lengths = fiber_lengths[:, :-1]
-              
-              # Set resting lengths based on initial position
-              for muscle_idx in range(NUM_MUSCLES):
-                  resting_lengths[muscle_idx] = fiber_lengths[muscle_idx, 0]
-                  
-                  # Calculate stretch/velocity
-                  stretch[muscle_idx]=fiber_lengths[muscle_idx]/resting_lengths[muscle_idx]-1
-                  velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
-          
-              # Use the final state file from perturbation as initial state for main simulation
-              state_file = initial_state_path
-          else:
-              print(f"Warning: Perturbation simulation failed. STDERR: {process.stderr}")
-              os.unlink(initial_state_path)
-          # Clean up
-          os.unlink(input_path)
-          os.unlink(output_path)
-          
+       
   # =============================================================================
   # Main Simulation Loop
   # =============================================================================
@@ -169,6 +106,62 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
 
   for iteration in range(NUM_ITERATIONS):
       print(f"--- Iteration {iteration+1} of {NUM_ITERATIONS} ---")
+
+
+      # Run OpenSim muscle simulation using the computed activations
+      with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_activation, \
+          tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_torque, \
+          tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as output_stretch, \
+          tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as output_joint, \
+          tempfile.NamedTemporaryFile(suffix='.json', delete=False) as new_state_file:
+
+          input_activation_path = input_activation.name
+          input_torque_path = input_torque.name
+          output_stretch_path = output_stretch.name
+          output_joint_path=output_joint.name
+          new_state_path = new_state_file.name
+
+          # Save activations and torque to temporary file
+          np.save(input_activation, activations)
+          np.save(input_torque, torque)
+
+          # Build command for OpenSim muscle simulation
+          cmd = [
+              'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
+              '--dt', str(TIME_STEP/second),
+              '--T', str(REACTION_TIME/second),
+              '--muscles_names', MUSCLE_NAMES_STR,
+              '--joint_name', associated_joint,
+              '--activation', input_activation_path,
+              '--torque', input_torque_path
+              '--output_stretch', output_stretch_path,
+              '--output_joint', output_joint_path
+              '--output_final_state', new_state_path
+          ]
+
+          # Add initial state parameter if not the first iteration
+          if state_file is not None:
+              cmd += ['--initial_state', state_file]
+
+          # Run OpenSim simulation
+          process = subprocess.run(cmd, capture_output=True, text=True)
+
+          # Process OpenSim results
+          if process.returncode == 0 and os.path.getsize(output_path) > 0:
+              # Load muscle lengths from simulation
+              fiber_lengths = np.load(output_path)
+              # Remove the last value as it will be included in the next iteration
+              fiber_lengths = fiber_lengths[:, :-1]
+
+              # Process each muscle's data
+              for muscle_idx in range(NUM_MUSCLES):
+                  # Set resting length on first iteration if not already set
+                  if resting_lengths[muscle_idx] is None:
+                      resting_lengths[muscle_idx] = fiber_lengths[muscle_idx, 0]
+
+                  # Calculate stretch and velocity for next iteration
+                  stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
+                  velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
 
       # Run neural simulation based on muscle count
       if NUM_MUSCLES == 1:
@@ -221,52 +214,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
               # Save final state for next iteration
               initial_params[muscle_idx] = final_values
 
-      # Run OpenSim muscle simulation using the computed activations
-      with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_file, \
-          tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as output_file, \
-          tempfile.NamedTemporaryFile(suffix='.json', delete=False) as new_state_file:
-
-          input_path = input_file.name
-          output_path = output_file.name
-          new_state_path = new_state_file.name
-
-          # Save activations to temporary file
-          np.save(input_path, mean_activation)
-
-          # Build command for OpenSim muscle simulation
-          cmd = [
-              'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
-              '--dt', str(TIME_STEP/second),
-              '--T', str(REACTION_TIME/second),
-              '--muscles', MUSCLE_NAMES_STR,
-              '--activation', input_path,
-              '--output_stretch', output_path,
-              '--output_final_state', new_state_path
-          ]
-
-          # Add initial state parameter if not the first iteration
-          if state_file is not None:
-              cmd += ['--initial_state', state_file]
-
-          # Run OpenSim simulation
-          process = subprocess.run(cmd, capture_output=True, text=True)
-
-          # Process OpenSim results
-          if process.returncode == 0 and os.path.getsize(output_path) > 0:
-              # Load muscle lengths from simulation
-              fiber_lengths = np.load(output_path)
-              # Remove the last value as it will be included in the next iteration
-              fiber_lengths = fiber_lengths[:, :-1]
-
-              # Process each muscle's data
-              for muscle_idx in range(NUM_MUSCLES):
-                  # Set resting length on first iteration if not already set
-                  if resting_lengths[muscle_idx] is None:
-                      resting_lengths[muscle_idx] = fiber_lengths[muscle_idx, 0]
-
-                  # Calculate stretch and velocity for next iteration
-                  stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
-                  velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
 
                   # Create batch data for current iteration
                   batch_data = {
