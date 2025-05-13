@@ -6,7 +6,7 @@ import json
 import opensim as osim
 
 def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, output_all=None, 
-                  initial_state=None, final_state=None, stretch_file=None):
+                  initial_state=None, final_state=None, stretch_file=None, joint_file=None):
     """
     Run an OpenSim simulation with muscle activations and/or external torques.
     
@@ -32,6 +32,8 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
         Path to save final state as JSON
     stretch_file : str, optional
         Path to save muscle fiber lengths
+    joint_file : str, optional
+        Path to save joint angles
     """
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
@@ -96,6 +98,23 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
             reporter.addToReport(muscle.getOutput("fiber_length"), f'{muscle_name}_fiber_length')
         model.addComponent(reporter)
 
+    # Add joint reporter to record joint angles
+    joint_reporter = None
+    if joint_file is not None and torque_data is not None:
+        joint_reporter = osim.TableReporter()
+        joint_reporter.setName("JointReporter")
+        joint_reporter.set_report_time_interval(dt)
+        
+        # Get the specific joint coordinates to record
+        for joint_name in torque_data['coordinates']:
+            coordinate = model.getCoordinateSet().get(joint_name)
+            if coordinate is not None:
+                joint_reporter.addToReport(coordinate.getOutput("value"), f'{joint_name}_angle')
+            else:
+                print(f"Warning: Coordinate '{joint_name}' not found in model")
+        
+        model.addComponent(joint_reporter)
+
     # Initialize state
     state = model.initSystem()
     if initial_state is not None:
@@ -157,9 +176,24 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
         for i, muscle_name in enumerate(muscles):
             fiber_length[i] = results_table.getDependentColumn(f'{muscle_name}_fiber_length').to_numpy()
         np.save(stretch_file, fiber_length)
+    
+    # Save joint angle data if requested
+    if joint_file is not None and joint_reporter is not None:
+        results_table = joint_reporter.getTable()
+        num_coords = len(torque_data['coordinates'])
+        joint_angles = np.zeros((num_coords, int(T/dt)+1))
+        
+        for i, joint_name in enumerate(torque_data['coordinates']):
+            try:
+                joint_angles[i] = results_table.getDependentColumn(f'{joint_name}_angle').to_numpy()
+            except Exception as e:
+                print(f"Error extracting joint data for {joint_name}: {e}")
+        
+        np.save(joint_file, joint_angles)
+        print(f'{joint_file} file is saved')
 
-    if output_all is None and final_state is None and stretch_file is None:
-        raise ValueError("At least one output target must be specified: 'output_all', 'final_state', or 'stretch_file'.")
+    if output_all is None and final_state is None and stretch_file is None and joint_file is None:
+        raise ValueError("At least one output target must be specified: 'output_all', 'final_state', 'stretch_file', or 'joint_file'.")
 
 
 if __name__ == "__main__":
@@ -172,13 +206,14 @@ if __name__ == "__main__":
     parser.add_argument('--activations', type=str, help='Path to input numpy array file for muscle activations')
     
     # Add torque parameters
-    parser.add_argument('--torque_coords', type=str, help='Comma-separated list of coordinates to apply torque')
-    parser.add_argument('--torque_values', type=str, help='Path to numpy array file with torque values')
+    parser.add_argument('--joint_name', type=str, help='Comma-separated list of joints to apply torque and record')
+    parser.add_argument('--torque', type=str, help='Path to numpy array file with torque values')
     
     # Other parameters
     parser.add_argument('--initial_state', type=str, help='Initial state JSON file')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
     parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array of fiber lengths')
+    parser.add_argument('--output_joint', type=str, help='Path to save output numpy array of joint angles')
     parser.add_argument('--output_final_state', type=str, help="Path to save final state JSON file")
 
     args = parser.parse_args()
@@ -195,15 +230,19 @@ if __name__ == "__main__":
         
     # Load and prepare torque data if provided
     torque_data = None
-    if args.torque_coords and args.torque_values:
-        if not os.path.isfile(args.torque_values):
-            raise FileNotFoundError(f"Torque values file not found: {args.torque_values}")
+    if args.joint_name and args.torque:
+        if not os.path.isfile(args.torque):
+            raise FileNotFoundError(f"Torque values file not found: {args.torque}")
+
+        torque_values = np.load(args.torque)
+        joint_names = args.joint_name.split(',')
         
-        torque_coords = args.torque_coords.split(',')
-        torque_values = np.load(args.torque_values)
+        # Ensure torque values match the number of joints
+        if len(joint_names) != torque_values.shape[0]:
+            print(f"Warning: Number of joints ({len(joint_names)}) doesn't match torque data shape ({torque_values.shape[0]})")
         
         torque_data = {
-            'coordinates': torque_coords,
+            'coordinates': joint_names,
             'torque_values': torque_values
         }
     
@@ -221,5 +260,6 @@ if __name__ == "__main__":
         output_all=args.output_all,
         initial_state=args.initial_state,
         final_state=args.output_final_state,
-        stretch_file=args.output_stretch
+        stretch_file=args.output_stretch,
+        joint_file=args.output_joint
     )
