@@ -99,7 +99,6 @@ def EES_stim_analysis(
         # Create a descriptive name for the output file
         param_str_parts = []
         for key in current_params.keys():
-            
             param_str_parts.append(f"{key}_{current_params[key]}")
         
         param_str = '_'.join(param_str_parts)
@@ -107,15 +106,18 @@ def EES_stim_analysis(
         sto_path = os.path.join(save_dir, sto_name)
     
         # --- Run simulation ---
-        spikes, main_data, joint = closed_loop(
+        spikes, main_data = closed_loop(
             N_ITERATIONS, REACTION_TIME, TIME_STEP, current_params, NEURON_COUNTS, CONNECTIONS,
             equation_Ia, equation_II, BIOPHYSICAL_PARAMS,
             MUSCLES_STR, sto_path, seed=seed
         )
         
+        # Extract time from the dataframe
+        time_data = main_data['Time']
+        
         # Get time length for preallocation on first iteration
         if num_muscles == 2 and activities is None:
-            T = len(main_data[0]['Time'])
+            T = len(time_data)
             activities = np.zeros((len(muscles_names), n_rows, T))
     
         # --- Plot each variable ---
@@ -124,16 +126,11 @@ def EES_stim_analysis(
             ax = axs_dict[var][i]
             
             # Set title with parameter information
-            ax.set_title(f"{param_label}: {value} ",
-                        #f"Ia: {current_params['Ia_recruited']}, "
-                        #f"II: {current_params['II_recruited']}, "
-                        #f"Motoneurons: {current_params['eff_recruited']}", 
-                        fontweight='bold')
+            ax.set_title(f"{param_label}: {value} ", fontweight='bold')
             
             ax.set_xlabel("Time (s)", fontweight='bold')
             if "rate" in var:
                 ax.set_ylabel(var.replace('_', ' ').title() + " (hertz)", fontweight='bold')
-            
             else:
                 ax.set_ylabel(var.replace('_', ' ').title() + " (dimless)", fontweight='bold')
             
@@ -141,7 +138,7 @@ def EES_stim_analysis(
             ax.grid(True, linestyle='--', alpha=0.3)
     
             if var == 'Joints':
-                ax.plot(main_data[0]['Time'], joints, color='darkred', 
+                ax.plot(time_data, main_data['Joints'], color='darkred', 
                        label='Ankle Angle', linewidth=2.5)
                 ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
     
@@ -168,14 +165,16 @@ def EES_stim_analysis(
             else:
                 # Plot data for each muscle with consistent colors
                 for idx, muscle_name in enumerate(muscles_names):
-                    t = main_data[idx]['Time']
-                    y = main_data[idx][var]
-                    ax.plot(t, y, label=muscle_name, color=muscle_colors[muscle_name], 
-                           linewidth=2.0, alpha=0.8)
+                    # Construct column name with muscle suffix
+                    col_name = f"{var}_{muscle_name}"
                     
-                    # Store mean activation
-                    if var == 'Activation' and num_muscles == 2:
-                        activities[idx, i, :] = y
+                    if col_name in main_data.columns:
+                        ax.plot(time_data, main_data[col_name], label=muscle_name, 
+                               color=muscle_colors[muscle_name], linewidth=2.0, alpha=0.8)
+                        
+                        # Store mean activation for coactivation analysis
+                        if var == 'Activation' and num_muscles == 2:
+                            activities[idx, i, :] = main_data[col_name].values
                 
             # Add legend with improved styling
             if var != 'Raster_MN':  # Raster plot has text labels instead
@@ -234,7 +233,7 @@ def EES_stim_analysis(
     
     print(f"Simulation and plotting complete! All plots saved to '{save_dir}' directory.")
     
-    #  co-activition analysis if we have 2 muscles 
+    # Co-activation analysis if we have 2 muscles 
     if num_muscles == 2:
         # ===== Flexor-Extensor Activation Analysis =====
         print("\nPerforming flexor-extensor activation analysis...")
@@ -269,14 +268,16 @@ def EES_stim_analysis(
         product_coactivation = np.zeros(len(param_values))
         flexor_active_time = np.zeros(len(param_values))
         extensor_active_time = np.zeros(len(param_values))
-        total_time = main_data[0]['Time'].iloc[-1] if hasattr(main_data[0]['Time'], 'iloc') else main_data[0]['Time'][-1]
+        
+        # Get total simulation time
+        time_array = main_data['Time']
+        total_time = time_array.iloc[-1] if hasattr(time_array, 'iloc') else time_array[-1]
         
         # Analyze each parameter value
         for i, value in enumerate(param_values):
             # Get flexor and extensor activation data
             flexor_activation = activities[flexor_idx, i, :]
             extensor_activation = activities[extensor_idx, i, :]
-            time_array = main_data[0]['Time']
             
             # Calculate time step for integration
             dt = time_array[1] - time_array[0] if len(time_array) > 1 else 0.001
@@ -423,5 +424,3 @@ def analyze_efferent_effects(efferent_range, ees_freq, aff_recruited, **kwargs):
     }
     
     return EES_stim_analysis(base_params, vary_param, **kwargs)
-
-
