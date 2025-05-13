@@ -16,6 +16,24 @@ color_keys = list(colorblind_friendly_colors.keys())
 
 
 def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+    """
+    Plot raster plot of spikes for different neuron types and muscles.
+    
+    Parameters:
+    -----------
+    spikes : dict
+        Dictionary of spike data organized by muscle and fiber type
+    folder : str
+        Path to save the plot
+    Ia_recruited : int
+        Number of Ia fibers recruited
+    II_recruited : int
+        Number of II fibers recruited
+    eff_recruited : int
+        Number of efferent fibers recruited
+    ees_freq : float
+        Frequency of electrical epidural stimulation
+    """
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))
     fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(12, 10), sharex=True)
@@ -41,74 +59,201 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
     plt.show()
 
 
-def plot_neural_dynamic(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
-    rate_columns = [(col, "FR (Hz)") for col in muscle_data[0].columns if "rate" in col and "I" in col]
-    IPSP_columns = [(col, "IPSP (nA)") for col in muscle_data[0].columns if "IPSP" in col]
-    columns = rate_columns + IPSP_columns + [("MN_rate", "FR (Hz)")]
-
+def plot_neural_dynamic(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    """
+    Plot neural dynamics from a combined dataframe.
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Combined dataframe containing data for all muscles with muscle name suffixes
+    muscle_names : list
+        List of muscle names
+    folder : str
+        Path to save the plot
+    ees_freq : float
+        Frequency of electrical epidural stimulation
+    Ia_recruited : int
+        Number of Ia fibers recruited
+    II_recruited : int
+        Number of II fibers recruited
+    eff_recruited : int
+        Number of efferent fibers recruited
+    """
+    # Identify columns containing rate data and IPSP data for each muscle
+    rate_columns = []
+    ipsp_columns = []
+    mn_rate_columns = []
+    
+    for muscle in muscle_names:
+        # Find Ia and II rate columns
+        ia_cols = [col for col in df.columns if "rate" in col.lower() and "I" in col and muscle in col]
+        rate_columns.extend([(col, "FR (Hz)") for col in ia_cols])
+        
+        # Find IPSP columns
+        ipsp_cols = [col for col in df.columns if "IPSP" in col and muscle in col]
+        ipsp_columns.extend([(col, "IPSP (nA)") for col in ipsp_cols])
+        
+        # Find MN rate columns
+        mn_cols = [col for col in df.columns if "MN_rate" in col and muscle in col]
+        mn_rate_columns.extend([(col, "FR (Hz)") for col in mn_cols])
+    
+    columns = rate_columns + ipsp_columns + mn_rate_columns
+    
+    if not columns:
+        print("No neural dynamics columns found in the dataframe")
+        return
+    
     fig, axs = plt.subplots(len(columns), 1, figsize=(12, 15), sharex=True)
-    time = muscle_data[0]['Time'].values
-
+    # Handle case with only one subplot
+    if len(columns) == 1:
+        axs = [axs]
+    
+    time = df['Time'].values
+    
     for i, (col, ylabel) in enumerate(columns):
         ax = axs[i]
         ax.set_title(col, fontsize=12)
         ax.set_ylabel(ylabel, fontsize=11)
-        for idx, muscle_name in enumerate(muscle_names):
-            ax.plot(muscle_data[idx]['Time'], muscle_data[idx][col], label=muscle_name)
-        ax.legend(fontsize=10)
+        ax.plot(time, df[col])
+        
+        # Extract muscle name from column for legend
+        for muscle in muscle_names:
+            if muscle in col:
+                ax.legend([muscle], fontsize=10)
+                break
+        
         ax.tick_params(labelsize=11)
-
+    
     axs[-1].set_xlabel('Time (s)', fontsize=11)
     fig.suptitle('Neural Dynamics', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-
+    
     path_fig = os.path.join(folder, f'Dynamic_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
 
-def plot_activation(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+def plot_activation(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    """
+    Plot activation dynamics from a combined dataframe.
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Combined dataframe containing data for all muscles with muscle name suffixes
+    muscle_names : list
+        List of muscle names
+    folder : str
+        Path to save the plot
+    ees_freq : float
+        Frequency of electrical epidural stimulation
+    Ia_recruited : int
+        Number of Ia fibers recruited
+    II_recruited : int
+        Number of II fibers recruited
+    eff_recruited : int
+        Number of efferent fibers recruited
+    """
     fig, axs = plt.subplots(5, 1, figsize=(12, 12), sharex=True)
     labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'Activation']
-
-    for i, label in enumerate(labels):
-        for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-            axs[i].plot(df['Time'], df[label], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
-        axs[i].set_ylabel(label, fontsize=11)
+    time = df['Time'].values
+    
+    for i, base_label in enumerate(labels):
+        for j, muscle_name in enumerate(muscle_names):
+            column_name = f"{base_label}_{muscle_name}"
+            if column_name in df.columns:
+                axs[i].plot(time, df[column_name], 
+                           label=f'{muscle_name}', 
+                           color=colorblind_friendly_colors[color_keys[j % len(color_keys)]])
+        
+        axs[i].set_ylabel(base_label, fontsize=11)
         axs[i].legend(fontsize=11)
         axs[i].tick_params(labelsize=11)
-
+    
     axs[-1].set_xlabel('Time (s)', fontsize=11)
     fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-
+    
     path_fig = os.path.join(folder, f'Activation_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
 
-def plot_mouvement(muscle_data,muscle_names, joint_value, joint_name folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+    """
+    Plot movement dynamics from a combined dataframe.
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Combined dataframe containing data for all muscles with muscle name suffixes
+    muscle_names : list
+        List of muscle names
+    joint_name : str
+        Name of the joint
+    folder : str
+        Path to save the plot
+    ees_freq : float
+        Frequency of electrical epidural stimulation
+    Ia_recruited : int
+        Number of Ia fibers recruited
+    II_recruited : int
+        Number of II fibers recruited
+    eff_recruited : int
+        Number of efferent fibers recruited
+    """
     fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
     props = ['Fiber_length', 'Stretch', 'Velocity']
     ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
-
+    time = df['Time'].values
+    
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
-        for j, (muscle_name, df) in enumerate(zip(muscle_names, muscle_data)):
-            axs[i].plot(df['Time'], df[prop], label=f'{muscle_name}', color=colorblind_friendly_colors[color_keys[j]])
+        for j, muscle_name in enumerate(muscle_names):
+            column_name = f"{prop}_{muscle_name}"
+            if column_name in df.columns:
+                axs[i].plot(time, df[column_name], 
+                           label=f'{muscle_name}', 
+                           color=colorblind_friendly_colors[color_keys[j % len(color_keys)]])
+        
         axs[i].set_ylabel(ylabel, fontsize=11)
         axs[i].legend(fontsize=11)
         axs[i].tick_params(labelsize=10)
-    axs[-1].plot(muscle_data[0]['Time'], joint_value, label=joint_name)
+    
+    # Plot joint angle
+    joint_column = f"Joint_{joint_name}"
+    if joint_column in df.columns:
+        axs[-1].plot(time, df[joint_column], label=joint_name)
+        axs[-1].legend(fontsize=11)
+    else:
+        print(f"Joint column '{joint_column}' not found in dataframe")
+    
     axs[-1].set_ylabel("angle (degree)", fontsize=11)
     axs[-1].set_xlabel('Time (s)', fontsize=11)
-    fig.suptitle("Mouvement", fontsize=16)
+    fig.suptitle("Movement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-
+    
     path_fig = os.path.join(folder, f'Mouvement_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
+
 def read_sto(filepath, columns):
+    """
+    Read OpenSim .sto file and extract specified columns.
+    
+    Parameters:
+    -----------
+    filepath : str
+        Path to the .sto file
+    columns : dict
+        Dictionary mapping column names to labels
+    
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame containing the extracted columns
+    """
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
@@ -123,31 +268,51 @@ def read_sto(filepath, columns):
 
     return df[cols]
  
-def plot_from_sto(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq, title=None):
 
-    df=read_sto(filepath, columns_wanted.keys())
-    fig, axs = plt.subplots(len(columns_wanted), 1, figsize=(10, 3*len(columns_wanted), sharex=True)
+def plot_from_sto(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq, title=None):
+    """
+    Plot data from an OpenSim .sto file.
+    
+    Parameters:
+    -----------
+    filepath : str
+        Path to the .sto file
+    columns_wanted : dict
+        Dictionary mapping column names to labels
+    folder : str
+        Path to save the plot
+    Ia_recruited : int
+        Number of Ia fibers recruited
+    II_recruited : int
+        Number of II fibers recruited
+    eff_recruited : int
+        Number of efferent fibers recruited
+    ees_freq : float
+        Frequency of electrical epidural stimulation
+    title : str, optional
+        Title for the plot
+    """
+    df = read_sto(filepath, columns_wanted.keys())
+    fig, axs = plt.subplots(len(columns_wanted), 1, figsize=(10, 3*len(columns_wanted)), sharex=True)
+    
+    # Handle single subplot case
+    if len(columns_wanted) == 1:
+        axs = [axs]
+    
     if title is not None:
         fig.suptitle(title, fontsize=16)
 
-    for i, (name_df, name_label) in enumerate(columns_wanted):
-        axs[i].plot(df['time'], df[name_df], label=f"name_label", color=colorblind_friendly_colors["green"])
-        axs[i].set_ylabel(name_label)
-        axs[i].grid(True)
+    for i, (name_df, name_label) in enumerate(columns_wanted.items()):
+        col_name = f"{name_df}/value"
+        if col_name in df.columns:
+            axs[i].plot(df['time'], df[col_name], label=name_label, color=colorblind_friendly_colors["green"])
+            axs[i].set_ylabel(name_label)
+            axs[i].grid(True)
+            axs[i].legend()
 
-    for ax in axs[-1, :]:
-        ax.set_xlabel("Time (s)")
+    axs[-1].set_xlabel("Time (s)")
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     fig_path = os.path.join(folder, f'Supplement_sto_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
-    plt.savefig(fig_path)
-    plt.show()
-
-
-  
-    
-
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    fig_path = os.path.join(folder, f'act_length_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(fig_path)
     plt.show()
