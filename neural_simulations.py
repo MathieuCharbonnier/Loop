@@ -73,8 +73,6 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
 
     # Extract neuron counts from dictionary
     n_Ia = neuron_pop['Ia']
-    n_II = neuron_pop['II']
-    n_exc = neuron_pop['exc']
     n_motor = neuron_pop['motor']  
 
     # Afferent neuron equations
@@ -85,46 +83,50 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     velocity= velocity_array(t):1
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
-    equation_II=spindle_model['II']
-    ii_eq = f'''
-    is_ees= (i < II_recruited) : boolean
-    stretch = stretch_array(t):1
-    velocity= velocity_array(t):1
-    rate = ({equation_II})*hertz+ ees_freq * int(is_ees) : Hz
-    '''
-    
-    # Create afferent neurons
     Ia = NeuronGroup(n_Ia, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-    II = NeuronGroup(n_II, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-    net.add([Ia, II])
+    net.add([Ia])
+                                            
+    #If II is specify in the spindle model, then the network contain II and excitatory neurons  (not monosynaptic network)                                    
+    if 'II' in spindle_model:
+      
+        n_II = neuron_pop['II']
+        n_exc = neuron_pop['exc']
+        equation_II=spindle_model['II']
+        ii_eq = f'''
+        is_ees= (i < II_recruited) : boolean
+        stretch = stretch_array(t):1
+        velocity= velocity_array(t):1
+        rate = ({equation_II})*hertz+ ees_freq * int(is_ees) : Hz
+        '''
+        II = NeuronGroup(n_II, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
 
-    # LIF neuron equations
-    ex_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
-    Isyn = gII*(E_ex - v) :amp
-    dgII/dt = -gII / tau_e : siemens
-    '''
+        # LIF neuron equations
+        ex_eq = '''
+        dv/dt = (gL*(Eleaky - v) + Isyn)/Cm : volt
+        Isyn = gII*(E_ex - v) :amp
+        dgII/dt = -gII / tau_e : siemens
+        '''
+        exc = NeuronGroup(n_exc, ex_eq, threshold='v > threshold_v', 
+                      reset='v = Eleaky', refractory=T_refr, method='euler')
+        exc.v = initial_potentials['exc']
+        net.add([II, exc])
+      
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
     Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) :amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgexc/dt = -gexc / tau_e : siemens  
     '''
- 
-    # Create neuron groups
-  
-    exc = NeuronGroup(n_exc, ex_eq, threshold='v > threshold_v', 
-                      reset='v = Eleaky', refractory=T_refr, method='euler')
-                                         
+                                      
     moto = NeuronGroup(n_motor, mn_eq, threshold='v > threshold_v', 
                        reset='v = Eleaky', refractory=T_refr, method='euler')
                        
     # Initialize membrane potentials
-    exc.v = initial_potentials['exc']
+    
     moto.v = initial_potentials['moto']
 
     # Add neuron groups to the network
-    net.add([exc, moto])
+    net.add([ moto])
                                             
     group_map = {
     "Ia":  Ia[:] ,
@@ -150,8 +152,10 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
           
     # Setup monitors
     mon_Ia = SpikeMonitor(Ia)
-    mon_II = SpikeMonitor(II)
-    mon_exc = SpikeMonitor(exc)
+    if 'II' in spindle_model:
+        mon_II = SpikeMonitor(II)
+        mon_exc = SpikeMonitor(exc)
+        net.add[mon_II, mon_exc]
     mon_motoneuron = SpikeMonitor(moto)
     
     mon_moto=StateMonitor(moto, ['Isyn'], n_motor/2)
@@ -159,7 +163,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     
     # Add all monitors to the network
     monitors = [
-        mon_Ia, mon_II, mon_exc, mon_motoneuron,mon_moto
+        mon_Ia,mon_motoneuron,mon_moto
     ]
                  
     net.add(monitors)
