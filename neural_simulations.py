@@ -205,10 +205,12 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
         }
     ]
     result = {
-        "Ia": {i: mon_Ia.spike_trains()[i] for i in range(n_Ia)},
-        "II": {i: mon_II.spike_trains()[i] for i in range(n_II)},
-        "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc)},
+        "Ia": mon_Ia.spike_trains()
     }
+    if 'II' in spindle_model:
+        result['II']=mon_II.spike_trains()
+        result['exc']= mon_exc.spike_trains()
+    
     if ees_freq > 0 and eff_recruited > 0:
         result["MN0"] = before_motor_spikes
 
@@ -219,7 +221,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
 
 
 def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
-                                          equation_Ia, equation_II, seed_run,initial_potentials, 
+                                          spindle_model, seed_run,initial_potentials, 
                                           Eleaky,gL, Cm, E_ex, E_inh, tau_e, tau_i,threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
@@ -293,7 +295,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     n_motor = neuron_pop['motor']  
 
     # Afferent neuron equations
-
+    equation_Ia=model_spindle['Ia']
     ia_eq = f'''
     is_flexor = (i < n_Ia) : boolean
     stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
@@ -301,7 +303,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     is_ees = ((is_flexor and i < Ia_recruited) or (not is_flexor and i < n_Ia + Ia_recruited)) : boolean
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
- 
+    equation_II=model_spindle['II']
     ii_eq = f'''
     is_flexor = (i < n_II) : boolean
     stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
