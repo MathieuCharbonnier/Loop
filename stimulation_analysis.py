@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import math
 from datetime import datetime
 from closed_loop import closed_loop
-from plots import read_sto
+
 
 def EES_stim_analysis(
     param_dict,
@@ -107,7 +107,7 @@ def EES_stim_analysis(
         sto_path = os.path.join(save_dir, sto_name)
     
         # --- Run simulation ---
-        spikes, main_data = closed_loop(
+        spikes, main_data, joint = closed_loop(
             N_ITERATIONS, REACTION_TIME, TIME_STEP, current_params, NEURON_COUNTS, CONNECTIONS,
             equation_Ia, equation_II, BIOPHYSICAL_PARAMS,
             MUSCLES_STR, sto_path, seed=seed
@@ -141,8 +141,7 @@ def EES_stim_analysis(
             ax.grid(True, linestyle='--', alpha=0.3)
     
             if var == 'Joints':
-                joints = read_sto(sto_path, ['ankle_angle_r'])
-                ax.plot(joints['time'], joints['ankle_angle_r/value']*180/np.pi, color='darkred', 
+                ax.plot(main_data[0]['Time'], joints, color='darkred', 
                        label='Ankle Angle', linewidth=2.5)
                 ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
     
