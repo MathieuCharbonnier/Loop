@@ -5,7 +5,7 @@ import os
 import json
 import opensim as osim
 
-def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initial_state=None, final_state=None, stretch_file=None):
+def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initial_state=None, final_state=None, stretch_file=None, muscles_recorded=None):
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     time_array = np.arange(0, T, dt)
@@ -27,11 +27,11 @@ def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initi
     controller = ActivationController(model, muscle_names, time_array, activation_array)
     model.addController(controller)
 
-    if stretch_file is not None:
+    if (stretch_file is not None and muscles_stretch is not None):
         reporter = osim.TableReporter()
         reporter.setName("MuscleReporter")
         reporter.set_report_time_interval(dt)
-        for i,muscle_name in enumerate(muscle_names):
+        for i,muscle_name in enumerate(muscles_stretch):
             muscle = model.getMuscles().get(muscle_name)
             reporter.addToReport(muscle.getOutput("fiber_length"), f'{muscle_name}_fiber_length')
         model.addComponent(reporter)
@@ -103,11 +103,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Muscle simulation')
     parser.add_argument('--dt', type=float, required=True, help='Time step')
     parser.add_argument('--T', type=float, required=True, help='Total simulation time')
-    parser.add_argument('--muscles', type=str, required=True, help='Muscle name')
+    parser.add_argument('--muscles_target', type=str, required=True, help='Muscle name corresponding to activation')
     parser.add_argument('--activations', type=str, required=True, help='Path to input numpy array file')
     parser.add_argument('--initial_state', type=str, help='Initial state JSON file')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
     parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array')
+    parser.add_argument('--muscles_recorded', type=str, help='Corresponding muscle for stretch ')
     parser.add_argument('--output_final_state', type=str, help="Path to save final state JSON file")
 
     args = parser.parse_args()
@@ -123,6 +124,7 @@ if __name__ == "__main__":
         'initial_state': args.initial_state,
         'final_state': args.output_final_state,
         'stretch_file': args.output_stretch,
+        'muscle_stretch': args.muscles_recorded
     }
 
     run_simulation(
