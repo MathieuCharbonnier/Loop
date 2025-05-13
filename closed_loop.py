@@ -1,3 +1,17 @@
+from brian2 import *
+import numpy as np
+import pandas as pd
+import os
+import subprocess
+import tempfile
+import json
+import matplotlib.pyplot as plt
+from collections import defaultdict
+from scipy.stats import gaussian_kde
+
+from neural_simulations import run_one_muscle_neuron_simulation, run_flexor_extensor_neuron_simulation
+from activation import decode_spikes_to_activation
+
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, sto_path, 
            initial_perturbation=None, seed=42):
