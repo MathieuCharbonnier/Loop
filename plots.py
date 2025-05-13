@@ -42,7 +42,7 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
 
 
 def plot_neural_dynamic(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
-    rate_columns = [(col, "FR (Hz)") for col in ["Ia_rate", "II_rate"]]
+    rate_columns = [(col, "FR (Hz)") for col in muscle_data[0].columns if "rate" in col and "I" in col]
     IPSP_columns = [(col, "IPSP (nA)") for col in muscle_data[0].columns if "IPSP" in col]
     columns = rate_columns + IPSP_columns + [("MN_rate", "FR (Hz)")]
 
@@ -87,7 +87,7 @@ def plot_activation(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, I
     plt.show()
 
 
-def plot_muscle_length(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+def plot_mouvement(muscle_data, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
     fig, axs = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
     props = ['Fiber_length', 'Stretch', 'Velocity']
     ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
@@ -100,10 +100,10 @@ def plot_muscle_length(muscle_data, muscle_names, folder, ees_freq, Ia_recruited
         axs[i].tick_params(labelsize=10)
 
     axs[-1].set_xlabel('Time (s)', fontsize=11)
-    fig.suptitle("Muscles Properties", fontsize=16)
+    fig.suptitle("Mouvement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    path_fig = os.path.join(folder, f'Muscle_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    path_fig = os.path.join(folder, f'Mouvement_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
 
@@ -124,11 +124,12 @@ def read_sto(filepath, columns):
 
 
   
-def plot_joints(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+def plot_from_sto(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq, title=None):
 
     df=read_sto(filepath, columns_wanted)
     fig, axs = plt.subplots(len(columns_wanted), 2, figsize=(12, 10), sharex=True)
-    fig.suptitle("Joint Angles and Speeds", fontsize=16)
+    if title is not None:
+        fig.suptitle(title, fontsize=16)
 
     for i, column in enumerate(columns_wanted):
         axs[i, 0].plot(df['time'], df[column + '/value']*180/np.pi, label=f"{column} value", color=colorblind_friendly_colors["green"])
