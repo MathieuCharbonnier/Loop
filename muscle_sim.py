@@ -5,33 +5,100 @@ import os
 import json
 import opensim as osim
 
-def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initial_state=None, final_state=None, stretch_file=None, muscles_recorded=None):
+def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, output_all=None, 
+                  initial_state=None, final_state=None, stretch_file=None):
+    """
+    Run an OpenSim simulation with muscle activations and/or external torques.
+    
+    Parameters:
+    -----------
+    dt : float
+        Time step for simulation
+    T : float
+        Total simulation time
+    muscles : list
+        List of muscle names to be recorded and/or activated
+    activation_array : numpy.ndarray, optional
+        Array of muscle activations over time [muscles × time_points]
+    torque_data : dict, optional
+        Dictionary containing torque information with keys:
+        - 'coordinates': list of coordinate names to apply torque
+        - 'torque_values': numpy array of torque values [coordinates × time_points]
+    output_all : str, optional
+        Path to save all states (.sto file)
+    initial_state : str, optional
+        Path to JSON file with initial state
+    final_state : str, optional
+        Path to save final state as JSON
+    stretch_file : str, optional
+        Path to save muscle fiber lengths
+    """
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     time_array = np.arange(0, T, dt)
+    print('time_array ', time_array)
+    
+    # Add muscle controller if activation provided
+    if activation_array is not None:
+        print("Setting up muscle activation controller")
+        print("activation shape:", activation_array.shape)
+        
+        class ActivationController(osim.PrescribedController):
+            def __init__(self, model, muscle_list, time_array, activation_array):
+                super().__init__()
+                self.setName("ActivationController")
+                for i, muscle_name in enumerate(muscle_list):
+                    muscle = model.getMuscles().get(muscle_name)
+                    self.addActuator(muscle)
 
-    class ActivationController(osim.PrescribedController):
-        def __init__(self, model, muscle_name, time_array, activation_array):
-            super().__init__()
-            self.setName("ActivationController")
-            for i,muscle_name in enumerate(muscle_names):
-                muscle = model.getMuscles().get(muscle_name)
-                self.addActuator(muscle)
+                    func = osim.PiecewiseLinearFunction()
+                    for t, a in zip(time_array, activation_array[i]):
+                        func.addPoint(t, float(a))
 
-                func = osim.PiecewiseLinearFunction()
-                for t, a in zip(time_array, activation_array[i]):
-                    func.addPoint(t, float(a))
+                    self.prescribeControlForActuator(muscle_name, func)
 
-                self.prescribeControlForActuator(muscle_name, func)
+        controller = ActivationController(model, muscles, time_array, activation_array)
+        model.addController(controller)
+    
+    # Add external torque if provided
+    if torque_data is not None:
+        print("Setting up external torque")
+        coordinates = torque_data['coordinates']
+        torque_values = torque_data['torque_values']
+        print("External torque will be applied to:", coordinates)
+        
+        for i, coord_name in enumerate(coordinates):
+            # Create an ExternalForce for each coordinate that needs torque
+            torque_function = osim.PiecewiseLinearFunction()
+            for t, torque in zip(time_array, torque_values[i]):
+                torque_function.addPoint(t, float(torque))
+            
+            # Create a prescribed force to apply the torque
+            prescribed_force = osim.PrescribedForce(model.getBodySet().get("tibia_r"))
+            prescribed_force.setName(f"Torque_{coord_name}")
+            
+            # Set torque function (this applies a pure torque)
+            prescribed_force.prescribeTorqueX(osim.Constant(0.0))
+            prescribed_force.prescribeTorqueY(osim.Constant(0.0))
+            
+            # For ankle dorsiflexion, typically apply torque around Z-axis
+            # For ankle_angle_r, positive torque creates dorsiflexion
+            if coord_name == "ankle_angle_r":
+                prescribed_force.prescribeTorqueZ(torque_function)
+            else:
+                # Default to Z-axis, but this should be customized based on the coordinate
+                prescribed_force.prescribeTorqueZ(torque_function)
+            
+            # Forces need to be enabled
+            prescribed_force.setAppliesForce(True)
+            model.addForce(prescribed_force)
 
-    controller = ActivationController(model, muscle_names, time_array, activation_array)
-    model.addController(controller)
-
-    if (stretch_file is not None and muscles_stretch is not None):
+    # Add muscle reporter to record fiber lengths
+    if stretch_file is not None:
         reporter = osim.TableReporter()
         reporter.setName("MuscleReporter")
         reporter.set_report_time_interval(dt)
-        for i,muscle_name in enumerate(muscles_stretch):
+        for muscle_name in muscles:
             muscle = model.getMuscles().get(muscle_name)
             reporter.addToReport(muscle.getOutput("fiber_length"), f'{muscle_name}_fiber_length')
         model.addComponent(reporter)
@@ -54,27 +121,29 @@ def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initi
                 print(f"Error loading initial state file: {e}")
         else:
             print(f"Initial state file not found: {initial_state}")
-
     # Set muscles to resting state if no initial state is provided
     else:
         print("Setting muscles to resting state")
-        for muscle_name in muscle_names:
+        for muscle_name in muscles:
             muscle = model.getMuscles().get(muscle_name)
             # Set muscle activation to 0
             muscle.setActivation(state, 0.0)
                 
         model.equilibrateMuscles(state)
 
+    # Run the simulation
     manager = osim.Manager(model)
     manager.setIntegratorAccuracy(1e-4)
     manager.initialize(state)
     manager.integrate(T)
 
+    # Save full simulation results if requested
     if output_all is not None:
         statesTable = manager.getStatesTable()
         osim.STOFileAdapter.write(statesTable, output_all)
         print(f'{output_all} file is saved')
 
+    # Save final state if requested
     if final_state is not None:
         json_ = {}
         statesTable = manager.getStatesTable()
@@ -88,10 +157,11 @@ def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initi
         with open(final_state, "w") as f:
             json.dump(json_, f, indent=4)
 
+    # Save muscle stretch data if requested
     if stretch_file is not None:
         results_table = reporter.getTable()
-        fiber_length=np.zeros((len(muscle_names),int(T/dt)+1))
-        for i,muscle_name in enumerate(muscle_names):
+        fiber_length = np.zeros((len(muscles), int(T/dt)+1))
+        for i, muscle_name in enumerate(muscles):
             fiber_length[i] = results_table.getDependentColumn(f'{muscle_name}_fiber_length').to_numpy()
         np.save(stretch_file, fiber_length)
 
@@ -100,39 +170,63 @@ def run_simulation(dt, T, muscle_names, activation_array, output_all=None, initi
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Muscle simulation')
+    parser = argparse.ArgumentParser(description='Muscle and torque simulation in OpenSim')
     parser.add_argument('--dt', type=float, required=True, help='Time step')
     parser.add_argument('--T', type=float, required=True, help='Total simulation time')
-    parser.add_argument('--muscles_target', type=str, required=True, help='Muscle name corresponding to activation')
-    parser.add_argument('--activations', type=str, required=True, help='Path to input numpy array file')
+    parser.add_argument('--muscles', type=str, required=True, help='Comma-separated list of muscles to activate/record')
+    
+    # Make activation optional
+    parser.add_argument('--activations', type=str, help='Path to input numpy array file for muscle activations')
+    
+    # Add torque parameters
+    parser.add_argument('--torque_coords', type=str, help='Comma-separated list of coordinates to apply torque')
+    parser.add_argument('--torque_values', type=str, help='Path to numpy array file with torque values')
+    
+    # Other parameters
     parser.add_argument('--initial_state', type=str, help='Initial state JSON file')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
-    parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array')
-    parser.add_argument('--muscles_recorded', type=str, help='Corresponding muscle for stretch ')
+    parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array of fiber lengths')
     parser.add_argument('--output_final_state', type=str, help="Path to save final state JSON file")
 
     args = parser.parse_args()
+    
+    # Parse muscles list
+    muscles = args.muscles.split(',')
+    
+    # Load activation data if provided
+    activation_array = None
+    if args.activations:
+        if not os.path.isfile(args.activations):
+            raise FileNotFoundError(f"Activation file not found: {args.activations}")
+        activation_array = np.load(args.activations)
+        
+    # Load and prepare torque data if provided
+    torque_data = None
+    if args.torque_coords and args.torque_values:
+        if not os.path.isfile(args.torque_values):
+            raise FileNotFoundError(f"Torque values file not found: {args.torque_values}")
+        
+        torque_coords = args.torque_coords.split(',')
+        torque_values = np.load(args.torque_values)
+        
+        torque_data = {
+            'coordinates': torque_coords,
+            'torque_values': torque_values
+        }
+    
+    # Ensure at least one of activation or torque is provided
+    if activation_array is None and torque_data is None:
+        raise ValueError("Must provide either muscle activations or external torques")
 
-    # Validate activation input file
-    if not os.path.isfile(args.activations):
-        raise FileNotFoundError(f"Activation file not found: {args.activations}")
-
-    activation_array = np.load(args.activations)
-
-    # Gather optional arguments
-    optional_args = {
-        'initial_state': args.initial_state,
-        'final_state': args.output_final_state,
-        'stretch_file': args.output_stretch,
-        'muscle_stretch': args.muscles_recorded
-    }
-
+    # Run the simulation
     run_simulation(
         args.dt,
         args.T,
-        args.muscles.split(','),
-        activation_array,
+        muscles,
+        activation_array=activation_array,
+        torque_data=torque_data,
         output_all=args.output_all,
-        **{k: v for k, v in optional_args.items() if v is not None}
+        initial_state=args.initial_state,
+        final_state=args.output_final_state,
+        stretch_file=args.output_stretch
     )
-
