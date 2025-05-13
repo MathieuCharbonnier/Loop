@@ -87,7 +87,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     net.add([Ia])
                                             
     #If II is specify in the spindle model, then the network contain II and excitatory neurons  (not monosynaptic network)                                    
-    if 'II' in spindle_model:
+    if 'II' in spindle_model and 'II' in neuron_pop and 'exc' in neuron_pop:
       
         n_II = neuron_pop['II']
         n_exc = neuron_pop['exc']
@@ -126,7 +126,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     moto.v = initial_potentials['moto']
 
     # Add neuron groups to the network
-    net.add([ moto])
+    net.add([moto])
                                             
     group_map = {
     "Ia":  Ia[:] ,
@@ -152,10 +152,10 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
           
     # Setup monitors
     mon_Ia = SpikeMonitor(Ia)
-    if 'II' in spindle_model:
+    if 'II' in spindle_model and 'II' in neuron_pop and 'exc' in neuron_pop:
         mon_II = SpikeMonitor(II)
         mon_exc = SpikeMonitor(exc)
-        net.add[mon_II, mon_exc]
+        net.add([mon_II, mon_exc])
     mon_motoneuron = SpikeMonitor(moto)
     
     mon_moto=StateMonitor(moto, ['Isyn'], n_motor/2)
@@ -207,7 +207,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     result = {
         "Ia": mon_Ia.spike_trains()
     }
-    if 'II' in spindle_model:
+    if 'II' in spindle_model and 'II' in neuron_pop and 'exc' in neuron_pop:
         result['II']=mon_II.spike_trains()
         result['exc']= mon_exc.spike_trains()
     
