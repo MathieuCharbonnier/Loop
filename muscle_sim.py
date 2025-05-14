@@ -220,7 +220,7 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
     if joint_file is not None and joint_reporter is not None:
         results_table = joint_reporter.getTable()
         joint_angles = results_table.getDependentColumn(f'{joint_name}_angle').to_numpy()
-
+        joint_angles=joint_angles*180/np.pi
         np.save(joint_file, joint_angles)
         print(f'{joint_file} file is saved')
 
