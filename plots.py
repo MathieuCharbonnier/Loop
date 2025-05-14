@@ -183,7 +183,7 @@ def plot_activation(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruit
 def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
     """
     Plot movement dynamics from a combined dataframe.
-    
+
     Parameters:
     -----------
     df : pandas.DataFrame
@@ -203,39 +203,59 @@ def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited,
     eff_recruited : int
         Number of efferent fibers recruited
     """
-    fig, axs = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
+    torque_column = f'Torque'
+    has_torque = torque_column in df.columns
+
+    n_subplots = 5 if has_torque else 4
+    fig_height = 15 if has_torque else 12
+    fig, axs = plt.subplots(n_subplots, 1, figsize=(12, fig_height), sharex=True)
+
+    time = df['Time'].values
+    current_axis = 0
+
+    # Plot torque first, if available
+    if has_torque:
+        axs[current_axis].plot(time, df[torque_column], label=f'Torque {joint_name}', color='tab:red')
+        axs[current_axis].set_ylabel("Torque (Nm)", fontsize=11)
+        axs[current_axis].legend(fontsize=11)
+        axs[current_axis].tick_params(labelsize=10)
+        current_axis += 1
+
+    # Plot fiber properties: Fiber_length, Stretch, Velocity
     props = ['Fiber_length', 'Stretch', 'Velocity']
     ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
-    time = df['Time'].values
-    
+
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
         for j, muscle_name in enumerate(muscle_names):
             column_name = f"{prop}_{muscle_name}"
             if column_name in df.columns:
-                axs[i].plot(time, df[column_name], 
-                           label=f'{muscle_name}', 
-                           color=colorblind_friendly_colors[color_keys[j % len(color_keys)]])
-        
-        axs[i].set_ylabel(ylabel, fontsize=11)
-        axs[i].legend(fontsize=11)
-        axs[i].tick_params(labelsize=10)
-    
+                axs[current_axis].plot(time, df[column_name],
+                                       label=f'{muscle_name}',
+                                       color=colorblind_friendly_colors[color_keys[j % len(color_keys)]])
+        axs[current_axis].set_ylabel(ylabel, fontsize=11)
+        axs[current_axis].legend(fontsize=11)
+        axs[current_axis].tick_params(labelsize=10)
+        current_axis += 1
+
     # Plot joint angle
     joint_column = f"Joint_{joint_name}"
     if joint_column in df.columns:
-        axs[-1].plot(time, df[joint_column], label=joint_name)
-        axs[-1].legend(fontsize=11)
+        axs[current_axis].plot(time, df[joint_column], label=joint_name)
+        axs[current_axis].legend(fontsize=11)
     else:
         print(f"Joint column '{joint_column}' not found in dataframe")
-    
-    axs[-1].set_ylabel("angle (degree)", fontsize=11)
-    axs[-1].set_xlabel('Time (s)', fontsize=11)
+
+    axs[current_axis].set_ylabel("Angle (°)", fontsize=11)
+    axs[current_axis].set_xlabel('Time (s)', fontsize=11)
+
     fig.suptitle("Movement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    
+
     path_fig = os.path.join(folder, f'Mouvement_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
     plt.savefig(path_fig)
     plt.show()
+
+
 
 
 def read_sto(filepath, columns):
