@@ -5,7 +5,7 @@ import os
 import json
 import opensim as osim
 
-def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, output_all=None, 
+def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torque_values=None, output_all=None, 
                   initial_state=None, final_state=None, stretch_file=None, joint_file=None):
     """
     Run an OpenSim simulation with muscle activations and/or external torques.
@@ -20,10 +20,10 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
         List of muscle names to be recorded and/or activated
     activation_array : numpy.ndarray, optional
         Array of muscle activations over time [muscles × time_points]
-    torque_data : dict, optional
-        Dictionary containing torque information with keys:
-        - 'coordinates': list of coordinate names to apply torque
-        - 'torque_values': numpy array of torque values [coordinates × time_points]
+    joint_name : string, optional
+        where to apply the torque, and which joint to record
+    torque_values: numpy.array, optional
+         torque values [time_points]
     output_all : str, optional
         Path to save all states (.sto file)
     initial_state : str, optional
@@ -38,12 +38,9 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     time_array = np.arange(0, T, dt)
-    print('time_array ', time_array)
     
     # Add muscle controller if activation provided
     if activation_array is not None:
-        print("Setting up muscle activation controller")
-        print("activation shape:", activation_array.shape)
         
         class ActivationController(osim.PrescribedController):
             def __init__(self, model, muscle_list, time_array, activation_array):
@@ -63,30 +60,75 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
         model.addController(controller)
     
     # Add external torque if provided
-    if torque_data is not None:
-        print("Setting up external torque")
-        coordinates = torque_data['coordinates']
-        torque_values = torque_data['torque_values']
-        print("External torque will be applied to:", coordinates)
+    if joint_name is not None and torque_values is not None:
+        # Get the coordinate for the specified joint
+        coordinate = model.getCoordinateSet().get(joint_name)
+        if coordinate is None:
+            raise ValueError(f"Coordinate '{joint_name}' not found in the model")
         
-        for i, coord_name in enumerate(coordinates):
-            # Create an ExternalForce for each coordinate that needs torque
-            torque_function = osim.PiecewiseLinearFunction()
-            for t, torque in zip(time_array, torque_values[i]):
-                torque_function.addPoint(t, float(torque))
-            
-            # Create a prescribed force to apply the torque
-            prescribed_force = osim.PrescribedForce(f"Torque_{coord_name}",model.getBodySet().get("tibia_r"))
-            # Set torque functions: (fx, fy, fz)
-
-            # Use osim.Constant(0.0) for unused axes
-            fx = osim.Constant(0.0)
+        # Get the joint and associated bodies
+        joint = coordinate.getJoint()
+        if joint is None:
+            raise ValueError(f"Joint for coordinate '{joint_name}' not found")
+        
+        # For OpenSim, we need to get the body associated with the coordinate
+        # In most OpenSim models, coordinate names are associated with specific bodies
+        # For ankle_angle_r, we need to use tibia_r as the body
+        body_name = None
+        
+        # Map common joint names to their associated bodies
+        joint_to_body_map = {
+            "ankle_angle_r": "tibia_r",
+            "knee_angle_r": "tibia_r",
+            "hip_flexion_r": "femur_r",
+            "hip_adduction_r": "femur_r",
+            "hip_rotation_r": "femur_r",
+            "ankle_angle_l": "tibia_l",
+            "knee_angle_l": "tibia_l",
+            "hip_flexion_l": "femur_l",
+            "hip_adduction_l": "femur_l",
+            "hip_rotation_l": "femur_l",
+        }
+        
+        if joint_name in joint_to_body_map:
+            body_name = joint_to_body_map[joint_name]
+       
+        body = model.getBodySet().get(body_name)
+        if body is None:
+            raise ValueError(f"Body '{body_name}' not found for joint '{joint_name}'")
+        
+        print(f"Applying torque to body '{body_name}' for joint '{joint_name}'")
+        
+        # Create torque function
+        torque_function = osim.PiecewiseLinearFunction()
+        for t, torque in zip(time_array, torque_values):
+            torque_function.addPoint(t, float(torque))
+        
+        # Create a prescribed force to apply the torque
+        prescribed_force = osim.PrescribedForce(f"Torque_{joint_name}", body)
+        
+        # Set torque functions based on the joint's rotation axis
+        # This is simplified - for more complex joints, additional logic would be needed
+        # Default to Z-axis rotation for most joints
+        fx = osim.Constant(0.0)
+        fy = osim.Constant(0.0)
+        fz = torque_function
+        
+        # For certain joints, adjust the torque direction based on their primary rotation axis
+        # This is a simplification and might need to be customized based on the specific model
+        if "knee" in joint_name.lower() or "ankle" in joint_name.lower():
+            # Many knee and ankle joints rotate around the X-axis
+            fx = torque_function
             fy = osim.Constant(0.0)
-            fz = torque_function 
+            fz = osim.Constant(0.0)
+        elif "hip" in joint_name.lower() and ("rotation" in joint_name.lower() or "ad" in joint_name.lower()):
+            # Hip rotation or adduction might be around Y-axis
+            fx = osim.Constant(0.0)
+            fy = torque_function
+            fz = osim.Constant(0.0)
 
-            prescribed_force.setTorqueFunctions(fx, fy, fz)
-            
-            model.addForce(prescribed_force)
+        prescribed_force.setTorqueFunctions(fx, fy, fz)
+        model.addForce(prescribed_force)
 
     # Add muscle reporter to record fiber lengths
     if stretch_file is not None:
@@ -100,18 +142,15 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
 
     # Add joint reporter to record joint angles
     joint_reporter = None
-    if joint_file is not None and torque_data is not None:
+    if joint_file is not None and joint_name is not None:
         joint_reporter = osim.TableReporter()
         joint_reporter.setName("JointReporter")
         joint_reporter.set_report_time_interval(dt)
-        
-        # Get the specific joint coordinates to record
-        for joint_name in torque_data['coordinates']:
-            coordinate = model.getCoordinateSet().get(joint_name)
-            if coordinate is not None:
-                joint_reporter.addToReport(coordinate.getOutput("value"), f'{joint_name}_angle')
-            else:
-                print(f"Warning: Coordinate '{joint_name}' not found in model")
+        coordinate = model.getCoordinateSet().get(joint_name)
+        if coordinate is not None:
+            joint_reporter.addToReport(coordinate.getOutput("value"), f'{joint_name}_angle')
+        else:
+            print(f"Warning: Coordinate '{joint_name}' not found in model")
         
         model.addComponent(joint_reporter)
 
@@ -180,15 +219,8 @@ def run_simulation(dt, T, muscles, activation_array=None, torque_data=None, outp
     # Save joint angle data if requested
     if joint_file is not None and joint_reporter is not None:
         results_table = joint_reporter.getTable()
-        num_coords = len(torque_data['coordinates'])
-        joint_angles = np.zeros((num_coords, int(T/dt)+1))
-        
-        for i, joint_name in enumerate(torque_data['coordinates']):
-            try:
-                joint_angles[i] = results_table.getDependentColumn(f'{joint_name}_angle').to_numpy()
-            except Exception as e:
-                print(f"Error extracting joint data for {joint_name}: {e}")
-        
+        joint_angles = results_table.getDependentColumn(f'{joint_name}_angle').to_numpy()
+
         np.save(joint_file, joint_angles)
         print(f'{joint_file} file is saved')
 
@@ -200,17 +232,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Muscle and torque simulation in OpenSim')
     parser.add_argument('--dt', type=float, required=True, help='Time step')
     parser.add_argument('--T', type=float, required=True, help='Total simulation time')
-    parser.add_argument('--muscles', type=str, required=True, help='Comma-separated list of muscles to activate/record')
-    
-    # Make activation optional
-    parser.add_argument('--activations', type=str, help='Path to input numpy array file for muscle activations')
-    
-    # Add torque parameters
-    parser.add_argument('--joint_name', type=str, help='Comma-separated list of joints to apply torque and record')
-    parser.add_argument('--torque', type=str, help='Path to numpy array file with torque values')
-    
-    # Other parameters
+    parser.add_argument('--muscles_names', type=str, required=True, help='Comma-separated list of muscles to activate/record')
     parser.add_argument('--initial_state', type=str, help='Initial state JSON file')
+    parser.add_argument('--activations', type=str, help='Path to input numpy array file for muscle activations')
+    parser.add_argument('--joint_name', type=str, help='Joint to apply torque and record')
+    parser.add_argument('--torque', type=str, help='Path to numpy array file with torque values')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
     parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array of fiber lengths')
     parser.add_argument('--output_joint', type=str, help='Path to save output numpy array of joint angles')
@@ -219,7 +245,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Parse muscles list
-    muscles = args.muscles.split(',')
+    muscles = args.muscles_names.split(',')
     
     # Load activation data if provided
     activation_array = None
@@ -229,25 +255,17 @@ if __name__ == "__main__":
         activation_array = np.load(args.activations)
         
     # Load and prepare torque data if provided
-    torque_data = None
+    torque_values = None
+    joint_name = None
     if args.joint_name and args.torque:
         if not os.path.isfile(args.torque):
             raise FileNotFoundError(f"Torque values file not found: {args.torque}")
 
         torque_values = np.load(args.torque)
-        joint_names = args.joint_name.split(',')
-        
-        # Ensure torque values match the number of joints
-        if len(joint_names) != torque_values.shape[0]:
-            print(f"Warning: Number of joints ({len(joint_names)}) doesn't match torque data shape ({torque_values.shape[0]})")
-        
-        torque_data = {
-            'coordinates': joint_names,
-            'torque_values': torque_values
-        }
+        joint_name = args.joint_name
     
     # Ensure at least one of activation or torque is provided
-    if activation_array is None and torque_data is None:
+    if activation_array is None and torque_values is None:
         raise ValueError("Must provide either muscle activations or external torques")
 
     # Run the simulation
@@ -256,7 +274,8 @@ if __name__ == "__main__":
         args.T,
         muscles,
         activation_array=activation_array,
-        torque_data=torque_data,
+        joint_name=joint_name,
+        torque_values=torque_values,
         output_all=args.output_all,
         initial_state=args.initial_state,
         final_state=args.output_final_state,
