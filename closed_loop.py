@@ -86,7 +86,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
 
     initial_potentials = {
         "exc": BIOPHYSICAL_PARAMS['Eleaky'],
-        "moto": BIOPHYSICAL_PARAMS['Eleaky']
+        "MN": BIOPHYSICAL_PARAMS['Eleaky']
     }
     if NUM_MUSCLES == 2:
         initial_potentials["inh"] = BIOPHYSICAL_PARAMS['Eleaky']
@@ -98,7 +98,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
             'c0': [0.0, 0.0],    # Initial calcium concentration state
             'P0': 0.0,           # Initial calcium-troponin binding state
             'a0': 0.0            # Initial activation state
-        } for _ in range(NEURON_COUNTS['motor'])]
+        } for _ in range(NEURON_COUNTS['MN'])]
         for _ in range(NUM_MUSCLES)]
 
     # Containers for simulation data
@@ -115,10 +115,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
 
     # Use temporary file for state management across iterations
     state_file = None
-    joints_all = []
-    
-    # Store torque values if provided
-    torque_values = []
     
     # =============================================================================
     # Main Simulation Loop
@@ -129,7 +125,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     print(f"Number Ia fibers recruited by EES: {EES_PARAMS['Ia_recruited']} / {NEURON_COUNTS['Ia']}")
     if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
         print(f"Number II fibers recruited by EES: {EES_PARAMS['II_recruited']} / {NEURON_COUNTS['II']}")
-    print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['eff_recruited']} / {NEURON_COUNTS['motor']}")
+    print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['eff_recruited']} / {NEURON_COUNTS['MN']}")
     
     # Create reusable temporary files for the whole simulation
     with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_activation, \
@@ -178,8 +174,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     current_torque = torque[start_idx:end_idx]
                     np.save(input_torque_path, current_torque)
                     cmd += ['--torque', input_torque_path]
-                    # Store torque values for dataframe
-                    torque_values.append(current_torque)
+
 
                 # Run OpenSim simulation
                 process = subprocess.run(cmd, capture_output=True, text=True)
@@ -188,12 +183,10 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                 if process.returncode == 0:
                     # Load muscle lengths and joint from simulation
                     fiber_lengths = np.load(output_stretch_path)
-                    joints = np.load(output_joint_path)
-                    
+                    joint = np.load(output_joint_path)
                     # Remove the last value as it will be included in the next iteration
                     fiber_lengths = fiber_lengths[:, :-1]
-                    joints = joints[:, :-1]
-                    joints_all.append(joints)
+                    joint = joint[:-1]
 
                     if resting_lengths[0] is None:
                         resting_lengths = fiber_lengths[:, 0]
@@ -298,12 +291,11 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                         batch_data[f'{key}_{MUSCLE_NAMES[muscle_idx]}'] = value
                     
                     # Add joint data
-                    batch_data[f'Joint_{associated_joint}'] = joints[0]
-                    
+                    batch_data[f'Joint_{associated_joint}'] = joint
+            
                     # Add torque data if available
                     if current_torque is not None:
                         batch_data['Torque'] = current_torque
-                    
                     # Store batch data for this muscle
                     muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
 
@@ -436,4 +428,4 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         os.unlink(input_activation_path)
         os.unlink(input_joint_path)
 
-    return spike_data, combined_df, joints_all
+    return spike_data, combined_df
