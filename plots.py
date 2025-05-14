@@ -36,7 +36,7 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
     """
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))
-    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(12, 10), sharex=True)
+    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(12, 3.5*num_fiber_types, sharex=True)
 
     if num_muscles == 1:
         axs = np.expand_dims(axs, axis=1)
@@ -104,7 +104,7 @@ def plot_neural_dynamic(df, muscle_names, folder, ees_freq, Ia_recruited, II_rec
         print("No neural dynamics columns found in the dataframe")
         return
     
-    fig, axs = plt.subplots(len(columns), 1, figsize=(12, 15), sharex=True)
+    fig, axs = plt.subplots(len(columns), 1, figsize=(12, 3.5*len(columns), sharex=True)
     # Handle case with only one subplot
     if len(columns) == 1:
         axs = [axs]
