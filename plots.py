@@ -206,7 +206,7 @@ def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited,
     torque_column = f'Torque'
     has_torque = torque_column in df.columns
 
-    n_subplots = 5 if has_torque else 4
+    n_subplots = 6 if has_torque else 5
     fig_height = 15 if has_torque else 12
     fig, axs = plt.subplots(n_subplots, 1, figsize=(12, fig_height), sharex=True)
 
@@ -224,7 +224,15 @@ def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited,
     # Plot joint angle
     joint_column = f"Joint_{joint_name}"
     axs[current_axis].plot(time, df[joint_column], label=joint_name)
-    axs[current_axis].set_ylabel("Angle (°)", fontsize=11)
+    axs[current_axis].set_ylabel("Joint Angle (°)", fontsize=11)
+    axs[current_axis].set_xlabel('Time (s)', fontsize=11)
+    axs[current_axis].legend(fontsize=11)
+    current_axis += 1
+
+    # Plot joint Velocity
+    joint_column = f"Joint_Velocity_{joint_name}"
+    axs[current_axis].plot(time, df[joint_column], label=joint_name+ " velocity")
+    axs[current_axis].set_ylabel("Joint Velocity (°/s)", fontsize=11)
     axs[current_axis].set_xlabel('Time (s)', fontsize=11)
     axs[current_axis].legend(fontsize=11)
     current_axis += 1
