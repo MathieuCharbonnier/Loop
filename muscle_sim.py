@@ -89,20 +89,11 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
         if joint_name in joint_to_body_map:
             body_name = joint_to_body_map[joint_name]
         else:
-            # Try to get the body directly from the coordinate's joint (alternative approach)
-            joint_name_parts = joint_name.split('_')
-            if len(joint_name_parts) > 2:
-                potential_body_name = f"{joint_name_parts[-2]}_{joint_name_parts[-1]}"
-                if model.getBodySet().contains(potential_body_name):
-                    body_name = potential_body_name
-        
-        if body_name is None:
             raise ValueError(f"Could not determine body for joint '{joint_name}'")
         
         body = model.getBodySet().get(body_name)
         if body is None:
             raise ValueError(f"Body '{body_name}' not found for joint '{joint_name}'")
-        
         print(f"Applying torque to body '{body_name}' for joint '{joint_name}'")
         
         # Create torque function
@@ -117,55 +108,29 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
         rotation_axis = "z"  # Default to Z-axis
         
         if "knee" in joint_name.lower() or "ankle" in joint_name.lower():
-            # Most knee and ankle joints in sagittal plane models rotate around X-axis
-            rotation_axis = "x"
-            print(f"Using X-axis rotation for {joint_name}")
-        elif "hip_flexion" in joint_name.lower():
-            # Hip flexion/extension is often around X-axis
-            rotation_axis = "x"
-            print(f"Using X-axis rotation for {joint_name}")
-        elif "hip_adduction" in joint_name.lower():
-            # Hip adduction/abduction is often around Y-axis
             rotation_axis = "y"
-            print(f"Using Y-axis rotation for {joint_name}")
+        elif "hip_flexion" in joint_name.lower():
+            rotation_axis = "y"
+        elif "hip_adduction" in joint_name.lower():
+            rotation_axis = "x"
         elif "hip_rotation" in joint_name.lower():
-            # Hip internal/external rotation is often around Z-axis
             rotation_axis = "z"
-            print(f"Using Z-axis rotation for {joint_name}")
         
         # Set torque functions based on the joint's rotation axis
         fx = osim.Constant(0.0)
         fy = osim.Constant(0.0)
         fz = osim.Constant(0.0)
         
-        # For ankle joint, check if we need to invert the torque
-        # This addresses the potential sign convention issue
-        if "ankle" in joint_name.lower():
-            # Invert torque for ankle joint (often necessary due to OpenSim conventions)
-            inverted_torque_function = osim.PiecewiseLinearFunction()
-            for t, torque in zip(time_array, torque_values):
-                inverted_torque_function.addPoint(t, float(-torque))
-            
-            if rotation_axis == "x":
-                fx = inverted_torque_function
-                print(f"Applying INVERTED torque around X-axis for {joint_name}")
-            elif rotation_axis == "y":
-                fy = inverted_torque_function
-                print(f"Applying INVERTED torque around Y-axis for {joint_name}")
-            else:
-                fz = inverted_torque_function
-                print(f"Applying INVERTED torque around Z-axis for {joint_name}")
+        # Apply torque 
+        if rotation_axis == "x":
+            fx = torque_function
+            print(f"Applying torque around X-axis for {joint_name}")
+        elif rotation_axis == "y":
+            fy = torque_function
+            print(f"Applying torque around Y-axis for {joint_name}")
         else:
-            # Apply non-inverted torque for other joints
-            if rotation_axis == "x":
-                fx = torque_function
-                print(f"Applying torque around X-axis for {joint_name}")
-            elif rotation_axis == "y":
-                fy = torque_function
-                print(f"Applying torque around Y-axis for {joint_name}")
-            else:
-                fz = torque_function
-                print(f"Applying torque around Z-axis for {joint_name}")
+            fz = torque_function
+            print(f"Applying torque around Z-axis for {joint_name}")
         
         prescribed_force.setTorqueFunctions(fx, fy, fz)
         model.addForce(prescribed_force)
