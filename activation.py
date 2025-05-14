@@ -168,19 +168,11 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
     # Cap the number of jobs at the number of motoneurons
     n_jobs = min(n_jobs, num_motoneurons)
     
-    # Execute in parallel with a progress bar if tqdm is available
-    try:
-        from tqdm.auto import tqdm
-        results = Parallel(n_jobs=n_jobs)(
-            delayed(process_motoneuron)(i, e_t_all[i], initial_params[i]) 
-            for i in tqdm(range(num_motoneurons), desc="Processing motoneurons")
-        )
-    except ImportError:
-        # Fall back if tqdm is not available
-        results = Parallel(n_jobs=n_jobs)(
-            delayed(process_motoneuron)(i, e_t_all[i], initial_params[i]) 
-            for i in range(num_motoneurons)
-        )
+
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(process_motoneuron)(i, e_t_all[i], initial_params[i]) 
+        for i in range(num_motoneurons)
+    )
     
     # Unpack results
     for i, (u_i, c_i, P_i, a_i, final_vals) in enumerate(results):
