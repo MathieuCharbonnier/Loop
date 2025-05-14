@@ -104,6 +104,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     # Containers for simulation data
     muscle_data = [[] for _ in range(NUM_MUSCLES)]
     resting_lengths = [None] * NUM_MUSCLES
+    joint_all=np.zeros((NUM_ITERATIONS*nb_points))
+ 
 
     spike_data = {
         muscle_name: {
@@ -187,12 +189,13 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     # Remove the last value as it will be included in the next iteration
                     fiber_lengths = fiber_lengths[:, :-1]
                     joint = joint[:-1]
-
+                    joint_all[iteration*nb_points: (iteration+1)*nb_points]=joint
+                    joint_velocity=np.gradient(joint, time_points)
                     if resting_lengths[0] is None:
                         resting_lengths = fiber_lengths[:, 0]
 
                     stretch = np.zeros((NUM_MUSCLES, nb_points))
-                    velocity = np.zeros((NUM_MUSCLES, nb_points))
+                    stretch_velocity = np.zeros((NUM_MUSCLES, nb_points))
                     
                     # Process each muscle's data
                     for muscle_idx in range(NUM_MUSCLES):
@@ -202,7 +205,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
 
                         # Calculate stretch and velocity for next iteration
                         stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
-                        velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
+                        stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
 
                 else:
                     error_msg = f'Error in iteration {iteration+1}. STDERR: {process.stderr}'
@@ -222,12 +225,12 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
             # Run neural simulation based on muscle count
             if NUM_MUSCLES == 1:
                 all_spikes, final_potentials, state_monitors = run_one_muscle_neuron_simulation(
-                    stretch, velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
+                    stretch, stretch_velocity,joint, joint_velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
                     initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
                 )
             else:  # NUM_MUSCLES == 2
                 all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
-                    stretch, velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
+                    stretch, stretch_velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
                     initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
                 )
             initial_potentials.update(final_potentials)
@@ -278,7 +281,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                         'Time': time_points + iteration * REACTION_TIME/second,
                         f'Fiber_length_{MUSCLE_NAMES[muscle_idx]}': fiber_lengths[muscle_idx],
                         f'Stretch_{MUSCLE_NAMES[muscle_idx]}': stretch[muscle_idx],
-                        f'Velocity_{MUSCLE_NAMES[muscle_idx]}': velocity[muscle_idx],
+                        f'Stretch_Velocity_{MUSCLE_NAMES[muscle_idx]}': stretch_velocity[muscle_idx],
                         f'mean_e_{MUSCLE_NAMES[muscle_idx]}': mean_e[muscle_idx],
                         f'mean_u_{MUSCLE_NAMES[muscle_idx]}': mean_u[muscle_idx],
                         f'mean_c_{MUSCLE_NAMES[muscle_idx]}': mean_c[muscle_idx],
@@ -289,13 +292,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     # Add state monitor data with muscle name as suffix
                     for key, value in state_monitors[muscle_idx].items():
                         batch_data[f'{key}_{MUSCLE_NAMES[muscle_idx]}'] = value
-                    
-                    # Add joint data
-                    batch_data[f'Joint_{associated_joint}'] = joint
-            
-                    # Add torque data if available
-                    if current_torque is not None:
-                        batch_data['Torque'] = current_torque
+
                     # Store batch data for this muscle
                     muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
 
@@ -312,17 +309,44 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     
     # Process data for each muscle
     for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
-        # Skip muscles with no data
-        if not muscle_data[muscle_idx]:
-            continue
-            
+          
         # Combine all iteration data for this muscle
-        all_data_dfs.append(pd.concat(muscle_data[muscle_idx], ignore_index=True))
+        df=pd.concat(muscle_data[muscle_idx], ignore_index=True)
 
-    # Ensure we have some data to work with
-    if not all_data_dfs:
-        print("No data generated during simulation.")
-        return spike_data, None, joints_all
+        # Compute firing rate for this muscle
+        # Extract stretch and velocity values for this muscle
+        stretch_values = df[f'Stretch_{muscle_name}'].values
+        velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
+        time = df['Time'].values
+        
+        # Compute Ia firing rate using spindle model
+        Ia_rate = eval(SPINDLE_MODEL['Ia'], 
+                       {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, 
+                       {"stretch": stretch_values, "stretch_velocity": velocity_values})
+        
+        # Add EES contribution
+        Ia_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
+        df[f'Ia_rate_{muscle_name}'] = 1/((1/Ia_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
+
+        # Compute II firing rate if applicable
+        if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
+            II_rate = eval(SPINDLE_MODEL['II'], 
+                          {"__builtins__": {}}, 
+                          {"stretch": stretch_values, "stretch_velocity": velocity_values})
+            II_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
+            df[f'II_rate_{muscle_name}'] = 1/((1/II_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
+
+        # Calculate all firing rate using KDE
+        for fiber_name, fiber_spikes in spike_data[muscle_name].items():
+        
+            all_spike_times = np.concatenate(list(fiber_spikes.values())) 
+            
+            firing_rate = np.zeros_like(time)
+            if len(all_spike_times) > 1:
+                kde = gaussian_kde(all_spike_times, bw_method=0.3)
+                firing_rate = kde(time) * len(all_spike_times) / max(len(fiber_spikes), 1)
+            df[f'{fiber_name}_measured_rate_{muscle_name}'] = firing_rate
+        all_data_dfs.append(df)
     
     # Combine all muscle data into a single dataframe
     if len(all_data_dfs) > 1:
@@ -334,44 +358,12 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     
     # Move Time column to be the first column
     combined_df = combined_df[['Time'] + [col for col in combined_df.columns if col != 'Time']]
-    
-    # Compute firing rates for each muscle and add to dataframe
-    for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
-        # Skip muscles with no data
-        if not muscle_data[muscle_idx]:
-            continue
-            
-        # Extract stretch and velocity values for this muscle
-        stretch_values = combined_df[f'Stretch_{muscle_name}'].values
-        velocity_values = combined_df[f'Velocity_{muscle_name}'].values
-        time = combined_df['Time'].values
-        
-        # Compute Ia firing rate using spindle model
-        Ia_rate = eval(SPINDLE_MODEL['Ia'], 
-                       {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, 
-                       {"stretch": stretch_values, "velocity": velocity_values})
-        
-        # Add EES contribution
-        Ia_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
-        combined_df[f'Ia_rate_{muscle_name}'] = 1/((1/Ia_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
 
-        # Compute II firing rate if applicable
-        if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
-            II_rate = eval(SPINDLE_MODEL['II'], 
-                          {"__builtins__": {}}, 
-                          {"stretch": stretch_values, "velocity": velocity_values})
-            II_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-            combined_df[f'II_rate_{muscle_name}'] = 1/((1/II_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
+    #add joint and torque if torque is applied
+    combined_df[f'Joint_{associated_joint}'] = joint_all
+    if current_torque is not None:
+        combined_df['Torque'] = torque
 
-        # Calculate motoneuron firing rate using KDE
-        mn_spikes = spike_data[muscle_name].get('MN', {})
-        all_spike_times = np.concatenate(list(mn_spikes.values())) if mn_spikes else np.array([])
-        
-        firing_rate = np.zeros_like(time)
-        if len(all_spike_times) > 1:
-            kde = gaussian_kde(all_spike_times, bw_method=0.3)
-            firing_rate = kde(time) * len(all_spike_times) / max(len(mn_spikes), 1)
-        combined_df[f'MN_rate_{muscle_name}'] = firing_rate
 
     # Save the combined dataframe to CSV
     combined_df.to_csv(csv_path, index=False)
