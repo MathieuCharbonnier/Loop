@@ -71,11 +71,6 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
         if joint is None:
             raise ValueError(f"Joint for coordinate '{joint_name}' not found")
         
-        # For OpenSim, we need to get the body associated with the coordinate
-        # In most OpenSim models, coordinate names are associated with specific bodies
-        # For ankle_angle_r, we need to use tibia_r as the body
-        body_name = None
-        
         # Map common joint names to their associated bodies
         joint_to_body_map = {
             "ankle_angle_r": "tibia_r",
@@ -90,9 +85,20 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
             "hip_rotation_l": "femur_l",
         }
         
+        body_name = None
         if joint_name in joint_to_body_map:
             body_name = joint_to_body_map[joint_name]
-       
+        else:
+            # Try to get the body directly from the coordinate's joint (alternative approach)
+            joint_name_parts = joint_name.split('_')
+            if len(joint_name_parts) > 2:
+                potential_body_name = f"{joint_name_parts[-2]}_{joint_name_parts[-1]}"
+                if model.getBodySet().contains(potential_body_name):
+                    body_name = potential_body_name
+        
+        if body_name is None:
+            raise ValueError(f"Could not determine body for joint '{joint_name}'")
+        
         body = model.getBodySet().get(body_name)
         if body is None:
             raise ValueError(f"Body '{body_name}' not found for joint '{joint_name}'")
@@ -107,26 +113,60 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
         # Create a prescribed force to apply the torque
         prescribed_force = osim.PrescribedForce(f"Torque_{joint_name}", body)
         
+        # Determine rotation axis based on joint name
+        rotation_axis = "z"  # Default to Z-axis
+        
+        if "knee" in joint_name.lower() or "ankle" in joint_name.lower():
+            # Most knee and ankle joints in sagittal plane models rotate around X-axis
+            rotation_axis = "x"
+            print(f"Using X-axis rotation for {joint_name}")
+        elif "hip_flexion" in joint_name.lower():
+            # Hip flexion/extension is often around X-axis
+            rotation_axis = "x"
+            print(f"Using X-axis rotation for {joint_name}")
+        elif "hip_adduction" in joint_name.lower():
+            # Hip adduction/abduction is often around Y-axis
+            rotation_axis = "y"
+            print(f"Using Y-axis rotation for {joint_name}")
+        elif "hip_rotation" in joint_name.lower():
+            # Hip internal/external rotation is often around Z-axis
+            rotation_axis = "z"
+            print(f"Using Z-axis rotation for {joint_name}")
+        
         # Set torque functions based on the joint's rotation axis
-        # This is simplified - for more complex joints, additional logic would be needed
-        # Default to Z-axis rotation for most joints
         fx = osim.Constant(0.0)
         fy = osim.Constant(0.0)
-        fz = torque_function
+        fz = osim.Constant(0.0)
         
-        # For certain joints, adjust the torque direction based on their primary rotation axis
-        # This is a simplification and might need to be customized based on the specific model
-        if "knee" in joint_name.lower() or "ankle" in joint_name.lower():
-            # Many knee and ankle joints rotate around the X-axis
-            fx = torque_function
-            fy = osim.Constant(0.0)
-            fz = osim.Constant(0.0)
-        elif "hip" in joint_name.lower() and ("rotation" in joint_name.lower() or "ad" in joint_name.lower()):
-            # Hip rotation or adduction might be around Y-axis
-            fx = osim.Constant(0.0)
-            fy = torque_function
-            fz = osim.Constant(0.0)
-
+        # For ankle joint, check if we need to invert the torque
+        # This addresses the potential sign convention issue
+        if "ankle" in joint_name.lower():
+            # Invert torque for ankle joint (often necessary due to OpenSim conventions)
+            inverted_torque_function = osim.PiecewiseLinearFunction()
+            for t, torque in zip(time_array, torque_values):
+                inverted_torque_function.addPoint(t, float(-torque))
+            
+            if rotation_axis == "x":
+                fx = inverted_torque_function
+                print(f"Applying INVERTED torque around X-axis for {joint_name}")
+            elif rotation_axis == "y":
+                fy = inverted_torque_function
+                print(f"Applying INVERTED torque around Y-axis for {joint_name}")
+            else:
+                fz = inverted_torque_function
+                print(f"Applying INVERTED torque around Z-axis for {joint_name}")
+        else:
+            # Apply non-inverted torque for other joints
+            if rotation_axis == "x":
+                fx = torque_function
+                print(f"Applying torque around X-axis for {joint_name}")
+            elif rotation_axis == "y":
+                fy = torque_function
+                print(f"Applying torque around Y-axis for {joint_name}")
+            else:
+                fz = torque_function
+                print(f"Applying torque around Z-axis for {joint_name}")
+        
         prescribed_force.setTorqueFunctions(fx, fy, fz)
         model.addForce(prescribed_force)
 
