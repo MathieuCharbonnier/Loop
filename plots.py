@@ -36,7 +36,7 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
     """
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))
-    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(12, 3.5*num_fiber_types, sharex=True)
+    fig, axs = plt.subplots(num_fiber_types, num_muscles, figsize=(12, 3.5*num_fiber_types), sharex=True)
 
     if num_muscles == 1:
         axs = np.expand_dims(axs, axis=1)
@@ -104,7 +104,7 @@ def plot_neural_dynamic(df, muscle_names, folder, ees_freq, Ia_recruited, II_rec
         print("No neural dynamics columns found in the dataframe")
         return
     
-    fig, axs = plt.subplots(len(columns), 1, figsize=(12, 3.5*len(columns), sharex=True)
+    fig, axs = plt.subplots(len(columns), 1, figsize=(12, 3.5*len(columns)), sharex=True)
     # Handle case with only one subplot
     if len(columns) == 1:
         axs = [axs]
@@ -221,8 +221,17 @@ def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited,
         axs[current_axis].tick_params(labelsize=10)
         current_axis += 1
 
+    # Plot joint angle
+    joint_column = f"Joint_{joint_name}"
+    axs[current_axis].plot(time, df[joint_column], label=joint_name)
+    axs[current_axis].set_ylabel("Angle (°)", fontsize=11)
+    axs[current_axis].set_xlabel('Time (s)', fontsize=11)
+    axs[current_axis].legend(fontsize=11)
+    current_axis += 1
+
+
     # Plot fiber properties: Fiber_length, Stretch, Velocity
-    props = ['Fiber_length', 'Stretch', 'Velocity']
+    props = ['Fiber_length', 'Stretch', 'Stretch_Velocity']
     ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
 
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
@@ -235,19 +244,7 @@ def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited,
         axs[current_axis].set_ylabel(ylabel, fontsize=11)
         axs[current_axis].legend(fontsize=11)
         axs[current_axis].tick_params(labelsize=10)
-        current_axis += 1
-
-    # Plot joint angle
-    joint_column = f"Joint_{joint_name}"
-    if joint_column in df.columns:
-        axs[current_axis].plot(time, df[joint_column], label=joint_name)
-        axs[current_axis].legend(fontsize=11)
-    else:
-        print(f"Joint column '{joint_column}' not found in dataframe")
-
-    axs[current_axis].set_ylabel("Angle (°)", fontsize=11)
-    axs[current_axis].set_xlabel('Time (s)', fontsize=11)
-
+        current_axis+=1
     fig.suptitle("Movement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
