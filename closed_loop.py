@@ -105,6 +105,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     muscle_data = [[] for _ in range(NUM_MUSCLES)]
     resting_lengths = [None] * NUM_MUSCLES
     joint_all=np.zeros((NUM_ITERATIONS*nb_points))
+    joint_velocity_all=np.zeros((NUM_ITERATIONS*nb_points))
  
 
     spike_data = {
@@ -191,6 +192,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     joint = joint[:-1]
                     joint_all[iteration*nb_points: (iteration+1)*nb_points]=joint
                     joint_velocity=np.gradient(joint, time_points)
+                    joint_velocity_all[iteration*nb_points: (iteration+1)*nb_points]=joint_velocity
                     if resting_lengths[0] is None:
                         resting_lengths = fiber_lengths[:, 0]
 
@@ -316,13 +318,15 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         # Compute firing rate for this muscle
         # Extract stretch and velocity values for this muscle
         stretch_values = df[f'Stretch_{muscle_name}'].values
-        velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
+        stretch_velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
+
         time = df['Time'].values
         
         # Compute Ia firing rate using spindle model
         Ia_rate = eval(SPINDLE_MODEL['Ia'], 
                        {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, 
-                       {"stretch": stretch_values, "stretch_velocity": velocity_values})
+                       {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
+                        "joint": joint_all, "joint_velocity":joint_velocity_all})
         
         # Add EES contribution
         Ia_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
@@ -332,7 +336,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
             II_rate = eval(SPINDLE_MODEL['II'], 
                           {"__builtins__": {}}, 
-                          {"stretch": stretch_values, "stretch_velocity": velocity_values})
+                          {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
+                           "joint": joint_all, "joint_velocity":joint_velocity_all})
+
             II_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
             df[f'II_rate_{muscle_name}'] = 1/((1/II_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
 
@@ -361,6 +367,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
 
     #add joint and torque if torque is applied
     combined_df[f'Joint_{associated_joint}'] = joint_all
+    combined_df[f'Joint_Velocity_{associated_joint}'] = joint_velocity_all
     if current_torque is not None:
         combined_df['Torque'] = torque
 
