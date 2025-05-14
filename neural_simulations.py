@@ -4,7 +4,7 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 
 
-def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
+def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, joint_input, joint_velocity_input, neuron_pop, connections, dt_run, T,
                                           spindle_model, seed_run, initial_potentials, 
                                           Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
@@ -69,7 +69,9 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
 
     # Input arrays
     stretch_array = TimedArray(stretch_input[0], dt=dt_run)
-    velocity_array = TimedArray(velocity_input[0], dt=dt_run)
+    stretch_velocity_array = TimedArray(stretch_velocity_input[0], dt=dt_run)
+    joint_array=TimedArray(joint_input, dt=dt_run)
+    joint_velocity_array=TimedArray(joint_velocity_input, dt=dt_run)
 
     # Extract neuron counts from dictionary
     n_Ia = neuron_pop['Ia']
@@ -80,7 +82,9 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     ia_eq = f'''
     is_ees = ( i < Ia_recruited): boolean
     stretch = stretch_array(t):1
-    velocity = velocity_array(t):1
+    stretch_velocity = stretch_velocity_array(t):1
+    joint=joint_array(t):1
+    joint_velocity=joint_velocity_array(t):1
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
     Ia = NeuronGroup(n_Ia, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
@@ -100,7 +104,9 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
         ii_eq = f'''
         is_ees = (i < II_recruited) : boolean
         stretch = stretch_array(t):1
-        velocity = velocity_array(t):1
+        stretch_velocity = stretch_velocity_array(t):1
+        joint=joint_array(t):1
+        joint_velocity=joint_velocity_array(t):1
         rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
         '''
         II = NeuronGroup(n_II, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
@@ -169,7 +175,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
         net.add([mon_II, mon_exc])
     mon_MN = SpikeMonitor(MN)
     
-    mon_MN_state = StateMonitor(MN, ['Isyn'], n_MN/2)
+    mon_MN_state = StateMonitor(MN, ['Isyn','v'], n_MN/2)
     
     # Add all monitors to the network
     monitors = [
@@ -210,7 +216,8 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     } 
     # Store state monitors for plotting
     state_monitors = [{
-        'IPSP_MN': mon_MN_state.Isyn[0]/nA
+        'IPSP_MN': mon_MN_state.Isyn[0]/nA,
+        'v_MN': mon_MN_state.v[0]/mV
     }]
     
     result = {
@@ -230,7 +237,7 @@ def run_one_muscle_neuron_simulation(stretch_input, velocity_input, neuron_pop, 
     return [result], final_potentials, state_monitors
 
 
-def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_pop, connections, dt_run, T,
+def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input, neuron_pop, connections, dt_run, T,
                                           spindle_model, seed_run, initial_potentials, 
                                           Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
                                           ees_freq, Ia_recruited, II_recruited, eff_recruited):
@@ -293,9 +300,9 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
 
     # Input arrays
     stretch_flexor_array = TimedArray(stretch_input[0], dt=dt_run)
-    velocity_flexor_array = TimedArray(velocity_input[0], dt=dt_run)
+    velocity_flexor_array = TimedArray(stretch_velocity_input[0], dt=dt_run)
     stretch_extensor_array = TimedArray(stretch_input[1], dt=dt_run)
-    velocity_extensor_array = TimedArray(velocity_input[1], dt=dt_run)
+    velocity_extensor_array = TimedArray(stretch_velocity_input[1], dt=dt_run)
 
     # Extract neuron counts from dictionary
     n_Ia = neuron_pop['Ia']
@@ -309,7 +316,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, velocity_input, neuron_
     ia_eq = f'''
     is_flexor = (i < n_Ia) : boolean
     stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
-    velocity = velocity_flexor_array(t) * int(is_flexor) + velocity_extensor_array(t) * int(not is_flexor) : 1
+    stretch_velocity = velocity_flexor_array(t) * int(is_flexor) + velocity_extensor_array(t) * int(not is_flexor) : 1
     is_ees = ((is_flexor and i < Ia_recruited) or (not is_flexor and i < n_Ia + Ia_recruited)) : boolean
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
