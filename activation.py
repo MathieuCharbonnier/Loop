@@ -5,7 +5,7 @@ from functools import partial
 import joblib
 from joblib import Parallel, delayed
 
-def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87, n_jobs=-1):
+def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87, n_jobs=-1):
     """
     Decode spike times to muscle activation signals using a biophysical model.
     
@@ -37,22 +37,38 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
     final_values : dict
         Final state values for each motoneuron
     """
-    # Define parameter values (from Table 1)
-    # Model parameters as a dictionary for better maintainability
-    params = {
-        # Eq 13 coefficients (fibre AP dynamics)
-        'a1': 7e7, 'a2': 5e7, 'a3': 2e4,
-        # Eq 14 coefficients (calcium dynamics)
-        'b1': 0.9, 'b2': 4.3e5, 'b3': 2.4e3,
-        # Eq 17 coefficients (calcium-troponin binding)
-        'c1': 1e12, 'c2': 41, 'P0': 3.8e-4,
-        # Eq 18 coefficients (MU activation)
-        'd1': 5e4, 'd2': 0.024, 'd3': 270,
-        # AP generation parameters
-        'Ve': 90, 't_ap': 0.0014,
+    # Define parameter values 
+    params_all = {
+        'slow':{
+                # Eq 13 coefficients (fibre AP dynamics)
+                'a1': 7e7, 'a2': 5e7, 'a3': 2e4,
+                # Eq 14 coefficients (calcium dynamics)
+                'b1': 0.4, 'b2': 1.5e5, 'b3': 2.5e3,
+                # Eq 17 coefficients (calcium-troponin binding)
+                'c1': 6e12, 'c2': 21, 'P0': 1.7e-4,
+                # Eq 18 coefficients (MU activation)
+                'd1': 5e4, 'd2': 0.024, 'd3': 270,
+                # AP generation parameters
+                'Ve': 90, 't_ap': 0.0014,
+               }
+        'fast':{
+                # Eq 13 coefficients (fibre AP dynamics)
+                'a1': 7e7, 'a2': 5e7, 'a3': 2e4,
+                # Eq 14 coefficients (calcium dynamics)
+                'b1': 0.9, 'b2': 4.3e5, 'b3': 2.4e3,
+                # Eq 17 coefficients (calcium-troponin binding)
+                'c1': 1e12, 'c2': 41, 'P0': 3.8e-4,
+                # Eq 18 coefficients (MU activation)
+                'd1': 5e4, 'd2': 0.024, 'd3': 270,
+                # AP generation parameters
+                'Ve': 90, 't_ap': 0.0014,
+               }
     }
-
-    # Pre-allocate time array only once
+    if fast:
+        params=params_all['fast']
+    else:
+        params=params_all['slow']
+        
     time = np.arange(0, T, dt)
     num_motoneurons = len(spikes_times)
     num_timesteps = len(time)
@@ -168,7 +184,6 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, f1_l=1.0, f
     # Cap the number of jobs at the number of motoneurons
     n_jobs = min(n_jobs, num_motoneurons)
     
-
     results = Parallel(n_jobs=n_jobs)(
         delayed(process_motoneuron)(i, e_t_all[i], initial_params[i]) 
         for i in range(num_motoneurons)
