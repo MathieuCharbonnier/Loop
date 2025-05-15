@@ -4,7 +4,7 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 
 
-ef run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, joint_input, joint_velocity_input, neuron_pop, connections, dt_run, T,
+def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, joint_input, joint_velocity_input, neuron_pop, connections, dt_run, T,
                                           spindle_model, seed_run, initial_potentials, 
                                           Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                                           ees_params=None):
