@@ -53,7 +53,7 @@ def plot_raster(spikes, base_output_path):
     plt.show()
 
 
-def plot_neural_dynamic(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+def plot_neural_dynamic(df, muscle_names, base_output_path):
     """
     Plot neural dynamics from a combined dataframe.
     
@@ -120,7 +120,7 @@ def plot_neural_dynamic(df, muscle_names, folder, ees_freq, Ia_recruited, II_rec
     plt.show()
 
 
-def plot_activation(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+def plot_activation(df, muscle_names, base_output_path):
     """
     Plot activation dynamics from a combined dataframe.
     
@@ -158,7 +158,7 @@ def plot_activation(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruit
     plt.show()
 
 
-def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited, II_recruited, eff_recruited):
+def plot_mouvement(df, muscle_names, joint_name, base_output_path):
     """
     Plot movement dynamics from a combined dataframe.
 
@@ -264,7 +264,7 @@ def read_sto(filepath, columns):
     return df[cols]
  
 
-def plot_from_sto(filepath, columns_wanted, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq, title=None):
+def plot_from_sto(filepath, columns_wanted, output_base_path, title=None):
     """
     Plot data from an OpenSim .sto file.
     
