@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from brian2.units import second, hertz
 import os
+from datetime import datetime
 
 # Colorblind-friendly palette
 colorblind_friendly_colors = {
@@ -13,9 +14,9 @@ colorblind_friendly_colors = {
     "purple": "#CC79A7"
 }
 color_keys = list(colorblind_friendly_colors.keys())
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-
-def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_freq):
+def plot_raster(spikes, base_output_path):
     """
     Plot raster plot of spikes for different neuron types and muscles.
     
@@ -23,16 +24,9 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
     -----------
     spikes : dict
         Dictionary of spike data organized by muscle and fiber type
-    folder : str
+    base_output_path : str
         Path to save the plot
-    Ia_recruited : int
-        Number of Ia fibers recruited
-    II_recruited : int
-        Number of II fibers recruited
-    eff_recruited : int
-        Number of efferent fibers recruited
-    ees_freq : float
-        Frequency of electrical epidural stimulation
+
     """
     num_muscles = len(spikes)
     num_fiber_types = len(next(iter(spikes.values())))
@@ -54,7 +48,7 @@ def plot_raster(spikes, folder, Ia_recruited, II_recruited, eff_recruited, ees_f
     fig.suptitle('Spikes Raster Plot', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    fig_path = os.path.join(folder, f'Raster_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    fig_path = os.path.join(base_output_path, f'RASTER_{timestamp}.png')
     plt.savefig(fig_path)
     plt.show()
 
@@ -69,16 +63,8 @@ def plot_neural_dynamic(df, muscle_names, folder, ees_freq, Ia_recruited, II_rec
         Combined dataframe containing data for all muscles with muscle name suffixes
     muscle_names : list
         List of muscle names
-    folder : str
+    base_output_path : str
         Path to save the plot
-    ees_freq : float
-        Frequency of electrical epidural stimulation
-    Ia_recruited : int
-        Number of Ia fibers recruited
-    II_recruited : int
-        Number of II fibers recruited
-    eff_recruited : int
-        Number of efferent fibers recruited
     """
     # Identify columns containing rate data and IPSP data for each muscle
     rate_columns = []
@@ -128,8 +114,8 @@ def plot_neural_dynamic(df, muscle_names, folder, ees_freq, Ia_recruited, II_rec
     axs[-1].set_xlabel('Time (s)', fontsize=11)
     fig.suptitle('Neural Dynamics', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    
-    path_fig = os.path.join(folder, f'Dynamic_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+
+    fig_path = os.path.join(base_output_path, f'NEURONS_DYNAMICS_{timestamp}.png')
     plt.savefig(path_fig)
     plt.show()
 
@@ -144,16 +130,8 @@ def plot_activation(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruit
         Combined dataframe containing data for all muscles with muscle name suffixes
     muscle_names : list
         List of muscle names
-    folder : str
+    base_output_path: str
         Path to save the plot
-    ees_freq : float
-        Frequency of electrical epidural stimulation
-    Ia_recruited : int
-        Number of Ia fibers recruited
-    II_recruited : int
-        Number of II fibers recruited
-    eff_recruited : int
-        Number of efferent fibers recruited
     """
     fig, axs = plt.subplots(5, 1, figsize=(12, 12), sharex=True)
     labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'Activation']
@@ -174,8 +152,8 @@ def plot_activation(df, muscle_names, folder, ees_freq, Ia_recruited, II_recruit
     axs[-1].set_xlabel('Time (s)', fontsize=11)
     fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    
-    path_fig = os.path.join(folder, f'Activation_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+
+    fig_path = os.path.join(base_output_path, f'ACTIVATIONS_{timestamp}.png')
     plt.savefig(path_fig)
     plt.show()
 
@@ -192,16 +170,8 @@ def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited,
         List of muscle names
     joint_name : str
         Name of the joint
-    folder : str
+    base_output_path : str
         Path to save the plot
-    ees_freq : float
-        Frequency of electrical epidural stimulation
-    Ia_recruited : int
-        Number of Ia fibers recruited
-    II_recruited : int
-        Number of II fibers recruited
-    eff_recruited : int
-        Number of efferent fibers recruited
     """
     torque_column = f'Torque'
     has_torque = torque_column in df.columns
@@ -256,7 +226,7 @@ def plot_mouvement(df, muscle_names, joint_name, folder, ees_freq, Ia_recruited,
     fig.suptitle("Movement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    path_fig = os.path.join(folder, f'Mouvement_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    fig_path = os.path.join(base_output_path, f'MOUVEMENT_{timestamp}.png')
     plt.savefig(path_fig)
     plt.show()
 
@@ -304,16 +274,9 @@ def plot_from_sto(filepath, columns_wanted, folder, Ia_recruited, II_recruited, 
         Path to the .sto file
     columns_wanted : dict
         Dictionary mapping column names to labels
-    folder : str
+    output_base_path : str
         Path to save the plot
-    Ia_recruited : int
-        Number of Ia fibers recruited
-    II_recruited : int
-        Number of II fibers recruited
-    eff_recruited : int
-        Number of efferent fibers recruited
-    ees_freq : float
-        Frequency of electrical epidural stimulation
+
     title : str, optional
         Title for the plot
     """
@@ -338,6 +301,6 @@ def plot_from_sto(filepath, columns_wanted, folder, Ia_recruited, II_recruited, 
     axs[-1].set_xlabel("Time (s)")
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    fig_path = os.path.join(folder, f'Supplement_sto_Ia_{Ia_recruited}_II_{II_recruited}_eff_{eff_recruited}_freq_{ees_freq}.png')
+    fig_path = os.path.join(base_output_path, f'Supplement_sto_{timestamp}.png')
     plt.savefig(fig_path)
     plt.show()
