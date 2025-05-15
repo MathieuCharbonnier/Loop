@@ -13,9 +13,9 @@ from neural_simulations import run_one_muscle_neuron_simulation, run_flexor_exte
 from activation import decode_spikes_to_activation
 
 
-def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COUNTS, CONNECTIONS,
-           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES_STR, associated_joint, sto_path, 
-           torque=None, seed=42, csv_path=None):
+def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,
+           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES, associated_joint, sto_path, 
+            EES_PARAMS=None, torque=None, seed=42, csv_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -44,8 +44,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         Model parameters for muscle spindles
     BIOPHYSICAL_PARAMS : dict
         Biophysical model parameters
-    MUSCLE_NAMES_STR : str
-        Comma-separated string of muscle names
+    MUSCLE_NAMES : list
+        List of muscle names strings
     associated_joint : str
         Name of the associated joint
     sto_path : str  
@@ -57,10 +57,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     csv_path : str, optional
         Path to save the combined data CSV file (default: None, will use sto_path with .csv extension)
     """
-    # Muscle configuration
-    MUSCLE_NAMES = MUSCLE_NAMES_STR.split(",")
-    NUM_MUSCLES = len(MUSCLE_NAMES)
-    nb_points = int(REACTION_TIME/TIME_STEP)
     
     # Set default CSV path if not provided
     if csv_path is None:
@@ -69,19 +65,18 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     # Validate muscle count
     if NUM_MUSCLES > 2:
         raise ValueError("This pipeline supports only 1 or 2 muscles!")
-    
-    # For symmetric afferent recruitment 
-    if 'aff_recruited' in EES_PARAMS:
-        value = EES_PARAMS.pop('aff_recruited')
-        EES_PARAMS['Ia_recruited'] = value
-        EES_PARAMS['II_recruited'] = value
 
     # =============================================================================
     # Initialization
     # =============================================================================
-
+                       
+    # Muscle configuration
+    NUM_MUSCLES = len(MUSCLE_NAMES)
+    #Discritization configuration
+    nb_points = int(REACTION_TIME/TIME_STEP)
+                       
     # Initialize muscle activation
-    activations = np.zeros((NUM_MUSCLES, nb_points))
+    activations = np.zeros(( NUM_MUSCLES, nb_points))
     time_points = np.arange(0, REACTION_TIME/second, TIME_STEP/second)
 
     initial_potentials = {
@@ -124,11 +119,12 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
     # =============================================================================
 
     print("Start Simulation:")
-    print(f"EES frequency: {EES_PARAMS['ees_freq']}")
-    print(f"Number Ia fibers recruited by EES: {EES_PARAMS['Ia_recruited']} / {NEURON_COUNTS['Ia']}")
-    if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
-        print(f"Number II fibers recruited by EES: {EES_PARAMS['II_recruited']} / {NEURON_COUNTS['II']}")
-    print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['eff_recruited']} / {NEURON_COUNTS['MN']}")
+    if EES_PARAMS is not None:
+        print(f"EES frequency: {EES_PARAMS['ees_freq']}")
+        print(f"Number Ia fibers recruited by EES: {EES_PARAMS['Ia_recruited']} / {NEURON_COUNTS['Ia']}")
+        if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
+            print(f"Number II fibers recruited by EES: {EES_PARAMS['II_recruited']} / {NEURON_COUNTS['II']}")
+        print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['eff_recruited']} / {NEURON_COUNTS['MN']}")
     
     # Create reusable temporary files for the whole simulation
     with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as input_activation, \
@@ -157,7 +153,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
                     '--dt', str(TIME_STEP/second),
                     '--T', str(REACTION_TIME/second),
-                    '--muscles_names', MUSCLE_NAMES_STR,
+                    '--muscles_names',','.join(MUSCLE_NAMES),
                     '--joint_name', associated_joint,
                     '--activation', input_activation_path,
                     '--output_stretch', output_stretch_path,
@@ -170,7 +166,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
                     cmd += ['--initial_state', state_file]
                 
                 # Add torque if provided
-                current_torque = None
                 if torque is not None:
                     start_idx = iteration * nb_points
                     end_idx = (iteration + 1) * nb_points
@@ -394,8 +389,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
             # Extract activations from combined dataframe
             if f'Activation_{muscle_name}' in combined_df.columns:
-                activations_array[muscle_idx] = combined_df[f'Activation_{muscle_name}'].values
-
+                #Input activations are not exactly the output activations present in the combined_df dataframe       
+                activations_array[muscle_idx, nb_points:] = combined_df[f'Activation_{muscle_name}'].values[nb_points:]
         np.save(input_activation_path, activations_array)
 
         # Build command for full muscle simulation
@@ -403,7 +398,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
             'conda', 'run', '-n', 'opensim_env', 'python', 'muscle_sim.py',
             '--dt', str(TIME_STEP/second),
             '--T', str(REACTION_TIME/second * NUM_ITERATIONS),
-            '--muscles_names', MUSCLE_NAMES_STR,
+            '--muscles_names', ','.join(MUSCLE_NAMES),
             '--activation', input_activation_path,
             '--output_all', sto_path
         ]
