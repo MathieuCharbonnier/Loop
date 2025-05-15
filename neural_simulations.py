@@ -65,36 +65,22 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     group_map = {}
     final_potentials = {}
     
-    # Process EES parameters
-    has_ees = ees_params is not None and ees_params.get('freq', 0) > 0
-    ees_freq = ees_params.get('freq', 0) if has_ees else 0
-    recruitment = ees_params.get('recruitment', {}) if has_ees else {}
-    
     # Create TimedArray inputs
-    input_arrays = {
-        'stretch': TimedArray(stretch_input[0], dt=dt_run),
-        'stretch_velocity': TimedArray(stretch_velocity_input[0], dt=dt_run),
-        'joint': TimedArray(joint_input, dt=dt_run),
-        'joint_velocity': TimedArray(joint_velocity_input, dt=dt_run)
-    }
-    net.add(list(input_arrays.values()))
+    stretch_array= TimedArray(stretch_input[0], dt=dt_run)
+    stretch_velocity_array= TimedArray(stretch_velocity_input[0], dt=dt_run)
+    joint_array= TimedArray(joint_input, dt=dt_run)
+    joint_velocity_array= TimedArray(joint_velocity_input, dt=dt_run)
+  
     
     # Create all neuron populations based on neuron_pop dictionary
     monitors = []
     
-    # Common equation components for all neurons
-    input_eq = '''
-    stretch = stretch_array(t): 1
-    stretch_velocity = stretch_velocity_array(t): 1
-    joint = joint_array(t): 1
-    joint_velocity = joint_velocity_array(t): 1
-    '''
     
     # Create primary afferent neurons (always present)
     create_afferent_neurons(
-        net, group_map, monitors, recruitment, ees_freq, 
-        'Ia', neuron_pop, spindle_model, input_arrays, T_refr,
-        final_potentials
+        net, group_map, monitors, ees_params, 
+        'Ia', neuron_pop, spindle_model, stretch_array, stretch_velocity_array, joint_array, joint_velocity_array, 
+        T_refr,final_potentials
     )
     
     # Create secondary afferent neurons (II) and excitatory interneurons if specified
@@ -102,9 +88,9 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     if has_II_pathway:
         create_afferent_neurons(
-            net, group_map, monitors, recruitment, ees_freq,
-            'II', neuron_pop, spindle_model, input_arrays, T_refr,
-            final_potentials
+            net, group_map, monitors, ees_params,'II', neuron_pop, spindle_model,
+             stretch_array, stretch_velocity_array, joint_array, joint_velocity_array,
+             T_refr,final_potentials
         )
         
         # Create excitatory interneurons
@@ -134,7 +120,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     # Handle EES stimulation if enabled for efferent neurons
     mon_ees_MN = None
-    if has_ees and recruitment.get('MN', 0) > 0:
+    if ees_params is not None and ees_params.get("freq",0)>0 and recruitment.get('MN', 0) > 0:
         eff_recruited = recruitment.get('MN', 0)
         ees_MN = PoissonGroup(N=eff_recruited, rates=ees_freq)
         mon_ees_MN = SpikeMonitor(ees_MN)
@@ -146,7 +132,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     # Process results
     result = process_results(
-        group_map, monitors, neuron_pop, T_refr, has_ees, 
+        group_map, monitors, neuron_pop, T_refr, 
         mon_ees_MN, has_II_pathway
     )
     
@@ -165,25 +151,34 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     return [result], final_potentials, state_monitors
 
 
-def create_afferent_neurons(net, group_map, monitors, recruitment, ees_freq, 
-                           neuron_type, neuron_pop, spindle_model, input_arrays, T_refr,
+def create_afferent_neurons(net, group_map, monitors, ees_params, 
+                           neuron_type, neuron_pop, spindle_model, stretch_array, stretch_velocity_array, joint_array, joint_velocity_array, T_refr,
                            final_potentials):
     """
     Create afferent neurons of specified type (Ia or II)
     """
     n_neurons = neuron_pop[neuron_type]
-    recruited = recruitment.get(neuron_type, 0)
-    
     equation = spindle_model[neuron_type]
-    afferent_eq = f'''
-    is_ees = (i < {recruited}): boolean
-    stretch = {input_arrays['stretch'].name}(t): 1
-    stretch_velocity = {input_arrays['stretch_velocity'].name}(t): 1
-    joint = {input_arrays['joint'].name}(t): 1
-    joint_velocity = {input_arrays['joint_velocity'].name}(t): 1
-    rate = ({equation})*hertz + {ees_freq} * int(is_ees): Hz
-    '''
-    
+    equation_baseline="""
+        stretch = stretch_array(t): 1
+        stretch_velocity = stretch_velocity_array(t): 1
+        joint = joint_array(t): 1
+        joint_velocity = joint_velocity_array(t): 1
+        """
+    if ees_params is not None and ees_params.get('freq', 0)>0 and ees_params['recruitment'][neuron_type]>0:
+
+        recruited=ees_params['recruitment'][neuron_type]
+        ees_freq=ees_params['freq']
+        afferent_eq = equation_baseline+ f'''
+        is_ees = (i < recruited): boolean
+        rate = ({equation})*hertz + ees_freq * int(is_ees): Hz
+        '''
+
+    else:
+
+        afferent_eq = equation_baseline+f'''
+        rate = ({equation})*hertz: Hz'''
+
     neurons = NeuronGroup(n_neurons, afferent_eq, 
                          threshold='rand() < rate*dt', 
                          refractory=T_refr, method='euler')
@@ -199,20 +194,17 @@ def create_interneurons(net, group_map, monitors, neuron_type, neuron_pop,
                        Eleaky, Cm, gL, E_ex, tau_e, threshold_v, T_refr, 
                        initial_potentials, final_potentials):
     """
-    Create interneurons (excitatory or inhibitory)
+    Create interneurons (excitatory)
     """
     if neuron_type not in neuron_pop:
         return
     
     n_neurons = neuron_pop[neuron_type]
     
-    # Define dynamic equation based on neuron type
-    pre_type = 'II' if neuron_type == 'exc' else 'Ia'  # Default connection for interneurons
-    
     neuron_eq = f'''
     dv/dt = (gL*(Eleaky - v) + Isyn)/Cm: volt
-    Isyn = g{pre_type}*(E_ex - v): amp
-    dg{pre_type}/dt = -g{pre_type} / tau_e: siemens
+    Isyn = gII*(E_ex - v): amp
+    dgII/dt = -gII / tau_e: siemens
     '''
     
     neurons = NeuronGroup(n_neurons, neuron_eq, 
@@ -298,7 +290,7 @@ def create_synaptic_connections(net, connections, group_map):
     return synapses
 
 
-def process_results(group_map, monitors, neuron_pop, T_refr, has_ees, 
+def process_results(group_map, monitors, neuron_pop, T_refr,  
                    mon_ees_MN, has_II_pathway):
     """
     Process simulation results
@@ -316,7 +308,7 @@ def process_results(group_map, monitors, neuron_pop, T_refr, has_ees,
         result['exc'] = monitors[3].spike_trains()
     
     # Process EES-stimulated motoneuron spikes if applicable
-    if has_ees and mon_ees_MN:
+    if mon_ees_MN:
         ees_spikes = mon_ees_MN.spike_trains()
         before_MN_spikes = result["MN"].copy()
         result["MN"] = process_motoneuron_spikes(
