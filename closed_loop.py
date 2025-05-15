@@ -14,8 +14,8 @@ from activation import decode_spikes_to_activation
 
 
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,
-           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES, associated_joint, sto_path, 
-            EES_PARAMS=None, torque=None, seed=42, csv_path=None):
+           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES, associated_joint, base_output_path, 
+            EES_PARAMS=None, torque=None, fast=True, seed=42):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -58,9 +58,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
         Path to save the combined data CSV file (default: None, will use sto_path with .csv extension)
     """
     
-    # Set default CSV path if not provided
-    if csv_path is None:
-        csv_path = os.path.splitext(sto_path)[0] + '.csv'
+    # create CSV and sto paths 
+    csv_path = base_output_path + '.csv'
+    sto_path = base_output_path + '.sto'
     
     # Validate muscle count
     if NUM_MUSCLES > 2:
@@ -257,7 +257,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                         mn_spikes_sec,
                         TIME_STEP/second,
                         REACTION_TIME/second,
-                        initial_params[muscle_idx]
+                        initial_params[muscle_idx],
+                        fast=fast
                     )
 
                     # Store mean values across all neurons
