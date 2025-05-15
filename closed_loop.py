@@ -61,17 +61,18 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     # create CSV and sto paths 
     csv_path = base_output_path + '.csv'
     sto_path = base_output_path + '.sto'
-    
+
+    # Muscle configuration
+    NUM_MUSCLES = len(MUSCLE_NAMES)
     # Validate muscle count
     if NUM_MUSCLES > 2:
         raise ValueError("This pipeline supports only 1 or 2 muscles!")
+    
 
     # =============================================================================
     # Initialization
     # =============================================================================
-                       
-    # Muscle configuration
-    NUM_MUSCLES = len(MUSCLE_NAMES)
+
     #Discritization configuration
     nb_points = int(REACTION_TIME/TIME_STEP)
                        
@@ -223,12 +224,12 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             if NUM_MUSCLES == 1:
                 all_spikes, final_potentials, state_monitors = run_one_muscle_neuron_simulation(
                     stretch, stretch_velocity,joint, joint_velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
-                    initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
+                    initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
                 )
             else:  # NUM_MUSCLES == 2
                 all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
                     stretch, stretch_velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
-                    initial_potentials, **EES_PARAMS, **BIOPHYSICAL_PARAMS
+                    initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
                 )
             initial_potentials.update(final_potentials)
 
@@ -324,9 +325,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                        {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
                         "joint": joint_all, "joint_velocity":joint_velocity_all})
         
-        # Add EES contribution
-        Ia_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['Ia_recruited']/NEURON_COUNTS['Ia']
-        df[f'Ia_rate_{muscle_name}'] = 1/((1/Ia_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
+        df[f'Ia_rate_baseline_{muscle_name}'] = Ia_rate
 
         # Compute II firing rate if applicable
         if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
@@ -335,8 +334,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                           {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
                            "joint": joint_all, "joint_velocity":joint_velocity_all})
 
-            II_rate += EES_PARAMS['ees_freq']/hertz * EES_PARAMS['II_recruited']/NEURON_COUNTS['II']
-            df[f'II_rate_{muscle_name}'] = 1/((1/II_rate) + BIOPHYSICAL_PARAMS['T_refr']/second)
+            df[f'II_rate_baseline_{muscle_name}'] = II_rate
 
         # Calculate all firing rate using KDE
         for fiber_name, fiber_spikes in spike_data[muscle_name].items():
