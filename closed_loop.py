@@ -324,7 +324,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, EES_PARAMS, NEURON_COU
         
         # Compute Ia firing rate using spindle model
         Ia_rate = eval(SPINDLE_MODEL['Ia'], 
-                       {"__builtins__": {'sign': np.sign, 'abs': np.abs}}, 
+                       {"__builtins__": {'sign': np.sign, 'abs': np.abs, 'clip': np.clip}}, 
                        {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
                         "joint": joint_all, "joint_velocity":joint_velocity_all})
         
