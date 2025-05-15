@@ -50,7 +50,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, 
                 'd1': 5e4, 'd2': 0.024, 'd3': 270,
                 # AP generation parameters
                 'Ve': 90, 't_ap': 0.0014,
-               }
+               },
         'fast':{
                 # Eq 13 coefficients (fibre AP dynamics)
                 'a1': 7e7, 'a2': 5e7, 'a3': 2e4,
@@ -62,7 +62,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, 
                 'd1': 5e4, 'd2': 0.024, 'd3': 270,
                 # AP generation parameters
                 'Ve': 90, 't_ap': 0.0014,
-               }
+               },
     }
     if fast:
         params=params_all['fast']
