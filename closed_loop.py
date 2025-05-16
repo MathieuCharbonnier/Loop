@@ -177,15 +177,18 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
 
                 # Run OpenSim simulation
                 process = subprocess.run(cmd, capture_output=True, text=True)
-
+                """
+                if process.stdout.strip():
+                    print("STDOUT:\n", process.stdout)
+                """
                 # Process OpenSim results
                 if process.returncode == 0:
                     # Load muscle lengths and joint from simulation
                     fiber_lengths = np.load(output_stretch_path)
                     joint = np.load(output_joint_path)
                     # Remove the last value as it will be included in the next iteration
-                    fiber_lengths = fiber_lengths[:, :-1]
-                    joint = joint[:-1]
+                    fiber_lengths = fiber_lengths[:, :nb_points]
+                    joint = joint[:nb_points]
                     joint_all[iteration*nb_points: (iteration+1)*nb_points]=joint
                     joint_velocity=np.gradient(joint, time_points)
                     joint_velocity_all[iteration*nb_points: (iteration+1)*nb_points]=joint_velocity
