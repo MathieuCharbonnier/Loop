@@ -47,7 +47,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, 
                 # Eq 17 coefficients (calcium-troponin binding)
                 'c1': 6e12, 'c2': 21, 'P0': 1.7e-4,
                 # Eq 18 coefficients (MU activation)
-                'd1': 5e4, 'd2': 0.024, 'd3': 270,
+                'd1': 1e5, 'd2': 0.024, 'd3': 270,
                 # AP generation parameters
                 'Ve': 90, 't_ap': 0.0014,
                },
@@ -59,7 +59,7 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, 
                 # Eq 17 coefficients (calcium-troponin binding)
                 'c1': 1e12, 'c2': 41, 'P0': 3.8e-4,
                 # Eq 18 coefficients (MU activation)
-                'd1': 5e4, 'd2': 0.024, 'd3': 270,
+                'd1': 1e5, 'd2': 0.024, 'd3': 270,
                 # AP generation parameters
                 'Ve': 90, 't_ap': 0.0014,
                },
