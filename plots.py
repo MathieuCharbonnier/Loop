@@ -48,7 +48,7 @@ def plot_raster(spikes, base_output_path):
     fig.suptitle('Spikes Raster Plot', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    fig_path = os.path.join(base_output_path, f'RASTER_{timestamp}.png')
+    fig_path = base_output_path+ f'RASTER_{timestamp}.png'
     plt.savefig(fig_path)
     plt.show()
 
@@ -115,8 +115,8 @@ def plot_neural_dynamic(df, muscle_names, base_output_path):
     fig.suptitle('Neural Dynamics', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    fig_path = os.path.join(base_output_path, f'NEURONS_DYNAMICS_{timestamp}.png')
-    plt.savefig(path_fig)
+    fig_path = base_output_path+ f'NEURONS_DYNAMICS_{timestamp}.png'
+    plt.savefig(fig_path)
     plt.show()
 
 
@@ -153,8 +153,8 @@ def plot_activation(df, muscle_names, base_output_path):
     fig.suptitle("Mean Activation Dynamics: Muscle Comparison", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    fig_path = os.path.join(base_output_path, f'ACTIVATIONS_{timestamp}.png')
-    plt.savefig(path_fig)
+    fig_path = base_output_path+ f'ACTIVATIONS_{timestamp}.png'
+    plt.savefig(fig_path)
     plt.show()
 
 
@@ -226,8 +226,8 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
     fig.suptitle("Movement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    fig_path = os.path.join(base_output_path, f'MOUVEMENT_{timestamp}.png')
-    plt.savefig(path_fig)
+    fig_path = base_output_path+ f'MOUVEMENT_{timestamp}.png'
+    plt.savefig(fig_path)
     plt.show()
 
 
@@ -264,7 +264,7 @@ def read_sto(filepath, columns):
     return df[cols]
  
 
-def plot_from_sto(filepath, columns_wanted, output_base_path, title=None):
+def plot_from_sto(filepath, columns_wanted, base_output_path, title=None):
     """
     Plot data from an OpenSim .sto file.
     
@@ -301,6 +301,6 @@ def plot_from_sto(filepath, columns_wanted, output_base_path, title=None):
     axs[-1].set_xlabel("Time (s)")
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    fig_path = os.path.join(base_output_path, f'Supplement_sto_{timestamp}.png')
+    fig_path = base_output_path+  f'Supplement_sto_{timestamp}.png'
     plt.savefig(fig_path)
     plt.show()
