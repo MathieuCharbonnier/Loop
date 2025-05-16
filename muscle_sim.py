@@ -8,7 +8,7 @@ import opensim as osim
 def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torque_values=None, output_all=None, 
                   initial_state=None, final_state=None, stretch_file=None, joint_file=None):
     """
-    Run an OpenSim simulation with muscle activations and/or external torques.
+    Run an OpenSim simulation with muscle activations and/or direct joint torques.
     
     Parameters:
     -----------
@@ -21,7 +21,7 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
     activation_array : numpy.ndarray, optional
         Array of muscle activations over time [muscles × time_points]
     joint_name : string, optional
-        where to apply the torque, and which joint to record
+        Which joint coordinate to directly apply torque to and record
     torque_values: numpy.array, optional
          torque values [time_points]
     output_all : str, optional
@@ -59,81 +59,38 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
         controller = ActivationController(model, muscles, time_array, activation_array)
         model.addController(controller)
     
-    # Add external torque if provided
+    # Add direct joint coordinate torque if provided
     if joint_name is not None and torque_values is not None:
         # Get the coordinate for the specified joint
         coordinate = model.getCoordinateSet().get(joint_name)
         if coordinate is None:
             raise ValueError(f"Coordinate '{joint_name}' not found in the model")
         
-        # Get the joint and associated bodies
-        joint = coordinate.getJoint()
-        if joint is None:
-            raise ValueError(f"Joint for coordinate '{joint_name}' not found")
-        
-        # Map common joint names to their associated bodies
-        joint_to_body_map = {
-            "ankle_angle_r": "tibia_r",
-            "knee_angle_r": "tibia_r",
-            "hip_flexion_r": "femur_r",
-            "hip_adduction_r": "femur_r",
-            "hip_rotation_r": "femur_r",
-            "ankle_angle_l": "tibia_l",
-            "knee_angle_l": "tibia_l",
-            "hip_flexion_l": "femur_l",
-            "hip_adduction_l": "femur_l",
-            "hip_rotation_l": "femur_l",
-        }
-        
-        body_name = None
-        if joint_name in joint_to_body_map:
-            body_name = joint_to_body_map[joint_name]
-        else:
-            raise ValueError(f"Could not determine body for joint '{joint_name}'")
-        
-        body = model.getBodySet().get(body_name)
-        if body is None:
-            raise ValueError(f"Body '{body_name}' not found for joint '{joint_name}'")
-        print(f"Applying torque to body '{body_name}' for joint '{joint_name}'")
-        
         # Create torque function
         torque_function = osim.PiecewiseLinearFunction()
         for t, torque in zip(time_array, torque_values):
             torque_function.addPoint(t, float(torque))
         
-        # Create a prescribed force to apply the torque
-        prescribed_force = osim.PrescribedForce(f"Torque_{joint_name}", body)
+        # Create a CoordinateActuator to directly apply torque to the joint coordinate
+        coord_actuator = osim.CoordinateActuator(joint_name)
+        coord_actuator.setName(f"Torque_{joint_name}")
         
-        # Determine rotation axis based on joint name
-        rotation_axis = "z"  # Default to Z-axis
+        # Set optimal force large enough to handle the maximum torque
+        max_torque = max(abs(max(torque_values)), abs(min(torque_values)))
+        coord_actuator.setOptimalForce(max_torque * 1.5)  # Set safely above maximum
         
-        if "knee" in joint_name.lower() or "ankle" in joint_name.lower():
-            rotation_axis = "y"
-        elif "hip_flexion" in joint_name.lower():
-            rotation_axis = "y"
-        elif "hip_adduction" in joint_name.lower():
-            rotation_axis = "x"
-        elif "hip_rotation" in joint_name.lower():
-            rotation_axis = "z"
+        # Add actuator to model
+        model.addForce(coord_actuator)
         
-        # Set torque functions based on the joint's rotation axis
-        fx = osim.Constant(0.0)
-        fy = osim.Constant(0.0)
-        fz = osim.Constant(0.0)
+        # Create a controller for the coordinate actuator
+        controller = osim.PrescribedController()
+        controller.setName(f"Controller_{joint_name}")
+        controller.addActuator(coord_actuator)
+        controller.prescribeControlForActuator(coord_actuator.getName(), torque_function)
+        model.addController(controller)
         
-        # Apply torque 
-        if rotation_axis == "x":
-            fx = torque_function
-            print(f"Applying torque around X-axis for {joint_name}")
-        elif rotation_axis == "y":
-            fy = torque_function
-            print(f"Applying torque around Y-axis for {joint_name}")
-        else:
-            fz = torque_function
-            print(f"Applying torque around Z-axis for {joint_name}")
-        
-        prescribed_force.setTorqueFunctions(fx, fy, fz)
-        model.addForce(prescribed_force)
+        print(f"Applying direct torque to coordinate '{joint_name}'")
+  
 
     # Add muscle reporter to record fiber lengths
     if stretch_file is not None:
@@ -216,9 +173,12 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
     # Save muscle stretch data if requested
     if stretch_file is not None:
         results_table = reporter.getTable()
-        fiber_length = np.zeros((len(muscles), int(T/dt)+1))
+        fiber_length = np.zeros((len(muscles), results_table.getNumRows()))
+        print("len fiber_length ", fiber_length.shape)
         for i, muscle_name in enumerate(muscles):
+            print('results ',results_table.getDependentColumn(f'{muscle_name}_fiber_length').to_numpy().shape)
             fiber_length[i] = results_table.getDependentColumn(f'{muscle_name}_fiber_length').to_numpy()
+            
         np.save(stretch_file, fiber_length)
     
     # Save joint angle data if requested
@@ -234,13 +194,13 @@ def run_simulation(dt, T, muscles, activation_array=None, joint_name=None, torqu
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Muscle and torque simulation in OpenSim')
+    parser = argparse.ArgumentParser(description='Muscle and direct coordinate actuation simulation in OpenSim')
     parser.add_argument('--dt', type=float, required=True, help='Time step')
     parser.add_argument('--T', type=float, required=True, help='Total simulation time')
     parser.add_argument('--muscles_names', type=str, required=True, help='Comma-separated list of muscles to activate/record')
     parser.add_argument('--initial_state', type=str, help='Initial state JSON file')
     parser.add_argument('--activations', type=str, help='Path to input numpy array file for muscle activations')
-    parser.add_argument('--joint_name', type=str, help='Joint to apply torque and record')
+    parser.add_argument('--joint_name', type=str, help='Joint coordinate to directly actuate and record')
     parser.add_argument('--torque', type=str, help='Path to numpy array file with torque values')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
     parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array of fiber lengths')
