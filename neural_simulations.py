@@ -145,7 +145,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     # Store state monitors for plotting
     state_monitors = [{
         'IPSP_MN': mon_MN_state.Isyn[0]/nA,
-        'v_MN': mon_MN_state.v[0]/mV
+        'potential_MN': mon_MN_state.v[0]/mV
     }]
     
     return [result], final_potentials, state_monitors
