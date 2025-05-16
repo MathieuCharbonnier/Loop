@@ -69,6 +69,7 @@ def plot_neural_dynamic(df, muscle_names, base_output_path):
     # Identify columns containing rate data and IPSP data for each muscle
     rate_columns = []
     ipsp_columns = []
+    v_columns=[]
     mn_rate_columns = []
     
     for muscle in muscle_names:
@@ -79,13 +80,17 @@ def plot_neural_dynamic(df, muscle_names, base_output_path):
         # Find IPSP columns
         ipsp_cols = [col for col in df.columns if "IPSP" in col and muscle in col]
         ipsp_columns.extend([(col, "IPSP (nA)") for col in ipsp_cols])
-        
+
+        # Find v columns
+        v_cols = [col for col in df.columns if "potential" in col and muscle in col]
+        v_columns.extend([(col, "v (mV)") for col in v_cols])
+
         # Find MN rate columns
         mn_cols = [col for col in df.columns if "MN_rate" in col and muscle in col]
         mn_rate_columns.extend([(col, "FR (Hz)") for col in mn_cols])
     
-    columns = rate_columns + ipsp_columns + mn_rate_columns
-    
+    columns = rate_columns + ipsp_columns + v_columns+ mn_rate_columns
+
     if not columns:
         print("No neural dynamics columns found in the dataframe")
         return
