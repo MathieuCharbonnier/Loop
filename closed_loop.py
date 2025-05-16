@@ -348,7 +348,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             if len(all_spike_times) > 1:
                 kde = gaussian_kde(all_spike_times, bw_method=0.3)
                 firing_rate = kde(time) * len(all_spike_times) / max(len(fiber_spikes), 1)
-            df[f'{fiber_name}_measured_rate_{muscle_name}'] = firing_rate
+            df[f'{fiber_name}_rate_measured_{muscle_name}'] = firing_rate
         all_data_dfs.append(df)
     
     # Combine all muscle data into a single dataframe
