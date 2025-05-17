@@ -1,4 +1,5 @@
 import argparse
+from pickle import EMPTY_DICT
 import numpy as np
 import sys
 import os
@@ -6,7 +7,7 @@ import json
 import opensim as osim
 
 def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_values=None, output_all=None, 
-                  initial_state=None, final_state=None):
+                  state_storage={}):
     """
     Run an OpenSim simulation with muscle activations and/or direct joint torques.
     
@@ -104,8 +105,8 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
 
     # Initialize state
     state = model.initSystem()
-    if initial_state is not None:
-        for label, value in initial_state.items():
+    if state_storage:
+        for label, value in state_storage.items():
             try:
                 model.setStateVariableValue(state, label, value)
             except Exception as e:
@@ -144,8 +145,18 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     if coordinate is not None:
         joint_angles = results_table.getDependentColumn(f'{joint_name}_angle').to_numpy()
         joint_angles = joint_angles * 180/np.pi
+    
+    json_ = {}
+    statesTable= manager.getStatesTable()
+    lastRowIndex = statesTable.getNumRows() - 1
+    lastRow = statesTable.getRowAtIndex(lastRowIndex)
+    columnLabels = statesTable.getColumnLabels()
+    for i in range(len(columnLabels)):
+        label = columnLabels[i]
+        value = lastRow[i]
+        json_[label] = value
 
-    return fiber_length, joint_angles, manager.getStatesTable()
+    return fiber_length, joint_angles,json_
 
 
 if __name__ == "__main__":
@@ -154,13 +165,13 @@ if __name__ == "__main__":
     parser.add_argument('--T', type=float, required=True, help='Total simulation time')
     parser.add_argument('--muscles_names', type=str, required=True, help='Comma-separated list of muscles to activate/record')
     parser.add_argument('--joint_name', type=str, required=True, help='Joint coordinate to directly actuate and record')
-    parser.add_argument('--initial_state', type=str, help='Initial state JSON file')
+    parser.add_argument('--state', type=str, help='State JSON file to initialise the simulation and save the final state')
     parser.add_argument('--activations', type=str, help='Path to input numpy array file for muscle activations')
     parser.add_argument('--torque', type=str, help='Path to numpy array file with torque values')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
     parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array of fiber lengths')
     parser.add_argument('--output_joint', type=str, help='Path to save output numpy array of joint angles')
-    parser.add_argument('--output_final_state', type=str, help="Path to save final state JSON file")
+
 
     args = parser.parse_args()
     
@@ -182,19 +193,19 @@ if __name__ == "__main__":
             raise FileNotFoundError(f"Torque values file not found: {args.torque}")
         torque_values = np.load(args.torque)
     
-    # Load initial state if provided
-    initial_state = None
-    if args.initial_state and os.path.isfile(args.initial_state):
+    # Load state file
+    state = {}
+    if args.state and os.path.isfile(args.state):
         try:
-            with open(args.initial_state, 'r') as f:
-                initial_state = json.load(f)
+            with open(args.state, 'r') as f:
+                state = json.load(f)
         except Exception as e:
             print(f"Error loading initial state file: {e}")
-    elif args.initial_state:
-        print(f"Initial state file not found: {args.initial_state}")
+    elif args.state:
+        print(f"Initial state file not found: {args.state}")
 
     # Run the simulation
-    fiber_lengths, joint_angles, statesTable = run_simulation(
+    fiber_lengths, joint_angles, json_ = run_simulation(
         args.dt,
         args.T,
         muscles,
@@ -202,7 +213,7 @@ if __name__ == "__main__":
         activation_array=activation_array,
         torque_values=torque_values,
         output_all=args.output_all,
-        initial_state=initial_state
+        state=state
     )
     
     # Save outputs if requested
@@ -212,14 +223,8 @@ if __name__ == "__main__":
     if args.output_joint and joint_angles is not None:
         np.save(args.output_joint, joint_angles)
     
-    if args.output_final_state:
-        json_ = {}
-        lastRowIndex = statesTable.getNumRows() - 1
-        lastRow = statesTable.getRowAtIndex(lastRowIndex)
-        columnLabels = statesTable.getColumnLabels()
-        for i in range(len(columnLabels)):
-            label = columnLabels[i]
-            value = lastRow[i]
-            json_[label] = value
-        with open(args.output_final_state, "w") as f:
-            json.dump(json_, f, indent=4)
+    
+    with open(args.state, "w") as f:
+        json.dump(json_, f, indent=4)
+
+
