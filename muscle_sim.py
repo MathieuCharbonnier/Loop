@@ -213,7 +213,7 @@ if __name__ == "__main__":
         activation_array=activation_array,
         torque_values=torque_values,
         output_all=args.output_all,
-        state=state
+        state_storage=state
     )
     
     # Save outputs if requested
