@@ -399,7 +399,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         II_extensor_recruited=ees_params['recruitment']['extensor']['II']
         MN_extensor_recruited=ees_params['recruitment']['extensor']['MN']
     else:
-        ees_freq=0
+        ees_freq=0*hertz
         Ia_flexor_recruited=0
         II_flexor_recruited=0
         MN_flexor_recruited=0
