@@ -100,8 +100,12 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     # Containers for simulation data
     muscle_data = [[] for _ in range(NUM_MUSCLES)]
     resting_lengths = [None] * NUM_MUSCLES
-    joint_all = np.zeros((NUM_ITERATIONS*nb_points))
-    joint_velocity_all = np.zeros((NUM_ITERATIONS*nb_points))
+     
+    total_time_points = nb_points * NUM_ITERATIONS
+    joint_all = np.zeros((total_time_points))
+    joint_velocity_all=np.zeros((total_time_points))
+    activations_all = np.zeros((NUM_MUSCLES, total_time_points))
+
  
     spike_data = {
         muscle_name: {
@@ -152,7 +156,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             joint = joint[:nb_points]
             joint_all[iteration*nb_points: (iteration+1)*nb_points] = joint
             joint_velocity = np.gradient(joint, time_points)
-            joint_velocity_all[iteration*nb_points: (iteration+1)*nb_points] = joint_velocity
+            joint_velocity_all[iteration*nb_points: (iteration+1)*nb_points]=joint_velocity
             
             # Set resting lengths on first iteration
             if resting_lengths[0] is None:
@@ -167,10 +171,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                 stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
                 stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
 
-            # Clean up the old state file if it exists 
-            if iteration > 0 and state_file is not None:
-                temp_file_manager.delete_file(state_file)
-
 
             # Run neural simulation based on muscle count
             if NUM_MUSCLES == 1:
@@ -181,7 +181,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                 )
             else:  # NUM_MUSCLES == 2
                 # Adjust EES frequency based on muscle activation if phase-dependent
-                if "ees_phase_freq" in EES_PARAMS:
+                if EES_PARAMS is not None and "ees_phase_freq" in EES_PARAMS:
                     if np.mean(activations[0]) >= np.mean(activations[1]):
                         EES_PARAMS['ees_freq'] = EES_PARAMS['ees_phase_freq']['flexor']
                     else:
@@ -233,7 +233,11 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
 
                     # Update activation for next iteration
                     activations[muscle_idx] = mean_activation[muscle_idx]
-
+                    
+                    # Store activations to relaunch the entire opensim simulation at the end
+                    if (activations_all.shape[1]>=(iteration+2)*nb_points):
+                        activations_all[muscle_idx,(iteration+1)*nb_points: (iteration+2)*nb_points] = mean_activation[muscle_idx]
+                    
                     # Save final state for next iteration
                     initial_params[muscle_idx] = final_values
 
@@ -332,27 +336,23 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     # ======================================================================================================
     # Recreate a simulator since we want to start the simulation from the beginning
     simulator = CoLabSimulator() if on_colab else LocalSimulator()
-    # Save muscle activations for full simulation
-    total_time_points = nb_points * NUM_ITERATIONS
-    activations_array = np.zeros((NUM_MUSCLES, total_time_points))
-    for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
-            # Extract activations from combined dataframe
-            if f'Activation_{muscle_name}' in combined_df.columns:
-                # Input activations are not exactly the output activations present in the combined_df dataframe       
-                activations_array[muscle_idx, nb_points:] = combined_df[f'Activation_{muscle_name}'].values[nb_points:]
-
-        
+    print("activations_all ", activations_all)
     # Run final simulation for visualization
-    simulator.run_muscle_simulation(
+    fiber_lengths, joint=simulator.run_muscle_simulation(
             TIME_STEP/second,
             REACTION_TIME/second * NUM_ITERATIONS,
             MUSCLE_NAMES,
             associated_joint,
-            activation_array,
+            activations_all,
             torque,
             sto_path
         )
-
+    """
+    if not np.array_equal(joint[:len(joint_all)], joint_all):
+        print('joint ', joint) 
+        print('joint_all ', joint_all)
+        raise ValueError('The results are not reproducible!')
+    """
     return spike_data, combined_df
 
 
@@ -422,9 +422,6 @@ class CoLabSimulator(SimulatorBase):
             np.save(self.input_torque_path, torque)
             cmd += ['--torque', self.input_torque_path]
         
-        # Add state file if provided
-        if state_file is not None:
-            cmd += ['--input_state', state_file]
         
         # Run OpenSim simulation
         process = subprocess.run(cmd, capture_output=True, text=True)
