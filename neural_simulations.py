@@ -390,13 +390,22 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     n_MN = neuron_pop['MN'] 
 
     #Extract EES_Params:
-    ees_freq=ees_params['freq']
-    Ia_flexor_recruited=ees_params['recruitment']['flexor']['Ia']
-    II_flexor_recruited=ees_params['recruitment']['flexor']['II']
-    MN_flexor_recruited=ees_params['recruitment']['flexor']['MN']
-    Ia_extensor_recruited=ees_params['recruitment']['extensor']['Ia']
-    II_extensor_recruited=ees_params['recruitment']['extensor']['II']
-    MN_extensor_recruited=ees_params['recruitment']['extensor']['MN']
+    if ees_params is not None:
+        ees_freq=ees_params['freq']
+        Ia_flexor_recruited=ees_params['recruitment']['flexor']['Ia']
+        II_flexor_recruited=ees_params['recruitment']['flexor']['II']
+        MN_flexor_recruited=ees_params['recruitment']['flexor']['MN']
+        Ia_extensor_recruited=ees_params['recruitment']['extensor']['Ia']
+        II_extensor_recruited=ees_params['recruitment']['extensor']['II']
+        MN_extensor_recruited=ees_params['recruitment']['extensor']['MN']
+    else:
+        ees_freq=0
+        Ia_flexor_recruited=0
+        II_flexor_recruited=0
+        MN_flexor_recruited=0
+        Ia_extensor_recruited=0
+        II_extensor_recruited=0
+        MN_extensor_recruited=0
 
 
     # Afferent neuron equations
@@ -486,7 +495,9 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
   
         syn = Synapses(pre, post, model="w : siemens", on_pre=f"g{pre_name.split('_')[0]}_post += w", method='exact')
         syn.connect(p=p)
-        syn.w = np.clip(weight + 0.2 * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
+        noise=0.2
+        syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
+        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms) 
         net.add(syn)
         synapses[key] = syn
           
@@ -516,8 +527,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     mon_ees_MN_extensor = None
                                             
     # Handle EES stimulation if enabled
-    if ees_freq > 0 and eff_recruited > 0:
-        ees_MN = PoissonGroup(N=2*eff_recruited, rates=ees_freq)
+    if ees_freq > 0 :
+        ees_MN = PoissonGroup(N=MN_flexor_recruited+MN_extensor_recruited, rates=ees_freq)
         mon_ees_MN = SpikeMonitor(ees_MN)
         net.add([ees_MN, mon_ees_MN])
 
@@ -528,14 +539,14 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN)} 
     MN_extensor_spikes = {i%n_MN: mon_MN.spike_trains()[i] for i in range(n_MN, 2*n_MN)} 
 
-    if ees_freq > 0 and eff_recruited > 0:
+    if ees_freq > 0 :
         ees_spikes = mon_ees_MN.spike_trains()
         before_MN_flexor_spikes = MN_flexor_spikes.copy()
         before_MN_extensor_spikes = MN_extensor_spikes.copy()
         MN_flexor_spikes = process_motoneuron_spikes(
             neuron_pop, MN_flexor_spikes, {i: ees_spikes[i] for i in range(MN_flexor_recruited)}, T_refr)
         MN_extensor_spikes = process_motoneuron_spikes(
-            neuron_pop, MN_extensor_spikes, {i%eff_recruited: ees_spikes[i+MN_extensor_recruited] for i in range(eff_recruited)}, T_refr)
+            neuron_pop, MN_extensor_spikes, {i%MN_extensor_recruited: ees_spikes[i+MN_extensor_recruited] for i in range(eff_recruited)}, T_refr)
     
     # Count spiking neurons
     recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
