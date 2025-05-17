@@ -1,3 +1,18 @@
+from brian2 import *
+import numpy as np
+import pandas as pd
+import os
+import subprocess
+import tempfile
+import json
+import matplotlib.pyplot as plt
+from collections import defaultdict
+from scipy.stats import gaussian_kde
+
+from neural_simulations import run_one_muscle_neuron_simulation, run_flexor_extensor_neuron_simulation
+from activation import decode_spikes_to_activation
+
+
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES, associated_joint, base_output_path, 
             EES_PARAMS=None, torque=None, fast=True, seed=42, on_colab=False):
@@ -129,8 +144,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                     MUSCLE_NAMES,
                     associated_joint,
                     activation=activations,
-                    torque= current_torque 
-                    state_file=new_state_path
+                    torque= current_torque
                 )
                 
             # Process muscle simulation results
@@ -432,16 +446,16 @@ class LocalSimulator(SimulatorBase):
     """Simulator implementation for local execution with in-memory state"""
     
     def __init__(self):
-        self.current_state = None  # Store simulation state in memory
+        self.current_state = {}  # Store simulation state in memory
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
                               activation,torque ):
         """Run a single muscle simulation iteration using direct function call with in-memory state"""
-        
+        from muscle_sim import run_simulation
         # Run simulation directly with in-memory state
         fiber_lengths, joint, new_state = run_simulation(
             dt, T, muscle_names, joint_name, activation,
-            self.current_state, current_torque
+            self.current_state
         )
         # Update in-memory state
         self.current_state = new_state
@@ -449,5 +463,5 @@ class LocalSimulator(SimulatorBase):
         
         return fiber_lengths, joint
     
-    
+ 
 
