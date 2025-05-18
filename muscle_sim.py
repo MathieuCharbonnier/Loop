@@ -36,7 +36,6 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     time_array = np.arange(0, T, dt)
-
     # Add muscle controller if activation provided
     if activation_array is not None:
         
@@ -59,6 +58,7 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     
     # Add direct joint coordinate torque if provided
     if torque_values is not None:
+        
         # Get the coordinate for the specified joint
         coordinate = model.getCoordinateSet().get(joint_name)
         if coordinate is None:
@@ -72,10 +72,6 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
         # Create a CoordinateActuator to directly apply torque to the joint coordinate
         coord_actuator = osim.CoordinateActuator(joint_name)
         coord_actuator.setName(f"Torque_{joint_name}")
-        
-        # Set optimal force large enough to handle the maximum torque
-        max_torque = max(abs(max(torque_values)), abs(min(torque_values)))
-        coord_actuator.setOptimalForce(max_torque * 1.5)  # Set safely above maximum
         
         # Add actuator to model
         model.addForce(coord_actuator)
@@ -201,8 +197,6 @@ if __name__ == "__main__":
                 state = json.load(f)
         except Exception as e:
             print(f"Error loading initial state file: {e}")
-    elif args.state:
-        print(f"Initial state file not found: {args.state}")
 
     # Run the simulation
     fiber_lengths, joint_angles, json_ = run_simulation(
