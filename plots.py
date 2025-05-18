@@ -83,7 +83,7 @@ def plot_neural_dynamic(df, muscle_names, base_output_path):
 
     # Create subplots
     fig, axs = plt.subplots(len(base_labels), 1, figsize=(12, 3.5 * len(base_labels)), sharex=True)
-    if len(unique_base_labels) == 1:
+    if len(base_labels) == 1:
         axs = [axs]
 
     time = df['Time'].values
