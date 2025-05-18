@@ -15,7 +15,7 @@ from activation import decode_spikes_to_activation
 
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES, associated_joint, base_output_path, 
-            EES_PARAMS=None, torque=None, fast=True, seed=42, on_colab=False):
+            EES_PARAMS=None, TORQUE=None, fast=True, seed=42):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -50,14 +50,12 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
         Name of the associated joint
     base_output_path : str
         Base path for output files
-    torque : numpy.ndarray, optional
-        External torque to apply at each time step
+    TORQUE : dict, optional
+        Parameter to create the external torque profile applied at each time step
     fast : bool, optional
         Whether to use the fast spike-to-activation decoding algorithm (default: True)
     seed : int, optional
         Random seed for simulation reproducibility (default: 42)
-    on_colab : bool, optional
-        Whether the simulation is running on Google Colab (default: False)
     """
     # Create CSV and STO paths 
     csv_path = base_output_path + '.csv'
@@ -73,12 +71,14 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     # Initialization
     # =============================================================================
 
-    # Discretization configuration
+    # Discretization configuration + vector initialization
     nb_points = int(REACTION_TIME/TIME_STEP)
-                       
-    # Initialize muscle activation
     activations = np.zeros((NUM_MUSCLES, nb_points))
-    time_points = np.arange(0, REACTION_TIME/second, TIME_STEP/second)
+    total_time_points = nb_points * NUM_ITERATIONS
+    time_points = np.arange(0, REACTION_TIME*NUM_ITERATIONS, TIME_STEP)
+    joint_all = np.zeros((total_time_points))
+    joint_velocity_all=np.zeros((total_time_points))
+    activations_all = np.zeros((NUM_MUSCLES, total_time_points))
 
     initial_potentials = {
         "exc": BIOPHYSICAL_PARAMS['Eleaky'],
@@ -100,11 +100,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     # Containers for simulation data
     muscle_data = [[] for _ in range(NUM_MUSCLES)]
     resting_lengths = [None] * NUM_MUSCLES
-     
-    total_time_points = nb_points * NUM_ITERATIONS
-    joint_all = np.zeros((total_time_points))
-    joint_velocity_all=np.zeros((total_time_points))
-    activations_all = np.zeros((NUM_MUSCLES, total_time_points))
 
  
     spike_data = {
@@ -114,7 +109,17 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
         }
         for muscle_name in MUSCLE_NAMES
     }
-    
+    torque=None
+    if TORQUE is not None:
+        if TORQUE['type']=="bump":
+            torque=bump(time_points*second,TORQUE['t_peak'], TORQUE['sigma'], 
+            TORQUE['max_amplitude'], TORQUE['sustained_amplitude'])
+        elif TORQUE['type']=="ramp":
+            torque=ramp(time_points*second, TORQUE['t_stop'], TORQUE['max_amplitude'], TORQUE['sustained_amplitude'])
+        else:
+            raise ValueError(f"{TORQUE['type']} is not implemented yet, existing type are bump or ramp")
+
+
     # =============================================================================
     # Main Simulation Loop
     # =============================================================================
@@ -128,6 +133,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
         print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['eff_recruited']} / {NEURON_COUNTS['MN']}")
 
     # Create a simulator instance based on execution environment
+    on_colab=is_running_on_colab()
     simulator = CoLabSimulator() if on_colab else LocalSimulator()
 
                        
@@ -155,7 +161,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             fiber_lengths = fiber_lengths[:, :nb_points]
             joint = joint[:nb_points]
             joint_all[iteration*nb_points: (iteration+1)*nb_points] = joint
-            joint_velocity = np.gradient(joint, time_points)
+            joint_velocity = np.gradient(joint, time_points[iteration*nb_points: (iteration+1)*nb_points])
             joint_velocity_all[iteration*nb_points: (iteration+1)*nb_points]=joint_velocity
             
             # Set resting lengths on first iteration
@@ -169,7 +175,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             for muscle_idx in range(NUM_MUSCLES):
                 # Calculate stretch and velocity
                 stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
-                stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points)
+                stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points[iteration*nb_points:(iteration+1)*nb_points])
 
 
             # Run neural simulation based on muscle count
@@ -243,7 +249,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
 
                     # Create batch data for current iteration
                     batch_data = {
-                        'Time': time_points + iteration * REACTION_TIME/second,
+                        'Time': time_points[iteration*nb_points:(iteration+1)*nb_points],
                         f'Fiber_length_{MUSCLE_NAMES[muscle_idx]}': fiber_lengths[muscle_idx],
                         f'Stretch_{MUSCLE_NAMES[muscle_idx]}': stretch[muscle_idx],
                         f'Stretch_Velocity_{MUSCLE_NAMES[muscle_idx]}': stretch_velocity[muscle_idx],
@@ -336,7 +342,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     # ======================================================================================================
     # Recreate a simulator since we want to start the simulation from the beginning
     simulator = CoLabSimulator() if on_colab else LocalSimulator()
-    print("activations_all ", activations_all)
+  
     # Run final simulation for visualization
     fiber_lengths, joint=simulator.run_muscle_simulation(
             TIME_STEP/second,
@@ -347,6 +353,10 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             torque,
             sto_path
         )
+    plt.plot(time_points, joint_all, label='loop simulation')
+    plt.plot(time_points, joint[:len(joint_all)], label='final simulation')
+    plt.legend()
+    plt.show()
     """
     if not np.array_equal(joint[:len(joint_all)], joint_all):
         print('joint ', joint) 
@@ -461,4 +471,42 @@ class LocalSimulator(SimulatorBase):
         return fiber_lengths, joint
     
  
+def is_running_on_colab():
+    try:
+        import google.colab
+        return True
+    except ImportError:
+        return False
+
+
+def ramp (time_array,t_stop, max_amplitude, sustained_amplitude=0):
+
+    num_points = len(time_array)
+    torque_profile = np.zeros((num_points))
+    # Create the torque profile
+    for i, t in enumerate(time_array):
+        if t < t_stop:
+            # Rapid increase in torque (quick stretch phase)
+            progress = t / t_stop
+            torque_profile[i] = max_amplitude * progress
+        else:
+            # Reduced holding torque (to allow natural oscillation)
+            torque_profile[i] = sustained_amplitude
+    return torque_profile
+
+
+def bump(time_array, t_peak, sigma, max_amplitude, sustained_amplitude=0):
+
+    # Gaussian torque
+    gaussian = max_amplitude * np.exp(-0.5 * ((time_array - t_peak) / sigma) ** 2)
+
+    # Find index where the torque drops below threshold after the peak
+    i_peak = np.argmax(gaussian)
+    i_hold_start = np.where(gaussian[i_peak:] <= sustained_amplitude)[0]
+    i_hold_start = i_hold_start[0] + i_peak if len(i_hold_start) > 0 else time_array.shape[0]
+
+    # Construct the final torque profile
+    torque = np.copy(gaussian)
+    torque[i_hold_start:] = sustained_amplitude
+    return torque
 
