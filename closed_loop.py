@@ -147,14 +147,14 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                 end_idx = (iteration + 1) * nb_points
                 current_torque = torque[start_idx:end_idx]
 
-                # Run muscle simulation with file paths
-                fiber_lengths, joint = simulator.run_muscle_simulation(
-                    TIME_STEP/second,
-                    REACTION_TIME/second,
-                    MUSCLE_NAMES,
-                    associated_joint,
-                    activation=activations,
-                    torque= current_torque
+            # Run muscle simulation with file paths
+            fiber_lengths, joint = simulator.run_muscle_simulation(
+                TIME_STEP/second,
+                REACTION_TIME/second,
+                MUSCLE_NAMES,
+                associated_joint,
+                activation=activations,
+                torque= current_torque
                 )
                 
             # Process muscle simulation results
@@ -304,16 +304,16 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
 
             df[f'II_rate_baseline_{muscle_name}'] = II_rate
 
-        # Calculate all firing rate using KDE
+        # Calculate all firing rate using 
         for fiber_name, fiber_spikes in spike_data[muscle_name].items():
-        
-            all_spike_times = np.concatenate(list(fiber_spikes.values())) 
-            
-            firing_rate = np.zeros_like(time)
-            if len(all_spike_times) > 1:
-                kde = gaussian_kde(all_spike_times, bw_method=0.3)
-                firing_rate = kde(time) * len(all_spike_times) / max(len(fiber_spikes), 1)
-            df[f'{fiber_name}_rate_measured_{muscle_name}'] = firing_rate
+            if fiber_spikes:
+                all_spike_times = np.concatenate(list(fiber_spikes.values())) 
+                
+                firing_rate = np.zeros_like(time)
+                if len(all_spike_times) > 1:
+                    kde = gaussian_kde(all_spike_times, bw_method=0.3)
+                    firing_rate = kde(time) * len(all_spike_times) / max(len(fiber_spikes), 1)
+                df[f'{fiber_name}_rate_measured_{muscle_name}'] = firing_rate
         all_data_dfs.append(df)
     
     # Combine all muscle data into a single dataframe
@@ -440,11 +440,15 @@ class CoLabSimulator(SimulatorBase):
         if process.returncode != 0:
             error_msg = f'Error in muscle simulation. STDERR: {process.stderr}'
             raise RuntimeError(error_msg)
-            
+        # Display messages:
+        #if process.stdout.strip():
+            #print("STDOUT:\n", process.stdout)
+
         # Load simulation results
         fiber_lengths = np.load(self.output_stretch_path)
         joint = np.load(self.output_joint_path)
         
+
         return fiber_lengths, joint
     
     
