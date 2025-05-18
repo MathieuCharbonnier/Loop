@@ -53,10 +53,11 @@ def plot_raster(spikes, base_output_path):
     plt.show()
 
 
+
 def plot_neural_dynamic(df, muscle_names, base_output_path):
     """
     Plot neural dynamics from a combined dataframe.
-    
+
     Parameters:
     -----------
     df : pandas.DataFrame
@@ -64,65 +65,64 @@ def plot_neural_dynamic(df, muscle_names, base_output_path):
     muscle_names : list
         List of muscle names
     base_output_path : str
-        Path to save the plot
+        Path to save the plot (e.g., "./figures/")
     """
-    # Identify columns containing rate data and IPSP data for each muscle
-    rate_columns = []
-    ipsp_columns = []
-    v_columns=[]
-    mn_rate_columns = []
-    
-    for muscle in muscle_names:
-        # Find Ia and II rate columns
-        ia_cols = [col for col in df.columns if "rate" in col.lower() and "I" in col and muscle in col]
-        rate_columns.extend([(col, "FR (Hz)") for col in ia_cols])
-        
-        # Find IPSP columns
-        ipsp_cols = [col for col in df.columns if "IPSP" in col and muscle in col]
-        ipsp_columns.extend([(col, "IPSP (nA)") for col in ipsp_cols])
+    base_labels = []
+    #take the first muscle and recover the variables to plot:
+    muscle= muscle_names[0]
+    # Ia/II rate
+    ia_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "rate" in col.lower() and "I" in col and muscle in col]
+    # IPSP
+    ipsp_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "IPSP" in col and muscle in col]
+    # Membrane potential
+    v_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "potential" in col and muscle in col]
+    # Motoneuron rate
+    mn_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "MN_rate" in col and muscle in col]
 
-        # Find v columns
-        v_cols = [col for col in df.columns if "potential" in col and muscle in col]
-        v_columns.extend([(col, "v (mV)") for col in v_cols])
+    base_labels.extend(ia_cols + ipsp_cols + v_cols + mn_cols)
 
-        # Find MN rate columns
-        mn_cols = [col for col in df.columns if "MN_rate" in col and muscle in col]
-        mn_rate_columns.extend([(col, "FR (Hz)") for col in mn_cols])
-    
-    columns = rate_columns + ipsp_columns + v_columns+ mn_rate_columns
-
-    if not columns:
-        print("No neural dynamics columns found in the dataframe")
-        return
-    
-    fig, axs = plt.subplots(len(columns), 1, figsize=(12, 3.5*len(columns)), sharex=True)
-    # Handle case with only one subplot
-    if len(columns) == 1:
+    # Create subplots
+    fig, axs = plt.subplots(len(base_labels), 1, figsize=(12, 3.5 * len(base_labels)), sharex=True)
+    if len(unique_base_labels) == 1:
         axs = [axs]
-    
+
     time = df['Time'].values
-    
-    for i, (col, ylabel) in enumerate(columns):
+
+    for i, base_label in enumerate(base_labels):
         ax = axs[i]
-        ax.set_title(col, fontsize=12)
+
+        # Determine y-label based on feature type
+        if "rate" in base_label.lower():
+            ylabel = "FR (Hz)"
+        elif "potential" in base_label.lower():
+            ylabel = "v (mV)"
+        elif "IPSP" in base_label:
+            ylabel = "IPSP (nA)"
+        else:
+            ylabel = base_label  # fallback
+
         ax.set_ylabel(ylabel, fontsize=11)
-        ax.plot(time, df[col])
-        
-        # Extract muscle name from column for legend
+        ax.set_title(base_label, fontsize=13)
+
         for muscle in muscle_names:
-            if muscle in col:
-                ax.legend([muscle], fontsize=10)
-                break
-        
+            full_col = f"{base_label}_{muscle}"
+            if full_col in df.columns:
+                ax.plot(time, df[full_col], label=muscle)
+
+        ax.legend(fontsize=9)
         ax.tick_params(labelsize=11)
-    
+
     axs[-1].set_xlabel('Time (s)', fontsize=11)
     fig.suptitle('Neural Dynamics', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    fig_path = base_output_path+ f'NEURONS_DYNAMICS_{timestamp}.png'
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    fig_path = f"{base_output_path}NEURONS_DYNAMICS_{timestamp}.png"
     plt.savefig(fig_path)
     plt.show()
+    print(f"Figure saved at: {fig_path}")
+
+  
 
 
 def plot_activation(df, muscle_names, base_output_path):
@@ -182,8 +182,7 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
     has_torque = torque_column in df.columns
 
     n_subplots = 6 if has_torque else 5
-    fig_height = 15 if has_torque else 12
-    fig, axs = plt.subplots(n_subplots, 1, figsize=(12, fig_height), sharex=True)
+    fig, axs = plt.subplots(n_subplots, 1, figsize=(12,3*n_subplots ), sharex=True)
 
     time = df['Time'].values
     current_axis = 0
