@@ -353,16 +353,13 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             torque,
             sto_path
         )
+    """
     plt.plot(time_points, joint_all, label='loop simulation')
     plt.plot(time_points, joint[:len(joint_all)], label='final simulation')
     plt.legend()
     plt.show()
     """
-    if not np.array_equal(joint[:len(joint_all)], joint_all):
-        print('joint ', joint) 
-        print('joint_all ', joint_all)
-        raise ValueError('The results are not reproducible!')
-    """
+
     return spike_data, combined_df
 
 
