@@ -126,11 +126,13 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
 
     print("Start Simulation:")
     if EES_PARAMS is not None:
-        print(f"EES frequency: {EES_PARAMS['ees_freq']}")
-        print(f"Number Ia fibers recruited by EES: {EES_PARAMS['Ia_recruited']} / {NEURON_COUNTS['Ia']}")
+        print(f"EES frequency: {EES_PARAMS['freq']}")
         if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
-            print(f"Number II fibers recruited by EES: {EES_PARAMS['II_recruited']} / {NEURON_COUNTS['II']}")
-        print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['eff_recruited']} / {NEURON_COUNTS['MN']}")
+            print(f"Number Ia fibers recruited by EES: {EES_PARAMS['afferent_recruited'][0]}")
+            print(f"Number II fibers recruited by EES: {EES_PARAMS['afferent_recruited'][1]}")
+        else:
+           print(f"Number Ia fibers recruited by EES: {EES_PARAMS['afferent_recruited']}")
+        print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['MN_recruited']} ")
 
     # Create a simulator instance based on execution environment
     on_colab=is_running_on_colab()
@@ -187,15 +189,16 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
                 )
             else:  # NUM_MUSCLES == 2
                 # Adjust EES frequency based on muscle activation if phase-dependent
-                if EES_PARAMS is not None and "ees_phase_freq" in EES_PARAMS:
+                EES_PARAMS_copy=EES_PARAMS.copy()
+                if EES_PARAMS is not None and isinstance(EES_PARAMS['freq'], tuple): 
                     if np.mean(activations[0]) >= np.mean(activations[1]):
-                        EES_PARAMS['ees_freq'] = EES_PARAMS['ees_phase_freq']['flexor']
+                        EES_PARAMS_copy['freq'] = EES_PARAMS['freq'][0]
                     else:
-                        EES_PARAMS['ees_freq'] = EES_PARAMS['ees_phase_freq']['extensor']
+                        EES_PARAMS_copy['freq'] = EES_PARAMS['freq'][1]
 
                 all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
                     stretch, stretch_velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, 
-                    SPINDLE_MODEL, seed, initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
+                    SPINDLE_MODEL, seed, initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS_copy
                 )
                 
             # Update initial potentials for next iteration
