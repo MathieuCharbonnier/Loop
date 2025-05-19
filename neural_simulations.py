@@ -75,10 +75,15 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     # Create all neuron populations based on neuron_pop dictionary
     monitors = []
     
-    
+    freq=ees_params['freq']
+    afferent_recruited=ees_params['afferent_recruited']
+    if isinstance(afferent_recruited, tuple):
+        Ia_recruited=afferent_recruited[0]
+    else:
+        Ia_recruited=afferent_recruited                               
     # Create primary afferent neurons (always present)
     create_afferent_neurons(
-        net, group_map, monitors, ees_params, 
+        net, group_map, monitors, freq, Ia_recruited,
         'Ia', neuron_pop, spindle_model, stretch_array, stretch_velocity_array, joint_array, joint_velocity_array, 
         T_refr,final_potentials
     )
@@ -88,7 +93,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     if has_II_pathway:
         create_afferent_neurons(
-            net, group_map, monitors, ees_params,'II', neuron_pop, spindle_model,
+            net, group_map, monitors, freq, ees_params['afferent_recruited'][1],'II', neuron_pop, spindle_model,
              stretch_array, stretch_velocity_array, joint_array, joint_velocity_array,
              T_refr,final_potentials
         )
@@ -120,7 +125,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     # Handle EES stimulation if enabled for efferent neurons
     mon_ees_MN = None
-    if ees_params is not None and ees_params.get("freq",0)>0 and recruitment.get('MN', 0) > 0:
+    if ees_params is not None and ees_params.get("freq",0)>0 and recruitment.get('MN_recruited', 0) > 0:
         eff_recruited = recruitment.get('MN', 0)
         ees_MN = PoissonGroup(N=eff_recruited, rates=ees_freq)
         mon_ees_MN = SpikeMonitor(ees_MN)
@@ -151,7 +156,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     return [result], final_potentials, state_monitors
 
 
-def create_afferent_neurons(net, group_map, monitors, ees_params, 
+def create_afferent_neurons(net, group_map, monitors, ees_freq, recruited, 
                            neuron_type, neuron_pop, spindle_model, stretch_array, stretch_velocity_array, joint_array, joint_velocity_array, T_refr,
                            final_potentials):
     """
@@ -165,10 +170,9 @@ def create_afferent_neurons(net, group_map, monitors, ees_params,
         joint = joint_array(t): 1
         joint_velocity = joint_velocity_array(t): 1
         """
-    if ees_params is not None and ees_params.get('freq', 0)>0 and ees_params['recruitment'][neuron_type]>0:
 
-        recruited=ees_params['recruitment'][neuron_type]
-        ees_freq=ees_params['freq']
+    if ees_freq>0 and recruited>0:
+
         afferent_eq = equation_baseline+ f'''
         is_ees = (i < recruited): boolean
         rate = ({equation})*hertz + ees_freq * int(is_ees): Hz
@@ -392,12 +396,18 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     #Extract EES_Params:
     if ees_params is not None:
         ees_freq=ees_params['freq']
-        Ia_flexor_recruited=ees_params['recruitment']['flexor']['Ia']
-        II_flexor_recruited=ees_params['recruitment']['flexor']['II']
-        MN_flexor_recruited=ees_params['recruitment']['flexor']['MN']
-        Ia_extensor_recruited=ees_params['recruitment']['extensor']['Ia']
-        II_extensor_recruited=ees_params['recruitment']['extensor']['II']
-        MN_extensor_recruited=ees_params['recruitment']['extensor']['MN']
+        B=ees_params['B']
+        w_flexor=(1+B)/2
+        w_extensor=(1-B)/2
+        Ia_recruited=ees_params['afferent_recruited'][0]
+        II_recruited=ees_params['afferent_recruited'][1]
+        MN_recruited=ees_params['MN_recruited']
+        Ia_flexor_recruited=Ia_recruited*w_flexor
+        II_flexor_recruited=II_recruited*w_flexor
+        MN_flexor_recruited=MN_recruited*w_flexor
+        Ia_extensor_recruited=Ia_recruited*w_flexor
+        II_extensor_recruited=II_recruited*w_extensor
+        MN_extensor_recruited=MN_recruited*w_extensor
     else:
         ees_freq=0*hertz
         Ia_flexor_recruited=0
