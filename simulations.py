@@ -4,41 +4,40 @@ import matplotlib.pyplot as plt
 import math
 from datetime import datetime
 from closed_loop import closed_loop
-from plots import plot_raster, plot_neural_dynamic,plot_activation,plot_mouvement
+from plots import plot_raster, plot_neural_dynamic, plot_activation, plot_mouvement
 from itertools import product
 import pandas as pd
 from tqdm import tqdm
 from brian2 import *
 
-Class BiologicalSystem():
+class BiologicalSystem:
 
-    def init(REACTION_TIME, NEURON_COUNTS, CONNECTIONS, SPINDLE_MODEL, BIOPHYSICAL_PARAMS,
+    def __init__(self, REACTION_TIME, NEURON_COUNTS, CONNECTIONS, SPINDLE_MODEL, BIOPHYSICAL_PARAMS,
         MUSCLES_NAMES, associated_joint):
-        self.REACTION_TIME=REACTION_TIME
-        self.NEURON_COUNTS=NEURON_COUNTS
-        self.CONNECTIONS= CONNECIONS
-        self.SPINDLE_MODEL= SPINDLE_MODEL
-        self.BIOPHYSICAL_PARAMS=BIOPHYSICAL_PARAMS
-        self.MUSCLES_NAMES=MUSCLES_NAMES
-        self.number_muscles=len(MUSCLES_NAMES)
-        self.associated_joint=associated_joint
+        self.REACTION_TIME = REACTION_TIME
+        self.NEURON_COUNTS = NEURON_COUNTS
+        self.CONNECTIONS = CONNECTIONS  # Fixed typo: CONNECIONS -> CONNECTIONS
+        self.SPINDLE_MODEL = SPINDLE_MODEL
+        self.BIOPHYSICAL_PARAMS = BIOPHYSICAL_PARAMS
+        self.MUSCLES_NAMES = MUSCLES_NAMES
+        self.number_muscles = len(MUSCLES_NAMES)
+        self.associated_joint = associated_joint
     
-    def simulations( base_output_path, N_ITERATIONS, TIME_STEP=0.1*ms, EES_PARAMS=None,
-                TORQUE=None, fast_type_MU=True,seed=42):
-        spikes, time_series=closed_loop(
+    def simulations(self, base_output_path, N_ITERATIONS, TIME_STEP=0.1*ms, EES_PARAMS=None,
+                TORQUE=None, fast_type_MU=True, seed=42):
+        spikes, time_series = closed_loop(
                 N_ITERATIONS, self.REACTION_TIME, TIME_STEP, self.NEURON_COUNTS, self.CONNECTIONS,
                 self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS,
-                self.MUSCLES_NAMES,self.associated_joint,base_output_path,
+                self.MUSCLES_NAMES, self.associated_joint, base_output_path,
                 TORQUE=TORQUE, EES_PARAMS=EES_PARAMS, fast=fast_type_MU, seed=seed)
                     
-        plot_mouvement(time_series, self.MUSCLES_NAMES,self.associated_joint, base_output_path)
-        plot_neural_dynamic(time_series, self.MUSCLES_NAMES,base_output_path)
-        plot_raster(spikes,base_output_path)
+        plot_mouvement(time_series, self.MUSCLES_NAMES, self.associated_joint, base_output_path)
+        plot_neural_dynamic(time_series, self.MUSCLES_NAMES, base_output_path)
+        plot_raster(spikes, base_output_path)
         plot_activation(time_series, self.MUSCLES_NAMES, base_output_path)
         
 
-
-    def analyze_frequency_effects(freq_range, Base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
+    def analyze_frequency_effects(self, freq_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
         """Analyze the effects of varying EES frequency with fixed afferent and efferent recruitment."""
       
         vary_param = {
@@ -47,10 +46,11 @@ Class BiologicalSystem():
             'label': 'EES Frequency '
         }
         
-        return EES_stim_analysis(base_EES_params, vary_param,N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES,TIME_STEP, seed)
+        return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
+                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
+                                 TIME_STEP, seed)
 
-    def analyze_co_recruitment_effects(afferent_range, Base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
+    def analyze_co_recruitment_effects(self, afferent_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
         """Analyze the effects of varying afferent recruitment."""
         
         vary_param = {
@@ -60,12 +60,13 @@ Class BiologicalSystem():
         }
 
         return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES,TIME_STEP, seed)
+                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
+                                 TIME_STEP, seed)
 
-    def analyse_unbalanced_recruitment_effects(B_range, Base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
+    def analyse_unbalanced_recruitment_effects(self, B_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
         """Analyze the effects of unbalanced afferent recruitment."""
-        if (number_muscle!=2):
-            print ("this functionality required 2 muscles!")
+        if (self.number_muscles != 2):  # Fixed variable name: number_muscle -> self.number_muscles
+            print("This functionality requires 2 muscles!")
             return
         vary_param = {
             'param_name': 'B',
@@ -74,10 +75,11 @@ Class BiologicalSystem():
         }
 
         return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES,TIME_STEP, seed)
+                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
+                                 TIME_STEP, seed)
 
 
-    def analyze_efferent_recruitment_effects(MN_range, Base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
+    def analyze_efferent_recruitment_effects(self, MN_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
         """Analyze the effects of varying efferent (motoneuron) recruitment."""
         
         vary_param = {
@@ -87,11 +89,11 @@ Class BiologicalSystem():
         }
         
         return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES,TIME_STEP, seed)
+                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
+                                 TIME_STEP, seed)
 
     
-
-    def clonus_analysis( base_output_path,torque_profile, duration=1*second, time_step=0.1*ms,
+    def clonus_analysis(self, base_output_path, torque_profile, duration=1*second, time_step=0.1*ms,
                     fast_type_MU=True, seed=41):
         """
         Analyze clonus behavior by varying one parameter at a time and create visualization plots.
@@ -130,20 +132,20 @@ Class BiologicalSystem():
             current_reaction_time = delay
             print("current_reaction_time ", current_reaction_time)
             # Run simulation with current parameters
-            n_iterations=int(duration/current_reaction_time)+1
+            n_iterations = int(duration/current_reaction_time) + 1
             spikes, time_series = closed_loop(
                 n_iterations, current_reaction_time, time_step, self.NEURON_COUNTS, self.CONNECTIONS,
-                self.SPINDLE_MODEL, self.BIOPHYSICAL_MODEL, self.MUSCLE_NAMES, self.associated_joint,
-                f"{base_output_path}_delay_{int(delay*1000)}ms",
+                self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, self.associated_joint,
+                f"{base_output_path}_delay_{int(delay/ms)}ms",  # Fixed: delay*1000 -> delay/ms
                 TORQUE=torque_profile, fast=fast_type_MU, seed=seed
             )
             
             # Plot joint angle
-            axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
-            axs1[i, 0].set_ylabel(f"Delay = {int(delay*1000)} ms\nJoint angle (deg)")
+            axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
+            axs1[i, 0].set_ylabel(f"Delay = {int(delay/ms)} ms\nJoint angle (deg)")  # Fixed: delay*1000 -> delay/ms
             
             # Plot muscle activations
-            for muscle in muscles_names:
+            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
                 activation_col = f"Activation_{muscle}"
                 axs1[i, 1].plot(time_series['Time'], time_series[activation_col], 
                               label=muscle)
@@ -157,7 +159,7 @@ Class BiologicalSystem():
         fig1.tight_layout()
         fig1.savefig(os.path.join(fig_dir, 'delay_variation.png'), dpi=300)
         
-        n_iterations=int(duration/reaction_time)+1
+        n_iterations = int(duration/self.REACTION_TIME) + 1
         # 2. Vary fast twitch parameter
         fig2, axs2 = plt.subplots(len(fast_twitch_values), 2, figsize=(15, 4*len(fast_twitch_values)), sharex=True)
         
@@ -166,19 +168,19 @@ Class BiologicalSystem():
             # Run simulation with current parameters
             spikes, time_series = closed_loop(
                 n_iterations, self.REACTION_TIME, time_step, self.NEURON_COUNTS, self.CONNECTIONS,
-                self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLE_NAMES, self.associated_joint,
+                self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, self.associated_joint,
                 f"{base_output_path}_fast_{fast}",
                 TORQUE=torque_profile, fast=fast, seed=seed
             )
             
             # Plot joint angle
-            axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
+            axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
             axs2[i, 0].set_ylabel(f"Fast = {fast}\nJoint angle (deg)")
             
             # Plot muscle activations
-            for muscle in muscles_names:
+            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
                 activation_col = f"Activation_{muscle}"
-                axs2[i, 1].plot(time_series['time'], time_series[activation_col], 
+                axs2[i, 1].plot(time_series['Time'], time_series[activation_col],  # Fixed: 'time' -> 'Time'
                               label=muscle)
             
             axs2[i, 1].set_ylabel("Muscle activation")
@@ -195,26 +197,25 @@ Class BiologicalSystem():
         
         for i, threshold in enumerate(tqdm(threshold_values, desc="Varying threshold voltage")):
             # Create a copy of biophysical params and update the threshold
-            current_biophysical_params = self.biophysical_params.copy()
+            current_biophysical_params = self.BIOPHYSICAL_PARAMS.copy()  # Fixed: self.biophysical_params -> self.BIOPHYSICAL_PARAMS
             current_biophysical_params['threshold_v'] = threshold
             
             # Run simulation with current parameters
             spikes, time_series = closed_loop(
-                n_iterations, self.REACTION_TIME, time_step, self.NEURON_COUNTS,self.CONNECTIONS,
-                self.SPINDLE_MODEL, current_biophysical_params, self.MUSCLE_NAMES, self.associated_joint,
-                f"{base_output_path}_threshold_{int(threshold*1000)}mV",
+                n_iterations, self.REACTION_TIME, time_step, self.NEURON_COUNTS, self.CONNECTIONS,
+                self.SPINDLE_MODEL, current_biophysical_params, self.MUSCLES_NAMES, self.associated_joint,  # Fixed: self.MUSCLE_NAMES -> self.MUSCLES_NAMES
+                f"{base_output_path}_threshold_{int(threshold/mV)}mV",  # Fixed: threshold*1000 -> threshold/mV
                 TORQUE=torque_profile, fast=fast_type_MU, seed=seed
             )
             
-            
             # Plot joint angle
-            axs3[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
-            axs3[i, 0].set_ylabel(f"Threshold = {int(threshold*1000)} mV\nJoint angle (deg)")
+            axs3[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
+            axs3[i, 0].set_ylabel(f"Threshold = {int(threshold/mV)} mV\nJoint angle (deg)")  # Fixed: threshold*1000 -> threshold/mV
             
             # Plot muscle activations
-            for muscle in muscles_names:
+            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
                 activation_col = f"Activation_{muscle}"
-                axs3[i, 1].plot(time_series['time'], time_series[activation_col], 
+                axs3[i, 1].plot(time_series['Time'], time_series[activation_col],  # Fixed: 'time' -> 'Time'
                               label=muscle)
             
             axs3[i, 1].set_ylabel("Muscle activation")
@@ -226,11 +227,9 @@ Class BiologicalSystem():
         fig3.tight_layout()
         fig3.savefig(os.path.join(fig_dir, 'threshold_variation.png'), dpi=300)
         
-        
         # Close all figures to free memory
         plt.close('all')
-        
-    
+
 
 def EES_stim_analysis(
     param_dict,
@@ -241,7 +240,7 @@ def EES_stim_analysis(
     CONNECTIONS,
     SPINDLE_MODEL, 
     BIOPHYSICAL_PARAMS, 
-    MUSCLE_NAMES,
+    MUSCLES_NAMES,
     TIME_STEP=0.1*ms,
     seed=42
 ):
@@ -265,14 +264,16 @@ def EES_stim_analysis(
         os.makedirs(save_dir)
         print(f"Created directory '{save_dir}' for saving plots")
     
+    # Create a base output path
+    base_path = os.path.join(save_dir, "output")  # Added base_path definition that was missing
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    num_muscles = len(MUSCLE_NAMES)
+    num_muscles = len(MUSCLES_NAMES)
     
     # Define a custom color palette for muscles
     # Using a colorblind-friendly palette
     muscle_colors = {
-        muscles_names[i]: plt.cm.tab10(i % 10) for i in range(num_muscle)
+        MUSCLES_NAMES[i]: plt.cm.tab10(i % 10) for i in range(num_muscles)  # Fixed: num_muscle -> num_muscles
     }
     
     # Define a custom style for the plots
@@ -312,6 +313,9 @@ def EES_stim_analysis(
         # Preallocate activities array
         activities = None  # Will initialize inside loop
     
+    # Define fast parameter for closed_loop call
+    fast = True  # Added default value for fast parameter
+    
     # Run simulations for each parameter value
     for i, value in enumerate(param_values):
         # Create a copy of the base parameters
@@ -331,18 +335,18 @@ def EES_stim_analysis(
     
         # --- Run simulation ---
         spikes, main_data = closed_loop(
-            N_ITERATIONS, REACTION_TIME, TIME_STEP, current_params, NEURON_COUNTS, CONNECTIONS,
-            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLES_NAMES, associated_joint, base_path,
+            N_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,  # Fixed parameter order
+            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLES_NAMES, associated_joint=param_dict.get('associated_joint', 'ankle'),  # Added missing parameter
+            base_path=base_path,  # Used proper base_path
             EES_PARAMS=current_params, fast=fast, seed=seed)
-        )
- 
+        
         # Extract time from the dataframe
         time_data = main_data['Time']
         
         # Get time length for preallocation on first iteration
         if num_muscles == 2 and activities is None:
             T = len(time_data)
-            activities = np.zeros((len(muscles_names), n_rows, T))
+            activities = np.zeros((len(MUSCLES_NAMES), n_rows, T))  # Fixed: muscles_names -> MUSCLES_NAMES
     
         # --- Plot each variable ---
         for var in time_series_to_plot:
@@ -362,13 +366,16 @@ def EES_stim_analysis(
             ax.grid(True, linestyle='--', alpha=0.3)
     
             if var == 'Joints':
-                ax.plot(time_data, main_data['Joints'], color='darkred', 
-                       label='Ankle Angle', linewidth=2.5)
-                ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
+                # Check if 'Joints' column exists, otherwise use 'Joint_ankle' or similar
+                joint_col = 'Joints' if 'Joints' in main_data.columns else f"Joint_{param_dict.get('associated_joint', 'ankle')}"
+                if joint_col in main_data.columns:
+                    ax.plot(time_data, main_data[joint_col], color='darkred', 
+                           label='Ankle Angle', linewidth=2.5)
+                    ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
     
             elif var == 'Raster_MN':
                 # Add different colors for each muscle in the raster plot
-                for idx, muscle_name in enumerate(muscles_names):
+                for idx, muscle_name in enumerate(MUSCLES_NAMES):  # Fixed: muscles_names -> MUSCLES_NAMES
                     if muscle_name in spikes:
                         color = muscle_colors[muscle_name]
                         
@@ -379,7 +386,7 @@ def EES_stim_analysis(
                                        '.', markersize=4, color=color)
                         
                         # Add a label for this muscle at its position
-                        ax.text(0.01+ idx*0.09, 1.05, muscle_name, 
+                        ax.text(0.01 + idx*0.09, 1.05, muscle_name, 
                                transform=ax.get_xaxis_transform(), color=color,
                                fontweight='bold', verticalalignment='center')
                 
@@ -388,7 +395,7 @@ def EES_stim_analysis(
                     
             else:
                 # Plot data for each muscle with consistent colors
-                for idx, muscle_name in enumerate(muscles_names):
+                for idx, muscle_name in enumerate(MUSCLES_NAMES):  # Fixed: muscles_names -> MUSCLES_NAMES
                     # Construct column name with muscle suffix
                     col_name = f"{var}_{muscle_name}"
                     
@@ -452,9 +459,13 @@ def EES_stim_analysis(
         figs[var].savefig(filepath, dpi=300, bbox_inches='tight')
         print(f"Saved plot: {filename}")
     
+    # Return activities if this was a coactivation analysis
+    if num_muscles == 2:
+        return activities
+    
     # Display all figures
     plt.show()
-    
+
     print(f"Simulation and plotting complete! All plots saved to '{save_dir}' directory.")
     
     # Co-activation analysis if we have 2 muscles 
