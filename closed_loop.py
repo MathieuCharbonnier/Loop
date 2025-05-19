@@ -126,7 +126,13 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
 
     print("Start Simulation:")
     if EES_PARAMS is not None:
-        print(f"EES frequency: {EES_PARAMS['freq']}")
+        freq= EES_PARAMS['freq']
+        if isinstance(freq, tuple):
+           print("Phase specific EES modulation")
+           print(f"frequency swing phase: freq[0]")
+           print(f"frequency stance phase: freq[1]")
+        else:
+            print(f"EES frequency: freq")       
         if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
             print(f"Number Ia fibers recruited by EES: {EES_PARAMS['afferent_recruited'][0]}")
             print(f"Number II fibers recruited by EES: {EES_PARAMS['afferent_recruited'][1]}")
