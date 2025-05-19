@@ -13,7 +13,7 @@ from neural_dynamics import run_one_muscle_neuron_simulation, run_flexor_extenso
 from activation import decode_spikes_to_activation
 
 
-def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,
+def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES, associated_joint, base_output_path, 
             EES_PARAMS=None, TORQUE=None, fast=True, seed=42):
     """
@@ -36,7 +36,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
         Time step size for simulation
     EES_PARAMS : dict
         Parameters for electrical epidural stimulation
-    NEURON_COUNTS : dict
+    NEURONS_POPULATION : dict
         Number of neurons for each type
     CONNECTIONS : dict
         Neural connection configuration
@@ -66,10 +66,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     # Validate muscle count
     if NUM_MUSCLES > 2:
         raise ValueError("This pipeline supports only 1 or 2 muscles!")
-    
-    try:
-      validate_parameters(
-            neuron_counts=NEURON_COUNTS,
+
+    validate_parameters(
+            neuron_counts=NEURONS_POPULATION,
             connections=CONNECTIONS,
             spindle_model=SPINDLE_MODEL,
             biophysical_params=BIOPHYSICAL_PARAMS,
@@ -77,8 +76,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             ees_params=EES_PARAMS,
             torque=TORQUE
         )
-    except ValueError as e:
-        print(e)
     # =============================================================================
     # Initialization
     # =============================================================================
@@ -106,7 +103,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             'c0': [0.0, 0.0],    # Initial calcium concentration state
             'P0': 0.0,           # Initial calcium-troponin binding state
             'a0': 0.0            # Initial activation state
-        } for _ in range(NEURON_COUNTS['MN'])]
+        } for _ in range(NEURONS_POPULATION['MN'])]
         for _ in range(NUM_MUSCLES)]
 
     # Containers for simulation data
@@ -117,7 +114,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
     spike_data = {
         muscle_name: {
             neuron_type: defaultdict(list)
-            for neuron_type in NEURON_COUNTS.keys()
+            for neuron_type in NEURONS_POPULATION.keys()
         }
         for muscle_name in MUSCLE_NAMES
     }
@@ -141,16 +138,27 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
         freq= EES_PARAMS['freq']
         if isinstance(freq, tuple):
            print("Phase specific EES modulation")
-           print(f"frequency swing phase: freq[0]")
-           print(f"frequency stance phase: freq[1]")
+           print(f"frequency swing phase: {freq[0]}")
+           print(f"frequency stance phase: {freq[1]}")
         else:
-            print(f"EES frequency: freq")       
-        if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
-            print(f"Number Ia fibers recruited by EES: {EES_PARAMS['afferent_recruited'][0]}")
-            print(f"Number II fibers recruited by EES: {EES_PARAMS['afferent_recruited'][1]}")
-        else:
-           print(f"Number Ia fibers recruited by EES: {EES_PARAMS['afferent_recruited']}")
-        print(f"Number Efferent fibers recruited by EES: {EES_PARAMS['MN_recruited']} ")
+            print(f"EES frequency: {freq}")
+        if NUM_MUSCLES==2:
+            B=EES_PARAMS['B']
+            w_flexor=(1+B)/2
+            w_extensor=(1-B)/2
+            print(f"Number FLEXOR Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][0]*w_flexor*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
+            print(f"Number FLEXOR II fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][1]*w_flexor*NEURONS_POPULATION['II'])}/{NEURONS_POPULATION['II']}")
+            print(f"Number FLEXOR MN fibers recruited by EES: {int(EES_PARAMS['MN_recruited']*w_flexor*NEURONS_POPULATION['MN'])}/{NEURONS_POPULATION['MN']}")
+            print(f"Number EXTENSOR Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][0]*w_extensor*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
+            print(f"Number EXTENSOR II fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][1]*w_extensor*NEURONS_POPULATION['II'])}/{NEURONS_POPULATION['II']}")
+            print(f"Number EXTENSOR MN fibers recruited by EES: {int(EES_PARAMS['MN_recruited']*w_extensor*NEURONS_POPULATION['MN'])}/{NEURONS_POPULATION['MN']}")
+        else:       
+            if "II" in NEURONS_POPULATION and "II" in SPINDLE_MODEL:
+                print(f"Number Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][0]*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
+                print(f"Number II fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][1]*NEURONS_POPULATION['II'])}/{NEURONS_POPULATION['II']}")
+            else:
+                print(f"Number Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited']*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
+            print(f"Number Efferent fibers recruited by EES: {int(EES_PARAMS['MN_recruited']*NEURONS_POPULATION['MN'])}/{NEURONS_POPULATION['MN']}")
 
     # Create a simulator instance based on execution environment
     on_colab=is_running_on_colab()
@@ -201,21 +209,24 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
             # Run neural simulation based on muscle count
             if NUM_MUSCLES == 1:
                 all_spikes, final_potentials, state_monitors = run_one_muscle_neuron_simulation(
-                    stretch, stretch_velocity, joint, joint_velocity, NEURON_COUNTS, CONNECTIONS, 
+                    stretch, stretch_velocity, joint, joint_velocity, NEURONS_POPULATION, CONNECTIONS, 
                     TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
                     initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
                 )
             else:  # NUM_MUSCLES == 2
                 # Adjust EES frequency based on muscle activation if phase-dependent
-                EES_PARAMS_copy=EES_PARAMS.copy()
-                if EES_PARAMS is not None and isinstance(EES_PARAMS['freq'], tuple): 
-                    if np.mean(activations[0]) >= np.mean(activations[1]):
-                        EES_PARAMS_copy['freq'] = EES_PARAMS['freq'][0]
-                    else:
-                        EES_PARAMS_copy['freq'] = EES_PARAMS['freq'][1]
+                EES_PARAMS_copy = None
+
+                if EES_PARAMS is not None:
+                    EES_PARAMS_copy = EES_PARAMS.copy()
+
+                    freq = EES_PARAMS.get("freq")
+                    if isinstance(freq, tuple) and len(freq) == 2:
+                        dominant = 0 if np.mean(activations[0]) >= np.mean(activations[1]) else 1
+                        EES_PARAMS_copy["freq"] = freq[dominant]
 
                 all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
-                    stretch, stretch_velocity, NEURON_COUNTS, CONNECTIONS, TIME_STEP, REACTION_TIME, 
+                    stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, TIME_STEP, REACTION_TIME, 
                     SPINDLE_MODEL, seed, initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS_copy
                 )
                 
@@ -317,7 +328,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECT
         df[f'Ia_rate_baseline_{muscle_name}'] = Ia_rate
 
         # Compute II firing rate if applicable
-        if "II" in NEURON_COUNTS and "II" in SPINDLE_MODEL:
+        if "II" in NEURONS_POPULATION and "II" in SPINDLE_MODEL:
             II_rate = eval(SPINDLE_MODEL['II'], 
                           {"__builtins__": {}}, 
                           {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
@@ -550,25 +561,28 @@ def validate_parameters(neuron_counts, connections, spindle_model, biophysical_p
     """
     issues = {"warnings": [], "errors": []}
     
-    # Check if neuron types in NEURON_COUNTS match with those in connections and spindle_model
+    # Check if neuron types in neuron popultion match with those in connections and spindle_model
     defined_neurons = set(neuron_counts.keys())
     
     # Check for II neurons and related conditions
     if "II" in defined_neurons:
         if "II" not in spindle_model:
-            issues["errors"].append("II neurons are defined in NEURON_COUNTS but no equation found in SPINDLE_MODEL")
+            issues["errors"].append("II neurons are defined in neuron population but no equation found in spindle model")
         
         if "exc" not in defined_neurons:
             issues["errors"].append("When II neurons are defined, exc neurons must also be defined")
     else:
         if "II" in spindle_model:
-            issues["warnings"].append("Equation for II defined in SPINDLE_MODEL but II neurons not defined in NEURON_COUNTS")
+            issues["warnings"].append("Equation for II defined in spindle model but II neurons not defined in the neurons population")
     
     # Check for inhibitory neurons and related parameters
     if "inh" not in defined_neurons:
         if "E_inh" in biophysical_params or "tau_i" in biophysical_params:
-            issues["errors"].append("Inhibitory neurons not defined but E_inh or tau_i parameters present in BIOPHYSICAL_PARAMS")
-    
+            issues["errors"].append("Inhibitory neurons not defined but E_inh or tau_i parameters present in biophysical parameters")
+    if "inh" in defined_neurons:
+        if not( "E_inh" in biophysical_params and "tau_i" in biophysical_params):
+            issues['errors'].append("you defined inhibitory neurons, but you forgot to specify one or both inhibitory synpase parameters (E_inh and tau_i)")
+
     # Check for all mandatory neuron types when multiple muscles are defined
     if len(muscle_names) == 2:
         required_neurons = {"Ia", "II", "inh", "exc", "MN"}
@@ -581,7 +595,7 @@ def validate_parameters(neuron_counts, connections, spindle_model, biophysical_p
         defined_equations = set(spindle_model.keys())
         missing_equations = required_equations - defined_equations
         if missing_equations:
-            issues["errors"].append(f"For two muscles, both Ia and II equations must be defined in SPINDLE_MODEL. Missing: {missing_equations}")
+            issues["errors"].append(f"For two muscles, both Ia and II equations must be defined in spindle model. Missing: {missing_equations}")
         
         # Check for proper connection naming with flexor/extensor suffix
         for connection_pair in connections:
@@ -598,13 +612,14 @@ def validate_parameters(neuron_counts, connections, spindle_model, biophysical_p
         base_post = post_neuron.split('_')[0] if '_' in post_neuron else post_neuron
         
         if base_pre not in defined_neurons:
-            issues["errors"].append(f"Neuron type '{base_pre}' used in connection {connection_pair} but not defined in NEURON_COUNTS")
+            issues["errors"].append(f"Neuron type '{base_pre}' used in connection {connection_pair} but not defined in the neurons population")
         if base_post not in defined_neurons:
-            issues["errors"].append(f"Neuron type '{base_post}' used in connection {connection_pair} but not defined in NEURON_COUNTS")
+            issues["errors"].append(f"Neuron type '{base_post}' used in connection {connection_pair} but not defined in the neurons population")
+    
     if ees_params is not None:
         # Check if freq has hertz unit
         if 'freq' in ees_params:
-            if not str(ees_params['freq']).endswith('hertz'):
+            if not str(ees_params['freq']).endswith('Hz'):
                 issues["errors"].append("The frequency of EES must have hertz as unit")
             
             # Check if freq is a tuple and if so, ensure we have exactly two muscles
@@ -674,7 +689,7 @@ def validate_parameters(neuron_counts, connections, spindle_model, biophysical_p
                 else:
                     # Check that t_stop has units
                     t_stop_str = str(torque['t_stop'])
-                    if not (t_stop_str.endswith('ms') or t_stop_str.endswith('second')):
+                    if not (t_stop_str.endswith('ms') or t_stop_str.endswith('s')):
                         issues["errors"].append("'t_stop' must have units (ms or second)")
                 
                 # Check for invalid parameters for this type
@@ -689,7 +704,7 @@ def validate_parameters(neuron_counts, connections, spindle_model, biophysical_p
                 else:
                     # Check that t_peak has units
                     t_peak_str = str(torque['t_peak'])
-                    if not (t_peak_str.endswith('ms') or t_peak_str.endswith('second')):
+                    if not (t_peak_str.endswith('ms') or t_peak_str.endswith('s')):
                         issues["errors"].append("'t_peak' must have units (ms or second)")
                         
                 if 'sigma' not in torque:
@@ -697,7 +712,7 @@ def validate_parameters(neuron_counts, connections, spindle_model, biophysical_p
                 else:
                     # Check that sigma has units
                     sigma_str = str(torque['sigma'])
-                    if not (sigma_str.endswith('ms') or sigma_str.endswith('second')):
+                    if not (sigma_str.endswith('ms') or sigma_str.endswith('s')):
                         issues["errors"].append("'sigma' must have units (ms or second)")
                 
                 # Check for invalid parameters for this type
