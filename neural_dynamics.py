@@ -75,15 +75,18 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     # Create all neuron populations based on neuron_pop dictionary
     monitors = []
 
+    #Extract EES parameters
     Ia_recruited=0
+    II_recruited=0
     freq=0
     if ees_params is not None:
         freq=ees_params['freq']
         afferent_recruited=ees_params['afferent_recruited']
         if isinstance(afferent_recruited, tuple):
-            Ia_recruited=afferent_recruited[0]
+            Ia_recruited=afferent_recruited[0]*neuron_pop['Ia']
+            II_recruited=afferent_recruited[1]*neuron_pop['II']
         else:
-            Ia_recruited=afferent_recruited                               
+            Ia_recruited=afferent_recruited*neuron_pop['Ia']                             
     # Create primary afferent neurons (always present)
     create_afferent_neurons(
         net, group_map, monitors, freq, Ia_recruited,
@@ -96,7 +99,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     if has_II_pathway:
         create_afferent_neurons(
-            net, group_map, monitors, freq, ees_params['afferent_recruited'][1],'II', neuron_pop, spindle_model,
+            net, group_map, monitors, freq, II_recruited,'II', neuron_pop, spindle_model,
              stretch_array, stretch_velocity_array, joint_array, joint_velocity_array,
              T_refr,final_potentials
         )
@@ -128,9 +131,9 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     # Handle EES stimulation if enabled for efferent neurons
     mon_ees_MN = None
-    if ees_params is not None and ees_params.get("freq",0)>0 and recruitment.get('MN_recruited', 0) > 0:
-        eff_recruited = recruitment.get('MN', 0)
-        ees_MN = PoissonGroup(N=eff_recruited, rates=ees_freq)
+    if ees_params is not None and freq>0 and ees_params.get('MN_recruited', 0) > 0:
+        eff_recruited = ees_params.get('MN_recruited')*neuron_pop['MN']
+        ees_MN = PoissonGroup(N=eff_recruited, rates=freq)
         mon_ees_MN = SpikeMonitor(ees_MN)
         net.add([ees_MN, mon_ees_MN])
         monitors.append(mon_ees_MN)
@@ -317,10 +320,8 @@ def process_results(group_map, monitors, neuron_pop, T_refr,
     # Process EES-stimulated motoneuron spikes if applicable
     if mon_ees_MN:
         ees_spikes = mon_ees_MN.spike_trains()
-        before_MN_spikes = result["MN"].copy()
         result["MN"] = process_motoneuron_spikes(
             neuron_pop, result["MN"], ees_spikes, T_refr)
-        result["MN0"] = before_MN_spikes
     
     return result
 
@@ -402,15 +403,15 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         B=ees_params['B']
         w_flexor=(1+B)/2
         w_extensor=(1-B)/2
-        Ia_recruited=ees_params['afferent_recruited'][0]
-        II_recruited=ees_params['afferent_recruited'][1]
-        MN_recruited=ees_params['MN_recruited']
-        Ia_flexor_recruited=Ia_recruited*w_flexor
-        II_flexor_recruited=II_recruited*w_flexor
-        MN_flexor_recruited=MN_recruited*w_flexor
-        Ia_extensor_recruited=Ia_recruited*w_flexor
-        II_extensor_recruited=II_recruited*w_extensor
-        MN_extensor_recruited=MN_recruited*w_extensor
+        Ia_recruited=ees_params['afferent_recruited'][0]*neuron_pop['Ia']
+        II_recruited=ees_params['afferent_recruited'][1]*neuron_pop['II']
+        MN_recruited=ees_params['MN_recruited']*neuron_pop['MN']
+        Ia_flexor_recruited=int(Ia_recruited*w_flexor)
+        II_flexor_recruited=int(II_recruited*w_flexor)
+        MN_flexor_recruited=int(MN_recruited*w_flexor)
+        Ia_extensor_recruited=int(Ia_recruited*w_flexor)
+        II_extensor_recruited=int(II_recruited*w_extensor)
+        MN_extensor_recruited=int(MN_recruited*w_extensor)
     else:
         ees_freq=0*hertz
         Ia_flexor_recruited=0
@@ -554,12 +555,10 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
 
     if ees_freq > 0 :
         ees_spikes = mon_ees_MN.spike_trains()
-        before_MN_flexor_spikes = MN_flexor_spikes.copy()
-        before_MN_extensor_spikes = MN_extensor_spikes.copy()
         MN_flexor_spikes = process_motoneuron_spikes(
             neuron_pop, MN_flexor_spikes, {i: ees_spikes[i] for i in range(MN_flexor_recruited)}, T_refr)
         MN_extensor_spikes = process_motoneuron_spikes(
-            neuron_pop, MN_extensor_spikes, {i%MN_extensor_recruited: ees_spikes[i+MN_extensor_recruited] for i in range(eff_recruited)}, T_refr)
+            neuron_pop, MN_extensor_spikes, {i%MN_extensor_recruited: ees_spikes[i+MN_extensor_recruited] for i in range(MN_extensor_recruited)}, T_refr)
     
     # Count spiking neurons
     recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
@@ -595,9 +594,6 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         "inh": {i%n_inh: mon_inh.spike_trains()[i] for i in range(n_inh, 2*n_inh)}
     }
 
-    if ees_freq > 0 and eff_recruited > 0:
-        result_flexor["MN0"] = before_MN_flexor_spikes
-        result_extensor["MN0"] = before_MN_extensor_spikes
 
     result_flexor["MN"] = MN_flexor_spikes
     result_extensor["MN"] = MN_extensor_spikes
