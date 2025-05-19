@@ -7,6 +7,7 @@ from closed_loop import closed_loop
 from itertools import product
 import pandas as pd
 from tqdm import tqdm
+from brian2 import *
 
 def EES_stim_analysis(
     param_dict,
@@ -430,10 +431,10 @@ def analyze_efferent_effects(efferent_range, ees_freq, aff_recruited, **kwargs):
 
 
 
-def clonus_analysis(closed_loop_func, neuron_counts, connections, spindle_model, 
+def clonus_analysis(neuron_counts, connections, spindle_model, 
                     biophysical_params, muscles_names, associated_joint, base_output_path,
-                    torque_profile, n_iterations=50, reaction_time=10e-3, time_step=0.1e-3,
-                    fast_type_default=True, seed=41):
+                    torque_profile, duration=1*second, reaction_time=10*ms, time_step=0.1*ms,
+                    fast_type_MU=True, seed=41):
     """
     Analyze clonus behavior by varying one parameter at a time and create visualization plots.
     
@@ -471,7 +472,7 @@ def clonus_analysis(closed_loop_func, neuron_counts, connections, spindle_model,
     # Parameter ranges to test
     delay_values = [10, 25, 50, 75, 100]*ms  # 10ms to 100ms
     fast_twitch_values = [False, True]  # False for slow, True for fast
-    threshold_values = [-45, -50, -55, -60]*mV  # -45mV to -60mV
+    threshold_values = [-45, -50, -55]*mV  # -45mV to -55mV
     
     # Create directory for saving figures
     fig_dir = os.path.join(os.path.dirname(base_output_path), 'figures')
@@ -479,27 +480,27 @@ def clonus_analysis(closed_loop_func, neuron_counts, connections, spindle_model,
     
     # 1. Vary delay
     fig1, axs1 = plt.subplots(len(delay_values), 2, figsize=(15, 4*len(delay_values)), sharex=True)
-    
     for i, delay in enumerate(tqdm(delay_values, desc="Varying delay")):
         # Set reaction time to the current delay value
         current_reaction_time = delay
-        
+        print("current_reaction_time ", current_reaction_time)
         # Run simulation with current parameters
-        spikes, time_series = closed_loop_func(
+        n_iterations=int(duration/current_reaction_time)+1
+        spikes, time_series = closed_loop(
             n_iterations, current_reaction_time, time_step, neuron_counts, connections,
             spindle_model, biophysical_params, muscles_names, associated_joint,
             f"{base_output_path}_delay_{int(delay*1000)}ms",
-            TORQUE=torque_profile, fast=fast_type_default, seed=seed
+            TORQUE=torque_profile, fast=fast_type_MU, seed=seed
         )
         
         # Plot joint angle
-        axs1[i, 0].plot(time_series['time'], time_series[associated_joint], 'b-')
+        axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
         axs1[i, 0].set_ylabel(f"Delay = {int(delay*1000)} ms\nJoint angle (deg)")
         
         # Plot muscle activations
         for muscle in muscles_names:
             activation_col = f"Activation_{muscle}"
-            axs1[i, 1].plot(time_series['time'], time_series[activation_col], 
+            axs1[i, 1].plot(time_series['Time'], time_series[activation_col], 
                           label=muscle)
         
         axs1[i, 1].set_ylabel("Muscle activation")
@@ -511,12 +512,14 @@ def clonus_analysis(closed_loop_func, neuron_counts, connections, spindle_model,
     fig1.tight_layout()
     fig1.savefig(os.path.join(fig_dir, 'delay_variation.png'), dpi=300)
     
+    n_iterations=int(duration/reaction_time)+1
     # 2. Vary fast twitch parameter
     fig2, axs2 = plt.subplots(len(fast_twitch_values), 2, figsize=(15, 4*len(fast_twitch_values)), sharex=True)
     
     for i, fast in enumerate(tqdm(fast_twitch_values, desc="Varying fast twitch parameter")):
+        
         # Run simulation with current parameters
-        spikes, time_series = closed_loop_func(
+        spikes, time_series = closed_loop(
             n_iterations, reaction_time, time_step, neuron_counts, connections,
             spindle_model, biophysical_params, muscles_names, associated_joint,
             f"{base_output_path}_fast_{fast}",
@@ -524,7 +527,7 @@ def clonus_analysis(closed_loop_func, neuron_counts, connections, spindle_model,
         )
         
         # Plot joint angle
-        axs2[i, 0].plot(time_series['time'], time_series[associated_joint], 'b-')
+        axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
         axs2[i, 0].set_ylabel(f"Fast = {fast}\nJoint angle (deg)")
         
         # Plot muscle activations
@@ -551,16 +554,16 @@ def clonus_analysis(closed_loop_func, neuron_counts, connections, spindle_model,
         current_biophysical_params['threshold_v'] = threshold
         
         # Run simulation with current parameters
-        spikes, time_series = closed_loop_func(
+        spikes, time_series = closed_loop(
             n_iterations, reaction_time, time_step, neuron_counts, connections,
             spindle_model, current_biophysical_params, muscles_names, associated_joint,
             f"{base_output_path}_threshold_{int(threshold*1000)}mV",
-            TORQUE=torque_profile, fast=fast_type_default, seed=seed
+            TORQUE=torque_profile, fast=fast_type_MU, seed=seed
         )
         
         
         # Plot joint angle
-        axs3[i, 0].plot(time_series['time'], time_series[associated_joint], 'b-')
+        axs3[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
         axs3[i, 0].set_ylabel(f"Threshold = {int(threshold*1000)} mV\nJoint angle (deg)")
         
         # Plot muscle activations
@@ -582,7 +585,6 @@ def clonus_analysis(closed_loop_func, neuron_counts, connections, spindle_model,
     # Close all figures to free memory
     plt.close('all')
     
-    return results
 
 
     
