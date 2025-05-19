@@ -74,13 +74,16 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     # Create all neuron populations based on neuron_pop dictionary
     monitors = []
-    
-    freq=ees_params['freq']
-    afferent_recruited=ees_params['afferent_recruited']
-    if isinstance(afferent_recruited, tuple):
-        Ia_recruited=afferent_recruited[0]
-    else:
-        Ia_recruited=afferent_recruited                               
+
+    Ia_recruited=0
+    freq=0
+    if ees_params is not None:
+        freq=ees_params['freq']
+        afferent_recruited=ees_params['afferent_recruited']
+        if isinstance(afferent_recruited, tuple):
+            Ia_recruited=afferent_recruited[0]
+        else:
+            Ia_recruited=afferent_recruited                               
     # Create primary afferent neurons (always present)
     create_afferent_neurons(
         net, group_map, monitors, freq, Ia_recruited,
