@@ -1,9 +1,14 @@
 from brian2 import *
+
+from brian2 import *
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 from closed_loop import closed_loop
+from analysis import delay_excitability_MU_type_analysis, EES_stim_analysis
+from controller import HierarchicalAnkleController
+from plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
 
 class BiologicalSystem:
     """
@@ -21,6 +26,8 @@ class BiologicalSystem:
         -----------
         reaction_time : brian2.units.fundamentalunits.Quantity
             Reaction time of the system (with time units)
+        ees_recruitment_params : dict
+            Dictionary containing EES recruitment parameters for different neuron types
         biophysical_params : dict
             Dictionary containing biophysical parameters for neurons
         muscles_names : list
@@ -29,6 +36,7 @@ class BiologicalSystem:
             Name of the joint associated with the system
         """
         self.reaction_time = reaction_time
+        self.ees_recruitment_params = ees_recruitment_params
         self.biophysical_params = biophysical_params
         self.muscles_names = muscles_names
         self.number_muscles = len(muscles_names)
@@ -38,6 +46,191 @@ class BiologicalSystem:
         self.neurons_population = {}
         self.connections = {}
         self.spindle_model = {}
+    
+    def validate_parameters(self):
+        """
+        Validates the configuration parameters for the neural model.
+        
+        Checks for consistency between neurons, connections, spindle models,
+        and biophysical parameters.
+        
+        Raises:
+            ValueError: If critical errors are found in the configuration
+        """
+        issues = {"warnings": [], "errors": []}
+        
+        # Check if neuron types in neuron population match with those in connections and spindle_model
+        defined_neurons = set(self.neurons_population.keys())
+        
+        # Validate muscle count
+        if self.number_muscles > 2:
+            issues["errors"].append("This pipeline supports only 1 or 2 muscles!")
+        
+        # If there are Ia or II neurons, check if their equations are properly defined
+        neuron_types = {n.split('_')[0] if '_' in n else n for n in defined_neurons}
+        
+        # Check for II neurons and related conditions
+        if "II" in neuron_types:
+            # Check if II equations are defined in spindle model
+            has_ii_equation = False
+            for key in self.spindle_model:
+                if key == "II" or key.startswith("II_"):
+                    has_ii_equation = True
+                    break
+                    
+            if not has_ii_equation:
+                issues["errors"].append("II neurons are defined in neuron population but no equation found in spindle model")
+                
+            if "exc" not in neuron_types:
+                issues["warnings"].append("When II neurons are defined, exc neurons are typically also defined")
+        else:
+            # Check if II equation is defined but II neurons are not
+            for key in self.spindle_model:
+                if key == "II" or key.startswith("II_"):
+                    issues["warnings"].append("Equation for II defined in spindle model but II neurons not defined in the neurons population")
+                    break
+        
+        # Check for inhibitory neurons and related parameters
+        if "inh" in neuron_types:
+            if "E_inh" not in self.biophysical_params or "tau_i" not in self.biophysical_params:
+                issues["errors"].append("You defined inhibitory neurons, but you forgot to specify one or both inhibitory synapse parameters (E_inh and tau_i)")
+        else:
+            if "E_inh" in self.biophysical_params or "tau_i" in self.biophysical_params:
+                issues["warnings"].append("Inhibitory neuron parameters (E_inh or tau_i) present but no inhibitory neurons defined")
+        
+        # Check for all mandatory neuron types when multiple muscles are defined
+        if self.number_muscles == 2:
+            required_types = {"Ia", "MN"}  # Minimum required types
+            recommended_types = {"Ia", "II", "inh", "exc", "MN"}  # Recommended for full reciprocal inhibition
+            
+            defined_types = neuron_types
+            missing_required = required_types - defined_types
+            
+            if missing_required:
+                issues["errors"].append(f"For two muscles, at minimum the neuron types {required_types} must be defined. Missing: {missing_required}")
+            
+            missing_recommended = recommended_types - defined_types
+            if missing_recommended:
+                issues["warnings"].append(f"For full reciprocal inhibition, all neuron types {recommended_types} are recommended. Missing: {missing_recommended}")
+                
+            # Check spindle model completeness for two muscles
+            if "Ia" in defined_types:
+                has_ia_equation = False
+                for key in self.spindle_model:
+                    if key == "Ia" or key.startswith("Ia_"):
+                        has_ia_equation = True
+                        break
+                
+                if not has_ia_equation:
+                    issues["errors"].append("Ia neurons defined but no Ia equation found in spindle model")
+        
+        # Check if all neurons used in connections are defined in neurons_population
+        for connection_pair in self.connections:
+            pre_neuron, post_neuron = connection_pair
+            
+            # For two muscles, check if connection neurons have proper muscle suffix
+            if self.number_muscles == 2:
+                if not any(muscle in pre_neuron for muscle in self.muscles_names) and '_' not in pre_neuron:
+                    issues["warnings"].append(f"With two muscles, pre-neuron '{pre_neuron}' in connection {connection_pair} should typically specify which muscle it belongs to")
+                
+                if not any(muscle in post_neuron for muscle in self.muscles_names) and '_' not in post_neuron:
+                    issues["warnings"].append(f"With two muscles, post-neuron '{post_neuron}' in connection {connection_pair} should typically specify which muscle it belongs to")
+            
+            # Check if neuron types exist in the population
+            pre_type = pre_neuron.split('_')[0] if '_' in pre_neuron else pre_neuron
+            post_type = post_neuron.split('_')[0] if '_' in post_neuron else post_neuron
+            
+            if pre_neuron not in self.neurons_population and pre_type not in self.neurons_population:
+                issues["errors"].append(f"Neuron '{pre_neuron}' used in connection {connection_pair} but not defined in the neurons population")
+            
+            if post_neuron not in self.neurons_population and post_type not in self.neurons_population:
+                issues["errors"].append(f"Neuron '{post_neuron}' used in connection {connection_pair} but not defined in the neurons population")
+
+        # Validate EES recruitment parameters
+        if self.ees_recruitment_params:
+            # Check if all required neuron types have recruitment parameters
+            for neuron_type in neuron_types:
+                if neuron_type in ["Ia", "II", "MN"] and neuron_type not in self.ees_recruitment_params:
+                    issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
+
+            
+            # Check each recruitment parameter set
+            for neuron_type, params in self.ees_recruitment_params.items():
+                required_params = ["threshold_10pct", "saturation_90pct"]
+                for param in required_params:
+                    if param not in params:
+                        issues["errors"].append(f"Missing '{param}' in EES recruitment parameters for '{neuron_type}'")
+                
+                # Check if threshold is less than saturation
+                if "threshold_10pct" in params and "saturation_90pct" in params:
+                    threshold = params['threshold_10pct']
+                    saturation = params['saturation_90pct']
+                    
+                    # Check values are between 0 and 1
+                    if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
+                        raise ValueError(
+                            f"Values for '{fiber}' must be between 0 and 1. Got: threshold={threshold}, saturation={saturation}"
+                        )
+                    if threshold >= saturation:
+                        issues["errors"].append(f"Threshold (10%) must be less than saturation (90%) for '{neuron_type}'")
+
+        # Define expected units for each parameter
+        expected_units = {
+            'T_refr': second,
+            'Eleaky': volt,
+            'gL': siemens,  
+            'Cm': farad,
+            'E_ex': volt,
+            'tau_e': second,
+            'threshold_v': volt
+        }
+        
+        # Check all expected parameters are defined
+        for param, expected_unit in expected_units.items():
+            if param not in self.biophysical_params:
+                issues["errors"].append(f"Missing mandatory biophysical parameter: '{param}'")
+                continue
+        
+            value = self.biophysical_params[param]
+            if not hasattr(value, 'unit'):
+                issues["errors"].append(f"Parameter '{param}' does not have units defined. Got: {value}")
+                continue
+        
+            # Check unit compatibility
+            if not value.unit.is_compatible_with(expected_unit):
+                issues["errors"].append(
+                    f"Parameter '{param}' has incorrect unit. "
+                    f"Expected unit compatible with {expected_unit}, but got {value.unit}"
+                )
+        
+        # Check optional parameters if they exist
+        if 'tau_i' in self.biophysical_params:
+            value = self.biophysical_params['tau_i']
+            if not hasattr(value, 'unit') or not value.unit.is_compatible_with(second):
+                issues["errors"].append(
+                    f"Parameter 'tau_i' has incorrect unit. "
+                    f"Expected unit compatible with second, but got {value.unit if hasattr(value, 'unit') else 'no unit'}"
+                )
+        
+        if 'E_inh' in self.biophysical_params:
+            value = self.biophysical_params['E_inh']
+            if not hasattr(value, 'unit') or not value.unit.is_compatible_with(volt):
+                issues["errors"].append(
+                    f"Parameter 'E_inh' has incorrect unit. "
+                    f"Expected unit compatible with volt, but got {value.unit if hasattr(value, 'unit') else 'no unit'}"
+                )
+
+        # Raise error if there are critical issues
+        if issues["errors"]:
+            error_messages = "\n".join(issues["errors"])
+            raise ValueError(f"Configuration errors found:\n{error_messages}")
+        
+        # Print warnings if any
+        if issues["warnings"]:
+            warning_messages = "\n".join(issues["warnings"])
+            print(f"WARNING: Configuration issues detected:\n{warning_messages}")
+            
+        return True  # Return True if validation passes
     
     def simulations(self, base_output_path, n_iterations, time_step=0.1*ms, ees_params=None,
                    torque=None, fast_type_mu=True, seed=42):
@@ -73,7 +266,7 @@ class BiologicalSystem:
         )
         
         # Generate standard plots
-        plot_recruitment_curves(self.ees_recruitment_params, balance=0, num_muscles=2)
+        plot_recruitment_curves(self.ees_recruitment_params, balance=0.5, num_muscles=self.number_muscles)
         plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path)
         plot_neural_dynamic(time_series, self.muscles_names, base_output_path)
         plot_raster(spikes, base_output_path)
@@ -178,8 +371,10 @@ class BiologicalSystem:
                                self.biophysical_params, self.muscles_names, time_step, seed)
 
       
-    def clonus_analysis(self, base_output_path, delay_values=[10, 25, 50, 75, 100]*ms,threshold_values = [-45, -50, -55]*mV,  duration=1*second, time_step=0.1*ms,
-                      fast_type_mu=True, torque_profile=None,ees_stimulations_params=None, Eseed=41):
+    def clonus_analysis(self, base_output_path, delay_values=[10, 25, 50, 75, 100]*ms, 
+                        threshold_values=[-45, -50, -55]*mV, duration=1*second, 
+                        time_step=0.1*ms, fast_type_mu=True, torque_profile=None, 
+                        ees_stimulations_params=None, seed=41):
         """
         Analyze clonus behavior by varying one parameter at a time.
         
@@ -187,20 +382,82 @@ class BiologicalSystem:
         -----------
         base_output_path : str
             Base path for saving output files
-        torque_profile : dict
-            Dictionary with torque profile parameters
+        delay_values : list
+            List of delay values to test
+        threshold_values : list
+            List of threshold values to test
         duration : brian2.units.fundamentalunits.Quantity
             Duration of each simulation
         time_step : brian2.units.fundamentalunits.Quantity
             Time step for simulations
         fast_type_mu : bool
-            Default value for fast twitch parameter
+            If True, use fast twitch motor units
+        torque_profile : dict
+            Dictionary with torque profile parameters
+        ees_stimulations_params : dict
+            Parameters for EES stimulation
         seed : int
             Random seed for reproducibility
+            
+        Returns:
+        --------
+        dict
+            Analysis results
         """
-        return delay_excitability_MU_type_analysis( duration, self.reaction_time, 
-                               self.neurons_population, self.connections, self.spindle_model, 
-                               self.biophysical_params, self.muscles_names,torque_profile, ees_stimulations_params, time_step, seed)
+        return delay_excitability_MU_type_analysis(
+            duration, self.reaction_time, self.neurons_population, self.connections, 
+            self.spindle_model, self.biophysical_params, self.muscles_names,
+            torque_profile, ees_stimulations_params, time_step, seed)
+
+    def find_ees_protocol(self, target_amplitude=15, target_period=2*second, 
+                        update_interval=200*ms, prediction_horizon=1000*ms, 
+                        simulation_time=10*second):
+        """
+        Find an optimal EES protocol for a given target movement.
+        
+        Parameters:
+        -----------
+        target_amplitude : float
+            Target amplitude of joint movement
+        target_period : brian2.units.fundamentalunits.Quantity
+            Target period of oscillation
+        update_interval : brian2.units.fundamentalunits.Quantity
+            Update interval for controller
+        prediction_horizon : brian2.units.fundamentalunits.Quantity
+            Prediction horizon for controller
+        simulation_time : brian2.units.fundamentalunits.Quantity
+            Total simulation time
+            
+        Returns:
+        --------
+        dict
+            Optimal EES protocol parameters
+        """
+        # Initial state
+        initial_state = {
+            'joint_angle': 0.0,
+            'joint_velocity': 0.0,
+            'flexor_activation': 0.0,
+            'extensor_activation': 0.0
+        }
+        
+        # Create controller
+        controller = HierarchicalAnkleController(
+            target_amplitude=target_amplitude,
+            target_period=target_period, 
+            update_interval=update_interval,   
+            prediction_horizon=prediction_horizon  
+        )
+        
+        # Initialize and run simulation
+        controller.initialize_simulation(initial_state)
+        controller.run_simulation(simulation_time)
+        
+        # Plot results
+        controller.plot_results()
+        
+        return controller.get_optimal_protocol()
+
         
 class MonosynapticReflex(BiologicalSystem):
     """
@@ -212,7 +469,7 @@ class MonosynapticReflex(BiologicalSystem):
     
     def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_params):
+                custom_spindle=None, custom_ees_recruitment_params=None):
         """
         Initialize a monosynaptic reflex system with default or custom parameters.
         
@@ -232,6 +489,8 @@ class MonosynapticReflex(BiologicalSystem):
             Custom neural connections (if None, use defaults)
         custom_spindle : dict, optional
             Custom spindle model equations (if None, use defaults)
+        custom_ees_recruitment_params : dict, optional
+            Custom EES recruitment parameters (if None, use defaults)
         """
         # Set default parameters if not provided
         if muscles_names is None:
@@ -247,23 +506,23 @@ class MonosynapticReflex(BiologicalSystem):
                 'tau_e': 0.5*ms,
                 'threshold_v': -50*mV
             }
+            
         if custom_ees_recruitment_params is None:
-              ees_recruitment_params = 
-              {
-                  'Ia': {
-                      'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                      'saturation_90pct': 0.7  # Normalized current for 90% recruitment
-                  },
-                  'II': {
-                      'threshold_10pct': 0.4,  # Type II fibers have higher threshold
-                      'saturation_90pct': 0.8  # and higher saturation point
-                  },
-                  'MN':{
-                      'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
-                      'saturation_90pct': 0.9  
-              }
+            ees_recruitment_params = {
+                'Ia': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                },
+                'MN': {
+                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
+                    'saturation_90pct': 0.9  
+                }
+            }
+        else:
+            ees_recruitment_params = custom_ees_recruitment_params
+            
         # Initialize the base class
-        super().__init__(reaction_time,custom_ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
         
         # Set default neuron populations
         self.neurons_population = {
@@ -292,6 +551,9 @@ class MonosynapticReflex(BiologicalSystem):
         # Override with custom spindle model if provided
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
+            
+        # Validate parameters
+        self.validate_parameters()
 
 
 class TrisynapticSystem(BiologicalSystem):
@@ -324,6 +586,8 @@ class TrisynapticSystem(BiologicalSystem):
             Custom neural connections (if None, use defaults)
         custom_spindle : dict, optional
             Custom spindle model equations (if None, use defaults)
+        custom_ees_recruitment_params : dict, optional
+            Custom EES recruitment parameters (if None, use defaults)
         """
         # Set default parameters if not provided
         if muscles_names is None:
@@ -339,21 +603,25 @@ class TrisynapticSystem(BiologicalSystem):
                 'tau_e': 0.5*ms,
                 'threshold_v': -50*mV
             }
+            
         if custom_ees_recruitment_params is None:
-              ees_recruitment_params = 
-              {
-                  'Ia': {
-                      'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                      'saturation_90pct': 0.7  # Normalized current for 90% recruitment
-                  },
-                  'II': {
-                      'threshold_10pct': 0.4,  # Type II fibers have higher threshold
-                      'saturation_90pct': 0.8  # and higher saturation point
-                  },
-                  'MN':{
-                      'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
-                      'saturation_90pct': 0.9  
-              }  
+            ees_recruitment_params = {
+                'Ia': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                },
+                'II': {
+                    'threshold_10pct': 0.4,  # Type II fibers have higher threshold
+                    'saturation_90pct': 0.8  # and higher saturation point
+                },
+                'MN': {
+                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
+                    'saturation_90pct': 0.9  
+                }
+            }
+        else:
+            ees_recruitment_params = custom_ees_recruitment_params
+            
         # Initialize the base class
         super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
         
@@ -389,6 +657,9 @@ class TrisynapticSystem(BiologicalSystem):
         # Override with custom spindle model if provided
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
+            
+        # Validate parameters
+        self.validate_parameters()
 
 
 class ReciprocalInhibition(BiologicalSystem):
@@ -421,6 +692,8 @@ class ReciprocalInhibition(BiologicalSystem):
             Custom neural connections (if None, use defaults)
         custom_spindle : dict, optional
             Custom spindle model equations (if None, use defaults)
+        custom_ees_recruitment_params : dict, optional
+            Custom EES recruitment parameters (if None, use defaults)
         """
         # Set default parameters if not provided
         if muscles_names is None:
@@ -440,12 +713,12 @@ class ReciprocalInhibition(BiologicalSystem):
                 'tau_i': 5*ms,
                 'threshold_v': -50*mV
             }
+            
         if custom_ees_recruitment_params is None:
-              ees_recruitment_params = 
-              {
-                  'Ia': {
-                      'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                      'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+            ees_recruitment_params = {
+                'Ia': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
                   },
                   'II': {
                       'threshold_10pct': 0.4,  # Type II fibers have higher threshold
@@ -454,31 +727,29 @@ class ReciprocalInhibition(BiologicalSystem):
                   'MN':{
                       'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
                       'saturation_90pct': 0.9  
-              }    
+              }  
+       
         # Initialize the base class
         super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
         
-        # Get muscle names for clarity in connection definitions
-        flexor_muscle = muscles_names[0]  # First muscle is flexor (e.g., tib_ant_r)
-        extensor_muscle = muscles_names[1]  # Second muscle is extensor (e.g., med_gas_r)
         
         # Setup specialized neuron populations for reciprocal inhibition
         self.neurons_population = {
             # Afferents for each muscle
-            f"Ia_{flexor_muscle}": 60,
-            f"II_{flexor_muscle}": 60,
-            f"Ia_{extensor_muscle}": 60,
-            f"II_{extensor_muscle}": 60,
+            f"Ia_flexor": 60,
+            f"II_flexor": 60,
+            f"Ia_extensor": 60,
+            f"II_extensor": 60,
             
             # Interneurons
-            f"exc_{flexor_muscle}": 196,
-            f"exc_{extensor_muscle}": 196,
-            f"inh_{flexor_muscle}": 196,
-            f"inh_{extensor_muscle}": 196,
+            f"exc_flexor": 196,
+            f"exc_extensor": 196,
+            f"inh_flexor": 196,
+            f"inh_extensor": 196,
             
             # Motor neurons
-            f"MN_{flexor_muscle}": 169,
-            f"MN_{extensor_muscle}": 169
+            f"MN_flexor": 169,
+            f"MN_extensor": 169
         }
         
         # Override with custom values if provided
@@ -488,32 +759,32 @@ class ReciprocalInhibition(BiologicalSystem):
         # Set default connections with reciprocal inhibition pattern
         self.connections = {
             # Direct pathways
-            (f"Ia_{flexor_muscle}", f"MN_{flexor_muscle}"): {"w": 2*2.1*nS, "p": 0.9},
-            (f"Ia_{extensor_muscle}", f"MN_{extensor_muscle}"): {"w": 2*2.1*nS, "p": 0.9},
+            (f"Ia_flexor", f"MN_flexor"): {"w": 2*2.1*nS, "p": 0.9},
+            (f"Ia_extensor", f"MN_extensor"): {"w": 2*2.1*nS, "p": 0.9},
             
             # Ia inhibition pathways
-            (f"Ia_{flexor_muscle}", f"inh_{flexor_muscle}"): {"w": 2*3.64*nS, "p": 0.9},
-            (f"Ia_{extensor_muscle}", f"inh_{extensor_muscle}"): {"w": 2*3.64*nS, "p": 0.9},
+            (f"Ia_flexor", f"inh_flexor"): {"w": 2*3.64*nS, "p": 0.9},
+            (f"Ia_extensor", f"inh_extensor"): {"w": 2*3.64*nS, "p": 0.9},
             
             # Type II excitation pathways
-            (f"II_{flexor_muscle}", f"exc_{flexor_muscle}"): {"w": 2*1.65*nS, "p": 0.9},
-            (f"II_{extensor_muscle}", f"exc_{extensor_muscle}"): {"w": 2*1.65*nS, "p": 0.9},
+            (f"II_flexor", f"exc_flexor"): {"w": 2*1.65*nS, "p": 0.9},
+            (f"II_extensor", f"exc_extensor"): {"w": 2*1.65*nS, "p": 0.9},
             
             # Type II inhibition pathways
-            (f"II_{flexor_muscle}", f"inh_{flexor_muscle}"): {"w": 2*2.19*nS, "p": 0.9},
-            (f"II_{extensor_muscle}", f"inh_{extensor_muscle}"): {"w": 2*2.19*nS, "p": 0.9},
+            (f"II_flexor", f"inh_flexor"): {"w": 2*2.19*nS, "p": 0.9},
+            (f"II_extensor", f"inh_extensor"): {"w": 2*2.19*nS, "p": 0.9},
             
             # Excitatory interneuron to motoneuron pathways
-            (f"exc_{flexor_muscle}", f"MN_{flexor_muscle}"): {"w": 2*0.7*nS, "p": 0.6},
-            (f"exc_{extensor_muscle}", f"MN_{extensor_muscle}"): {"w": 2*0.7*nS, "p": 0.6},
+            (f"exc_flexor", f"MN_flexor"): {"w": 2*0.7*nS, "p": 0.6},
+            (f"exc_extensor", f"MN_extensor"): {"w": 2*0.7*nS, "p": 0.6},
             
             # Reciprocal inhibition pathways
-            (f"inh_{flexor_muscle}", f"MN_{extensor_muscle}"): {"w": 2*0.2*nS, "p": 0.8},
-            (f"inh_{extensor_muscle}", f"MN_{flexor_muscle}"): {"w": 2*0.2*nS, "p": 0.8},
+            (f"inh_flexor", f"MN_extensor"): {"w": 2*0.2*nS, "p": 0.8},
+            (f"inh_extensor", f"MN_flexor"): {"w": 2*0.2*nS, "p": 0.8},
             
             # Inhibitory interneuron interactions
-            (f"inh_{flexor_muscle}", f"inh_{extensor_muscle}"): {"w": 2*0.76*nS, "p": 0.3},
-            (f"inh_{extensor_muscle}", f"inh_{flexor_muscle}"): {"w": 2*0.76*nS, "p": 0.3}
+            (f"inh_flexor", f"inh_extensor"): {"w": 2*0.76*nS, "p": 0.3},
+            (f"inh_extensor", f"inh_flexor"): {"w": 2*0.76*nS, "p": 0.3}
         }
         
         # Override with custom connections if provided
@@ -522,9 +793,8 @@ class ReciprocalInhibition(BiologicalSystem):
             
         # Set default spindle model - need to handle specific muscle names
         self.spindle_model = {}
-        for muscle in muscles_names:
-            self.spindle_model[f"Ia_{muscle}"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
-            self.spindle_model[f"II_{muscle}"] = "20 + 13.5*stretch"
+        self.spindle_model[f"Ia"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+        self.spindle_model[f"II"] = "20 + 13.5*stretch"
         
         # Override with custom spindle model if provided
         if custom_spindle is not None:
@@ -553,7 +823,7 @@ class ReciprocalInhibition(BiologicalSystem):
             Analysis results
         """
         vary_param = {
-            'param_name': 'B',
+            'param_name': 'balance',
             'values': b_range,
             'label': 'Afferent Fiber Unbalanced Recruitment'
         }
@@ -561,3 +831,4 @@ class ReciprocalInhibition(BiologicalSystem):
         return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
                                self.neurons_population, self.connections, self.spindle_model, 
                                self.biophysical_params, self.muscles_names, time_step, seed)
+                    
