@@ -16,7 +16,7 @@ from input_generator import transform_torque_params_in_array, transform_intensit
 
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CONNECTIONS,
            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES,NUM_MUSCLES, associated_joint, base_output_path, 
-            EES_RECRUITMENT_PARAMS,EES_STIMULATION_PARAMS=None, TORQUE=None, fast=True, seed=42):
+            EES_RECRUITMENT_PROFILE,EES_STIMULATION_PARAMS=None, TORQUE=None, fast=True, seed=42):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -35,7 +35,9 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
         Duration of each simulation iteration
     TIME_STEP : brian2.unit.second
         Time step size for simulation
-    EES_PARAMS : dict
+    EES_RECRUITMENT_PROFILE : dict
+        Parameters to define recruitment curve
+    EES_STIMULATION_PROFILE : dict
         Parameters for electrical epidural stimulation
     NEURONS_POPULATION : dict
         Number of neurons for each type
@@ -113,7 +115,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
     EES_PARAMS=None
     if EES_STIMULATION_PARAMS is not None:
         EES_PARAMS=transform_intensity_balance_in_recruitment(
-          EES_RECRUITMENT_PARAMS, EES_STIMULATION_PARAMS, NEURONS_POPULATION, NUM_MUSCLES)
+          EES_RECRUITMENT_PROFILE, EES_STIMULATION_PARAMS, NEURONS_POPULATION, NUM_MUSCLES)
 
     # =============================================================================
     # Main Simulation Loop
