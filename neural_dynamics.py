@@ -78,16 +78,16 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     #Extract EES parameters
     Ia_recruited=0
     II_recruited=0
-    freq=0
+    ees_freq=0
     if ees_params is not None:
         freq=ees_params['freq']
-        Ia_recruited=ees_params['Ia']
+        Ia_recruited=ees_params['recruitment']['Ia']
         if 'II' in ees_params:
-            II_recruited=ees_params['II']
+            II_recruited=ees_params['recruitment']['II']
                             
-    # Create primary afferent neurons (always present)
+
     create_afferent_neurons(
-        net, group_map, monitors, freq, Ia_recruited,
+        net, group_map, monitors, ees_freq, Ia_recruited,
         'Ia', neuron_pop, spindle_model, stretch_array, stretch_velocity_array, joint_array, joint_velocity_array, 
         T_refr,final_potentials
     )
@@ -97,7 +97,7 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     if has_II_pathway:
         create_afferent_neurons(
-            net, group_map, monitors, freq, II_recruited,'II', neuron_pop, spindle_model,
+            net, group_map, monitors, ees_freq, II_recruited,'II', neuron_pop, spindle_model,
              stretch_array, stretch_velocity_array, joint_array, joint_velocity_array,
              T_refr,final_potentials
         )
@@ -129,8 +129,8 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     # Handle EES stimulation if enabled for efferent neurons
     mon_ees_MN = None
-    if ees_params is not None and freq>0 and ees_params.get('MN', 0) > 0:
-        eff_recruited = ees_params.get('MN')*neuron_pop['MN']
+    if ees_params is not None and freq>0 and ees_params['recruitment'].get('MN', 0) > 0:
+        eff_recruited = ees_params['recruitment'].get('MN')
         ees_MN = PoissonGroup(N=eff_recruited, rates=freq)
         mon_ees_MN = SpikeMonitor(ees_MN)
         net.add([ees_MN, mon_ees_MN])
@@ -178,7 +178,7 @@ def create_afferent_neurons(net, group_map, monitors, ees_freq, recruited,
     if ees_freq>0 and recruited>0:
 
         afferent_eq = equation_baseline+ f'''
-        is_ees = (i < recruited): boolean
+        is_ees = (i < {recruited}): boolean
         rate = ({equation})*hertz + ees_freq * int(is_ees): Hz
         '''
 
@@ -290,8 +290,9 @@ def create_synaptic_connections(net, connections, group_map):
                       method='exact')
         
         syn.connect(p=p)
-        syn.w = np.clip(weight + 0.2 * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        
+        noise=0.2
+        syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
+        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms) 
         net.add(syn)
         synapses[key] = syn
     
