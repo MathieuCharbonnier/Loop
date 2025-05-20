@@ -1,17 +1,30 @@
-def clonus_analysis( NEURONS_POPULATION, CONNECTIONS,SPINDLE_MODEL,BIOPHYSICAL_PARAMS, MUSCLES_NAMES, associated_joint, base_output_path, torque_profile, duration=1*second, time_step=0.1*ms,
-                    fast_type_MU=True, seed=41):
+def delay_excitability_MU_type_analysis( DURATION, REACTION_TIME, NEURONS_POPULATION, CONNECTIONS,SPINDLE_MODEL,BIOPHYSICAL_PARAMS, MUSCLES_NAMES,
+                                        associated_joint, torque_profile, ees_stimulation_params,fast_type_MU, base_output_path, seed=41):
+                
         """
         Analyze clonus behavior by varying one parameter at a time and create visualization plots.
         
         Parameters:
         -----------
+        duration: brian2.unit
+            duration of the simulation 
+        reaction_time: brian2.unit
+            feedback time
+        neurons_population: dict
+            neurons count for each fiber type
+        connections: dict
+            connections between neurons
+        spindle model: dict
+            equations to transform stretch or joint angle into afferent firing rate
+        biophysical params
+            parameters for neural dynamics simulations
+        associated_joint
             Name of the joint to analyze
         base_output_path : str
             Base path for saving output files
         torque_profile : dict
             Dictionary with torque profile parameters
-        duration : int
-            Duration of each simulation
+
         time_step : float
             Time step in seconds
         fast_type_default : bool
