@@ -200,7 +200,7 @@ class BiologicalSystem:
                     f"Expected unit compatible with {expected_unit}, but got {value.unit}"
                 )
         
-        # Check optional parameters if they exist
+        # Check inhibitory parameters 
         if 'tau_i' in self.biophysical_params:
             value = self.biophysical_params['tau_i']
             if not hasattr(value, 'unit') or not value.unit.is_compatible_with(second):
@@ -230,7 +230,7 @@ class BiologicalSystem:
         return True  # Return True if validation passes
     
     def run_simulation(self, base_output_path, n_iterations, time_step=0.1*ms, ees_stimulation_params=None,
-                   torque=None, fast_type_mu=True, seed=42):
+                   torque=None, fast_type_mu=True, seed=42, save=True):
         """
         Run simulations and generate plots.
         
@@ -263,11 +263,13 @@ class BiologicalSystem:
         )
         
         # Generate standard plots
-        plot_recruitment_curves(self.ees_recruitment_params, balance=0.5, num_muscles=self.number_muscles)
-        plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path)
-        plot_neural_dynamic(time_series, self.muscles_names, base_output_path)
-        plot_raster(spikes, base_output_path)
-        plot_activation(time_series, self.muscles_names, base_output_path)
+        if ees_params is not None:
+            plot_recruitment_curves(self.ees_recruitment_params, current_current=ees_params.get('intensity'), balance=ees_params.get('balance'), num_muscles=self.number_muscles, save=save)
+            
+        plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path, save=save)
+        plot_neural_dynamic(time_series, self.muscles_names, base_output_path, save=save)
+        plot_raster(spikes, base_output_path,save=save)
+        plot_activation(time_series, self.muscles_names, base_output_path, save=save)
         
         return spikes, time_series
 
@@ -466,7 +468,7 @@ class Monosynaptic(BiologicalSystem):
     
     def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_params=None):
+                custom_spindle=None, custom_ees_recruitment_profile=None):
         """
         Initialize a monosynaptic reflex system with default or custom parameters.
         
@@ -505,7 +507,7 @@ class Monosynaptic(BiologicalSystem):
             }
             
         if custom_ees_recruitment_params is None:
-            ees_recruitment_params = {
+            ees_recruitment_profile = {
                 'Ia': {
                     'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
                     'saturation_90pct': 0.7  # Normalized current for 90% recruitment
@@ -516,10 +518,10 @@ class Monosynaptic(BiologicalSystem):
                 }
             }
         else:
-            ees_recruitment_params = custom_ees_recruitment_params
+            ees_recruitment_profile = custom_ees_recruitment_profile
             
         # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
         
         # Set default neuron populations
         self.neurons_population = {
@@ -563,7 +565,7 @@ class Trisynaptic(BiologicalSystem):
     
     def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_params=None):
+                custom_spindle=None, custom_ees_recruitment_profile=None):
         """
         Initialize a trisynaptic reflex system with default or custom parameters.
         
@@ -601,8 +603,8 @@ class Trisynaptic(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if custom_ees_recruitment_params is None:
-            ees_recruitment_params = {
+        if custom_ees_recruitment_profile is None:
+            ees_recruitment_profile = {
                 'Ia': {
                     'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
                     'saturation_90pct': 0.7  # Normalized current for 90% recruitment
@@ -617,7 +619,7 @@ class Trisynaptic(BiologicalSystem):
                 }
             }
         else:
-            ees_recruitment_params = custom_ees_recruitment_params
+            ees_recruitment_params = custom_ees_recruitment_profile
             
         # Initialize the base class
         super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
@@ -669,7 +671,7 @@ class ReciprocalInhibition(BiologicalSystem):
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_params=None):
+                custom_spindle=None, custom_ees_recruitment_profile=None):
         """
         Initialize a reciprocal inhibition system with default or custom parameters.
         
@@ -711,8 +713,8 @@ class ReciprocalInhibition(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if custom_ees_recruitment_params is None:
-            ees_recruitment_params = {
+        if custom_ees_recruitment_profile is None:
+            ees_recruitment_profile = {
                 'Ia': {
                     'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
                     'saturation_90pct': 0.7  # Normalized current for 90% recruitment
@@ -727,7 +729,7 @@ class ReciprocalInhibition(BiologicalSystem):
               }  
             }
         # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
         
         
         # Setup specialized neuron populations for reciprocal inhibition
