@@ -1,8 +1,19 @@
 
-
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from brian2 import*
 
+def transform_torque_params_in_array(time_points,TORQUE):
+    validate_torque(TORQUE)
+    if TORQUE['type']=="bump":
+        torque=bump(time_points*second,TORQUE['t_peak'], TORQUE['sigma'], 
+        TORQUE['max_amplitude'], TORQUE['sustained_amplitude'])
+    elif TORQUE['type']=="ramp":
+        torque=ramp(time_points*second, TORQUE['t_stop'], TORQUE['max_amplitude'], TORQUE['sustained_amplitude'])
+    else:
+        raise ValueError(f"{TORQUE['type']} is not implemented yet, existing type are bump or ramp")
+    return torque
 
 def ramp (time_array,t_stop, max_amplitude, sustained_amplitude=0):
 
@@ -34,9 +45,7 @@ def bump(time_array, t_peak, sigma, max_amplitude, sustained_amplitude=0):
     torque = np.copy(gaussian)
     torque[i_hold_start:] = sustained_amplitude
     return torque
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+
 
 def sigmoid_recruitment(current_amplitude, threshold_10pct, saturation_90pct):
     """
@@ -64,7 +73,7 @@ def sigmoid_recruitment(current_amplitude, threshold_10pct, saturation_90pct):
     
     return fraction
   
-def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimulation_params, neurons_population, balance=0, num_muscles=2):
+def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimulation_params, neurons_population, num_muscles=2):
     """
     Transform intensity and balance parameters into recruitment counts
     
@@ -78,11 +87,13 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimu
     Returns:
     - Dictionary with recruitment counts and frequency
     """
+    validate_ees(ees_params,ees_recruitment_params, num_muscles, neurons_population)
+    
     # Get fractions first
     fractions = calculate_full_recruitment(
         ees_stimulation_params['intensity'], 
         ees_recruitment_params,
-        balance, 
+        ees_stimulation_params['balance'], 
         num_muscles
     )
     
@@ -147,73 +158,130 @@ def calculate_full_recruitment(normalized_current, ees_recruitment_params, balan
     
     return fractions
 
-def plot_recruitment_curves(ees_recruitment_params, balance=0, num_muscles=2):
-    """
-    Plot recruitment curves for all fiber types using the threshold-based sigmoid.
-    Only shows fractions of population, not absolute counts.
-    
-    Parameters:
-    - ees_recruitment_params: Dictionary with threshold and saturation values
-    - balance: float (-1 to 1), electrode position bias
-    - num_muscles: Number of muscles (2 for flexor/extensor or 1 for single muscle)
-    """
-    currents = np.linspace(0, 1, 100)
-    
-    # Calculate recruitment fractions at each intensity
-    fraction_results = []
-    
-    for current in currents:
-        # Get fractions directly
-        fractions = calculate_full_recruitment(
-            current, 
-            ees_recruitment_params, 
-            balance, 
-            num_muscles
-        )
-        fraction_results.append(fractions)
-      
-    # Convert results to DataFrame for easier plotting
-    df = pd.DataFrame(fraction_results)
-    
-    # Plot
-    plt.figure(figsize=(10, 6))
-    
-    # Define colors and styles for different fiber types
-    style_map = {
-        'Ia_flexor': 'r-', 'II_flexor': 'r--', 'MN_flexor': 'r-.',
-        'Ia_extensor': 'b-', 'II_extensor': 'b--', 'MN_extensor': 'b-.'
-    }
-    
-    # For non-muscle-specific case
-    single_style_map = {'Ia': 'g-', 'II': 'g--', 'MN': 'g-.'}
-    
-    for col in df.columns:
-        # Choose appropriate style
-        if col in style_map:
-            line_style = style_map[col]
-        elif col in single_style_map:
-            line_style = single_style_map[col]
-        else:
-            # Default styling
-            if "extensor" in col:
-                line_style = 'b-'  # Blue for extensors
+def validate_torque(torque)
+    issues = {"warnings": [], "errors": []}
+    if torque is not None:
+            # Check if torque_profile has a type field
+            if 'type' not in torque:
+                issues["errors"].append("Torque must contain a 'type' parameter")
             else:
-                line_style = 'r-'  # Red for flexors
+                profile_type = torque['type']
+                
+                # Common parameters for all types
+                if 'max_amplitude' not in torque:
+                    issues["errors"].append("Torque must contain 'max_amplitude' parameter")
+                
+                if 'sustained_amplitude' not in torque:
+                    issues["errors"].append("Torque must contain 'sustained_amplitude' parameter")
+                
+                # Type-specific parameter validation
+                if profile_type == "ramp":
+                    # Required parameters for ramp type
+                    if 't_stop' not in torque:
+                        issues["errors"].append("Torque with type 'ramp' must contain 't_stop' parameter")
+                    else:
+                        # Check that t_stop has units
+                        t_stop_str = str(torque['t_stop'])
+                        if not (t_stop_str.endswith('ms') or t_stop_str.endswith('s')):
+                            issues["errors"].append("'t_stop' must have units (ms or second)")
+                    
+                    # Check for invalid parameters for this type
+                    invalid_params = set(torque.keys()) - {'type', 'max_amplitude', 'sustained_amplitude', 't_stop'}
+                    if invalid_params:
+                        issues["warnings"].append(f"Torque with type 'ramp' has unexpected parameters: {invalid_params}")
+                        
+                elif profile_type == "bump":
+                    # Required parameters for bump type
+                    if 't_peak' not in torque:
+                        issues["errors"].append("Torque with type 'bump' must contain 't_peak' parameter")
+                    else:
+                        # Check that t_peak has units
+                        t_peak_str = str(torque['t_peak'])
+                        if not (t_peak_str.endswith('ms') or t_peak_str.endswith('s')):
+                            issues["errors"].append("'t_peak' must have units (ms or second)")
+                            
+                    if 'sigma' not in torque:
+                        issues["errors"].append("Torque with type 'bump' must contain 'sigma' parameter")
+                    else:
+                        # Check that sigma has units
+                        sigma_str = str(torque['sigma'])
+                        if not (sigma_str.endswith('ms') or sigma_str.endswith('s')):
+                            issues["errors"].append("'sigma' must have units (ms or second)")
+                    
+                    # Check for invalid parameters for this type
+                    invalid_params = set(torque.keys()) - {'type', 'max_amplitude', 'sustained_amplitude', 't_peak', 'sigma'}
+                    if invalid_params:
+                        issues["warnings"].append(f"Torque with type 'bump' has unexpected parameters: {invalid_params}")
+                        
+                else:
+                    issues["errors"].append(f"For torque, type must be 'ramp' or 'bump', got '{profile_type}'")
+                    
+        if issues["errors"]:
+            error_messages = "\n".join(issues["errors"])
+            raise ValueError(f"Configuration errors found:\n{error_messages}")
         
-        plt.plot(currents, df[col], line_style, label=col)
-    
-    plt.xlabel('Normalized Current Amplitude')
-    plt.ylabel('Fraction of Fibers Recruited')
-    plt.title(f'Fiber Recruitment (Balance = {balance})')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    
-    # Add horizontal lines at 10% and 90% recruitment
-    plt.axhline(y=0.1, color='gray', linestyle=':', alpha=0.7)
-    plt.axhline(y=0.9, color='gray', linestyle=':', alpha=0.7)
-    
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.show()
+        if issues["warnings"]:
+            warning_messages = "\n".join(issues["warnings"])
+            print(f"WARNING: Configuration issues detected:\n{warning_messages}")
 
+def validate_ees(ees_params,ees_recruitment_params, number_muscle, neurons_population)
+        issues = {"warnings": [], "errors": []}
+        if ees_params is not None:
+            # Check if freq has hertz unit
+            if 'freq' in ees_params:
+                if not str(ees_params['freq']).endswith('Hz'):
+                    issues["errors"].append("The frequency of EES must have hertz as unit")
+                if not (-1 <= ees_params['freq'] <= 1):
+                    issues["errors"].append(f"ees frequency must be positive, got {val}")
+                # Check if freq is a tuple and if so, ensure we have exactly two muscles
+                if isinstance(ees_params['freq'], tuple):
+                    if number_muscle != 2:
+                        issues["errors"].append("When EES frequency is a tuple, exactly two muscles must be defined")
+            else:
+                issues["errors"].append("EES parameters must contain 'freq' parameter")
+            
+            # Check recruitment parameters
+            if 'balance' in ees_params:
+                    if not (-1 <= ees_params["balance"] <= 1):
+                        issues["errors"].append(f"'balance parameter ' in ees stimulation must contains values between -1 and 1, got {val}")
+                    if num_muscle==1:
+                        issues["warning"].append(f"'balance parameter ' in ees stimulation is for two muscles simulation only, it will be not be considered")
+            else:
+                if num_muscle==2:
+                     issues[”warning"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero") 
+            if 'intensity' in ees_params:
+                    if not (0 <= ees_params["intensity"] <= 1):
+                        issues["errors"].append(f"'intensity paramter ' in ees stimulation must contains values between 0 and 1, got {val}")
+            else:
+                issues["errors"].append("EES parameters must contain 'intensity' parameter")
+                
+        required_keys = ['threshold_10pct', 'saturation_90pct']
 
+        for fiber, params in ees_recruitment_params.items():
+            # Check if all required keys are present
+            for key in required_keys:
+                if key not in params:
+                    raise KeyError(f"Missing or misspelled key '{key}' in parameters for '{fiber}'")
+        
+            threshold = params['threshold_10pct']
+            saturation = params['saturation_90pct']
+            
+            # Check values are between 0 and 1
+            if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
+                raise ValueError(
+                    f"Values for '{fiber}' must be between 0 and 1. Got: threshold={threshold}, saturation={saturation}"
+                )
+            
+            # Check threshold < saturation
+            if threshold >= saturation:
+                raise ValueError(
+                    f"Threshold must be less than saturation for '{fiber}'. Got: threshold={threshold}, saturation={saturation}"
+                )
+
+        if issues["errors"]:
+            error_messages = "\n".join(issues["errors"])
+            raise ValueError(f"Configuration errors found:\n{error_messages}")
+        
+        if issues["warnings"]:
+            warning_messages = "\n".join(issues["warnings"])
+            print(f"WARNING: Configuration issues detected:\n{warning_messages}")
