@@ -389,11 +389,16 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     velocity_extensor_array = TimedArray(stretch_velocity_input[1], dt=dt_run)
 
     # Extract neuron counts from dictionary
-    n_Ia = neuron_pop['Ia']
-    n_II = neuron_pop['II']
-    n_exc = neuron_pop['exc']
-    n_inh = neuron_pop['inh']
-    n_MN = neuron_pop['MN'] 
+    n_Ia_flexor = neuron_pop['Ia_flexor']
+    n_II_flexor = neuron_pop['II_flexor']
+    n_exc_flexor = neuron_pop['exc_flexor']
+    n_inh_flexor = neuron_pop['inh_flexor']
+    n_MN_flexor = neuron_pop['MN_flexor']
+    n_Ia_extensor = neuron_pop['Ia_extensor']
+    n_II_extensor = neuron_pop['II_extensor']
+    n_exc_extensor = neuron_pop['exc_extensor']
+    n_inh_extensor = neuron_pop['inh_extensor']
+    n_MN_extensor = neuron_pop['MN_extensor']  
 
     #Extract EES_Params:
     if ees_params is not None:
@@ -417,23 +422,23 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     # Afferent neuron equations
     equation_Ia = spindle_model['Ia']
     ia_eq = f'''
-    is_flexor = (i < n_Ia) : boolean
+    is_flexor = (i < n_Ia_flexor) : boolean
     stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
     stretch_velocity = velocity_flexor_array(t) * int(is_flexor) + velocity_extensor_array(t) * int(not is_flexor) : 1
-    is_ees = ((is_flexor and i < Ia_flexor_recruited) or (not is_flexor and i < n_Ia + Ia_extensor_recruited)) : boolean
+    is_ees = ((is_flexor and i < Ia_flexor_recruited) or (not is_flexor and i < n_Ia_flexor + Ia_extensor_recruited)) : boolean
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
     equation_II = spindle_model['II']
     ii_eq = f'''
-    is_flexor = (i < n_II) : boolean
+    is_flexor = (i < n_II_flexor) : boolean
     stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
-    is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II + II_extensor_recruited)) : boolean
+    is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean
     rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
     '''
     
     # Create afferent neurons
-    Ia = NeuronGroup(2*n_Ia, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
-    II = NeuronGroup(2*n_II, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
+    Ia = NeuronGroup(n_Ia_flexor+ n_Ia_extensor, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
+    II = NeuronGroup(n_II_flexor+ n_II_extensor, ii_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
     net.add([Ia, II])
 
     # LIF neuron equations
@@ -460,13 +465,13 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     ''' 
   
     # Create neuron groups
-    inh = NeuronGroup(2*n_inh, inh_eq, threshold='v > threshold_v', 
+    inh = NeuronGroup(n_inh_flexor+ n_inh_extensor, inh_eq, threshold='v > threshold_v', 
                       reset='v = Eleaky', refractory=T_refr, method='euler')
   
-    exc = NeuronGroup(2*n_exc, ex_eq, threshold='v > threshold_v', 
+    exc = NeuronGroup(n_exc_flexor+n_exc_extensor, ex_eq, threshold='v > threshold_v', 
                       reset='v = Eleaky', refractory=T_refr, method='euler')
                                          
-    MN = NeuronGroup(2*n_MN, mn_eq, threshold='v > threshold_v', 
+    MN = NeuronGroup(n_MN_flexor+n_MN_extensor, mn_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', refractory=T_refr, method='euler')
                        
     # Initialize membrane potentials
@@ -542,8 +547,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     net.run(T)
     
     # Extract motoneuron spikes
-    MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN)} 
-    MN_extensor_spikes = {i%n_MN: mon_MN.spike_trains()[i] for i in range(n_MN, 2*n_MN)} 
+    MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN_flexor)} 
+    MN_extensor_spikes = {i%n_MN: mon_MN.spike_trains()[i] for i in range(n_MN_flexor, n_MN_flexor+n_MN_extensor)} 
 
     if ees_freq > 0 :
         ees_spikes = mon_ees_MN.spike_trains()
@@ -554,9 +559,9 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     
     # Count spiking neurons
     recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
-    print(f"Number of flexor recruited motoneuron: {recruited_MN_flexor}/{n_MN}")
+    print(f"Number of flexor recruited motoneuron: {recruited_MN_flexor}/{n_MN_flexor}")
     recruited_MN_extensor = sum(1 for spikes in MN_extensor_spikes.values() if len(spikes) > 0)
-    print(f"Number of extensor recruited motoneuron: {recruited_MN_extensor}/{n_MN}")
+    print(f"Number of extensor recruited motoneuron: {recruited_MN_extensor}/{n_MN_extensor}")
 
     # Final membrane potentials
     final_potentials = {
@@ -574,16 +579,16 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         }
     ]
     result_flexor = {
-        "Ia": {i: mon_Ia.spike_trains()[i] for i in range(n_Ia)},
-        "II": {i: mon_II.spike_trains()[i] for i in range(n_II)},
-        "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc)},
-        "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh)}
+        "Ia": {i: mon_Ia.spike_trains()[i] for i in range(n_Ia_flexor)},
+        "II": {i: mon_II.spike_trains()[i] for i in range(n_II_flexor)},
+        "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc_flexor)},
+        "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh_flexor)}
     }
     result_extensor = {
-        "Ia": {i%n_Ia: mon_Ia.spike_trains()[i] for i in range(n_Ia, 2*n_Ia)},
-        "II": {i%n_II: mon_II.spike_trains()[i] for i in range(n_II, 2*n_II)},
-        "exc": {i%n_exc: mon_exc.spike_trains()[i] for i in range(n_exc, 2*n_exc)},
-        "inh": {i%n_inh: mon_inh.spike_trains()[i] for i in range(n_inh, 2*n_inh)}
+        "Ia": {i%n_Ia: mon_Ia.spike_trains()[i] for i in range(n_Ia_flexor, n_Ia_flexor+n_Ia_extensor)},
+        "II": {i%n_II: mon_II.spike_trains()[i] for i in range(n_II_flexor, n_II_flexor+n_II_extensor)},
+        "exc": {i%n_exc: mon_exc.spike_trains()[i] for i in range(n_exc_flexor, n_exc_flexor+n_exc_extensor)},
+        "inh": {i%n_inh: mon_inh.spike_trains()[i] for i in range(n_inh_flexor, n_inh_flexor+n_inh_extensor)}
     }
 
 
