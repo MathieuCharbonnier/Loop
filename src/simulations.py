@@ -264,7 +264,7 @@ class BiologicalSystem:
         
         # Generate standard plots
         if ees_params is not None:
-            plot_recruitment_curves(self.ees_recruitment_params, current_current=ees_params.get('intensity'), balance=ees_params.get('balance'), num_muscles=self.number_muscles, save=save)
+            plot_recruitment_curves(self.ees_recruitment_params, current_current=ees_params.get('intensity'), balance=ees_params.get('balance', 0), num_muscles=self.number_muscles, save=save)
             
         plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path, save=save)
         plot_neural_dynamic(time_series, self.muscles_names, base_output_path, save=save)
