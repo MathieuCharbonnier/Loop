@@ -73,7 +73,7 @@ def sigmoid_recruitment(current_amplitude, threshold_10pct, saturation_90pct):
     
     return fraction
   
-def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimulation_params, neurons_population, num_muscles=2):
+def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimulation_params, neurons_population, num_muscles):
     """
     Transform intensity and balance parameters into recruitment counts
     
@@ -87,16 +87,22 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimu
     Returns:
     - Dictionary with recruitment counts and frequency
     """
-    validate_ees(ees_params,ees_recruitment_params, num_muscles, neurons_population)
+    validate_ees(ees_stimulation_params,ees_recruitment_params, num_muscles, neurons_population)
     
     # Get fractions first
-    fractions = calculate_full_recruitment(
-        ees_stimulation_params['intensity'], 
-        ees_recruitment_params,
-        ees_stimulation_params['balance'], 
-        num_muscles
-    )
-    
+    if 'balance' in ees_stimulation_params:
+        fractions = calculate_full_recruitment(
+            ees_stimulation_params['intensity'], 
+            ees_recruitment_params,
+            num_muscles,
+            ees_stimulation_params['balance']   
+        )
+    else:
+        fractions = calculate_full_recruitment(
+            ees_stimulation_params['intensity'], 
+            ees_recruitment_params,
+            num_muscles
+        )   
     # Convert fractions to counts
     counts = {}
     for key, fraction in fractions.items():
@@ -112,7 +118,7 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimu
         "freq": ees_stimulation_params['freq']
     }
 
-def calculate_full_recruitment(normalized_current, ees_recruitment_params, balance=0, num_muscles=2):
+def calculate_full_recruitment(normalized_current, ees_recruitment_params,num_muscles, balance=0):
     """
     Calculate recruitment fractions for all fiber types based on normalized current and balance.
     
@@ -158,7 +164,7 @@ def calculate_full_recruitment(normalized_current, ees_recruitment_params, balan
     
     return fractions
 
-def validate_torque(torque)
+def validate_torque(torque):
     issues = {"warnings": [], "errors": []}
     if torque is not None:
             # Check if torque_profile has a type field
@@ -216,41 +222,41 @@ def validate_torque(torque)
                 else:
                     issues["errors"].append(f"For torque, type must be 'ramp' or 'bump', got '{profile_type}'")
                     
-        if issues["errors"]:
-            error_messages = "\n".join(issues["errors"])
-            raise ValueError(f"Configuration errors found:\n{error_messages}")
+    if issues["errors"]:
+        error_messages = "\n".join(issues["errors"])
+        raise ValueError(f"Configuration errors found:\n{error_messages}")
         
-        if issues["warnings"]:
-            warning_messages = "\n".join(issues["warnings"])
-            print(f"WARNING: Configuration issues detected:\n{warning_messages}")
+    if issues["warnings"]:
+        warning_messages = "\n".join(issues["warnings"])
+        print(f"WARNING: Configuration issues detected:\n{warning_messages}")
 
-def validate_ees(ees_params,ees_recruitment_params, number_muscle, neurons_population)
+def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, neurons_population):
         issues = {"warnings": [], "errors": []}
-        if ees_params is not None:
+        if ees_stimulation_params is not None:
             # Check if freq has hertz unit
-            if 'freq' in ees_params:
-                if not str(ees_params['freq']).endswith('Hz'):
+            if 'freq' in ees_stimulation_params:
+                if not str(ees_stimulation_params['freq']).endswith('Hz'):
                     issues["errors"].append("The frequency of EES must have hertz as unit")
-                if not (-1 <= ees_params['freq'] <= 1):
-                    issues["errors"].append(f"ees frequency must be positive, got {val}")
+                if not (0*hertz <= ees_stimulation_params['freq'] ):
+                    issues["errors"].append(f"ees frequency must be positive, , got {val}")
                 # Check if freq is a tuple and if so, ensure we have exactly two muscles
-                if isinstance(ees_params['freq'], tuple):
+                if isinstance(ees_stimulation_params['freq'], tuple):
                     if number_muscle != 2:
                         issues["errors"].append("When EES frequency is a tuple, exactly two muscles must be defined")
             else:
                 issues["errors"].append("EES parameters must contain 'freq' parameter")
             
             # Check recruitment parameters
-            if 'balance' in ees_params:
-                    if not (-1 <= ees_params["balance"] <= 1):
+            if 'balance' in ees_stimulation_params:
+                    if not (-1 <= ees_stimulation_params["balance"] <= 1):
                         issues["errors"].append(f"'balance parameter ' in ees stimulation must contains values between -1 and 1, got {val}")
-                    if num_muscle==1:
+                    if number_muscle==1:
                         issues["warning"].append(f"'balance parameter ' in ees stimulation is for two muscles simulation only, it will be not be considered")
             else:
-                if num_muscle==2:
-                     issues[”warning"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero") 
-            if 'intensity' in ees_params:
-                    if not (0 <= ees_params["intensity"] <= 1):
+                if number_muscle==2:
+                     issues["warning"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero") 
+            if 'intensity' in ees_stimulation_params:
+                    if not (0 <= ees_stimulation_params["intensity"] <= 1):
                         issues["errors"].append(f"'intensity paramter ' in ees stimulation must contains values between 0 and 1, got {val}")
             else:
                 issues["errors"].append("EES parameters must contain 'intensity' parameter")
