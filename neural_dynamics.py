@@ -81,12 +81,10 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     freq=0
     if ees_params is not None:
         freq=ees_params['freq']
-        afferent_recruited=ees_params['afferent_recruited']
-        if isinstance(afferent_recruited, tuple):
-            Ia_recruited=afferent_recruited[0]*neuron_pop['Ia']
-            II_recruited=afferent_recruited[1]*neuron_pop['II']
-        else:
-            Ia_recruited=afferent_recruited*neuron_pop['Ia']                             
+        Ia_recruited=ees_params['Ia']
+        if 'II' in ees_params:
+            II_recruited=ees_params['II']
+                            
     # Create primary afferent neurons (always present)
     create_afferent_neurons(
         net, group_map, monitors, freq, Ia_recruited,
@@ -131,8 +129,8 @@ def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, join
     
     # Handle EES stimulation if enabled for efferent neurons
     mon_ees_MN = None
-    if ees_params is not None and freq>0 and ees_params.get('MN_recruited', 0) > 0:
-        eff_recruited = ees_params.get('MN_recruited')*neuron_pop['MN']
+    if ees_params is not None and freq>0 and ees_params.get('MN', 0) > 0:
+        eff_recruited = ees_params.get('MN')*neuron_pop['MN']
         ees_MN = PoissonGroup(N=eff_recruited, rates=freq)
         mon_ees_MN = SpikeMonitor(ees_MN)
         net.add([ees_MN, mon_ees_MN])
@@ -400,18 +398,12 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     #Extract EES_Params:
     if ees_params is not None:
         ees_freq=ees_params['freq']
-        B=ees_params['B']
-        w_flexor=(1+B)/2
-        w_extensor=(1-B)/2
-        Ia_recruited=ees_params['afferent_recruited'][0]*neuron_pop['Ia']
-        II_recruited=ees_params['afferent_recruited'][1]*neuron_pop['II']
-        MN_recruited=ees_params['MN_recruited']*neuron_pop['MN']
-        Ia_flexor_recruited=int(Ia_recruited*w_flexor)
-        II_flexor_recruited=int(II_recruited*w_flexor)
-        MN_flexor_recruited=int(MN_recruited*w_flexor)
-        Ia_extensor_recruited=int(Ia_recruited*w_flexor)
-        II_extensor_recruited=int(II_recruited*w_extensor)
-        MN_extensor_recruited=int(MN_recruited*w_extensor)
+        Ia_flexor_recruited=ees_params['recruitement']['Ia_flexor']
+        II_flexor_recruited=ees_params['recruitment']['II_flexor']
+        MN_flexor_recruited=ees_params['recruitment']['MN_flexor']
+        Ia_extensor_recruited=ees_params['recruitment']['Ia_extensor']
+        II_extensor_recruited=ees_params['recruitment']['II_extensor']
+        MN_extensor_recruited=ees_params['recruitment']['MN_extensor']
     else:
         ees_freq=0*hertz
         Ia_flexor_recruited=0
