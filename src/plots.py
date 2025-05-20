@@ -237,7 +237,7 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path, save=True):
         plt.savefig(fig_path)
     plt.show()
 
-def plot_recruitment_curves(ees_recruitment_params, current_current, base_output_path, balance=None, num_muscles=2, save=True):
+def plot_recruitment_curves(ees_recruitment_params, current_current, base_output_path, balance=0, num_muscles=2, save=True):
     """
     Plot recruitment curves for all fiber types using the threshold-based sigmoid.
     Only shows fractions of population, not absolute counts.
