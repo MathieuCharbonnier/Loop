@@ -1,4 +1,3 @@
-from brian2 import *
 
 from brian2 import *
 import numpy as np
@@ -192,12 +191,10 @@ class BiologicalSystem:
                 continue
         
             value = self.biophysical_params[param]
-            if not hasattr(value, 'unit'):
-                issues["errors"].append(f"Parameter '{param}' does not have units defined. Got: {value}")
-                continue
-        
+
             # Check unit compatibility
-            if not value.unit.is_compatible_with(expected_unit):
+            if not value.dim == expected_unit.dim:
+
                 issues["errors"].append(
                     f"Parameter '{param}' has incorrect unit. "
                     f"Expected unit compatible with {expected_unit}, but got {value.unit}"
@@ -232,7 +229,7 @@ class BiologicalSystem:
             
         return True  # Return True if validation passes
     
-    def simulations(self, base_output_path, n_iterations, time_step=0.1*ms, ees_params=None,
+    def run_simulation(self, base_output_path, n_iterations, time_step=0.1*ms, ees_stimulation_params=None,
                    torque=None, fast_type_mu=True, seed=42):
         """
         Run simulations and generate plots.
@@ -261,8 +258,8 @@ class BiologicalSystem:
         """
         spikes, time_series = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
-            self.spindle_model, self.biophysical_params, self.muscles_names, self.associated_joint,
-            base_output_path, TORQUE=torque, EES_PARAMS=ees_params, fast=fast_type_mu, seed=seed
+            self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
+            base_output_path=base_output_path, TORQUE=torque,EES_RECRUITMENT_PARAMS=self.ees_recruitment_params, EES_STIMULATION_PARAMS=ees_stimulation_params, fast=fast_type_mu, seed=seed
         )
         
         # Generate standard plots
@@ -459,7 +456,7 @@ class BiologicalSystem:
         return controller.get_optimal_protocol()
 
         
-class MonosynapticReflex(BiologicalSystem):
+class Monosynaptic(BiologicalSystem):
     """
     Specialized class for monosynaptic reflexes.
     
@@ -526,8 +523,8 @@ class MonosynapticReflex(BiologicalSystem):
         
         # Set default neuron populations
         self.neurons_population = {
-            "Ia": 60,       # Type Ia afferent neurons
-            "MN": 169       # Motor neurons
+            "Ia": 410,       # Type Ia afferent neurons
+            "MN": 500       # Motor neurons
         }
         
         # Override with custom values if provided
@@ -556,7 +553,7 @@ class MonosynapticReflex(BiologicalSystem):
         self.validate_parameters()
 
 
-class TrisynapticSystem(BiologicalSystem):
+class Trisynaptic(BiologicalSystem):
     """
     Specialized class for trisynaptic reflexes.
     
@@ -564,7 +561,7 @@ class TrisynapticSystem(BiologicalSystem):
     to motor neurons (MN) through excitatory interneurons.
     """
     
-    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
                 custom_spindle=None, custom_ees_recruitment_params=None):
         """
@@ -627,10 +624,10 @@ class TrisynapticSystem(BiologicalSystem):
         
         # Set default neuron populations
         self.neurons_population = {
-            "Ia": 60,       # Type Ia afferent neurons
-            "II": 60,       # Type II afferent neurons
-            "exc": 196,     # Excitatory interneurons
-            "MN": 169       # Motor neurons
+            "Ia": 280,       # Type Ia afferent neurons
+            "II": 280,       # Type II afferent neurons
+            "exc": 500,     # Excitatory interneurons
+            "MN": 450       # Motor neurons
         }
         
         # Override with custom values if provided
@@ -670,7 +667,7 @@ class ReciprocalInhibition(BiologicalSystem):
     muscle systems, with both excitatory and inhibitory connections.
     """
     
-    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
                 custom_spindle=None, custom_ees_recruitment_params=None):
         """
@@ -728,7 +725,7 @@ class ReciprocalInhibition(BiologicalSystem):
                       'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
                       'saturation_90pct': 0.9  
               }  
-       
+            }
         # Initialize the base class
         super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
         
@@ -736,20 +733,20 @@ class ReciprocalInhibition(BiologicalSystem):
         # Setup specialized neuron populations for reciprocal inhibition
         self.neurons_population = {
             # Afferents for each muscle
-            f"Ia_flexor": 60,
-            f"II_flexor": 60,
-            f"Ia_extensor": 60,
-            f"II_extensor": 60,
+            f"Ia_flexor": 280,
+            f"II_flexor": 280,
+            f"Ia_extensor": 160,
+            f"II_extensor": 160,
             
             # Interneurons
-            f"exc_flexor": 196,
-            f"exc_extensor": 196,
-            f"inh_flexor": 196,
-            f"inh_extensor": 196,
+            f"exc_flexor": 500,
+            f"exc_extensor": 500,
+            f"inh_flexor": 500,
+            f"inh_extensor": 500,
             
             # Motor neurons
-            f"MN_flexor": 169,
-            f"MN_extensor": 169
+            f"MN_flexor": 450,
+            f"MN_extensor": 580
         }
         
         # Override with custom values if provided
