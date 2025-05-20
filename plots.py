@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from brian2.units import second, hertz
 import os
 from datetime import datetime
+from input_generator import calculate_full_recruitment
+
 
 # Colorblind-friendly palette
 colorblind_friendly_colors = {
@@ -231,7 +233,74 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
     plt.savefig(fig_path)
     plt.show()
 
-
+def plot_recruitment_curves(ees_recruitment_params, balance=0, num_muscles=2):
+    """
+    Plot recruitment curves for all fiber types using the threshold-based sigmoid.
+    Only shows fractions of population, not absolute counts.
+    
+    Parameters:
+    - ees_recruitment_params: Dictionary with threshold and saturation values
+    - balance: float (-1 to 1), electrode position bias
+    - num_muscles: Number of muscles (2 for flexor/extensor or 1 for single muscle)
+    """
+    currents = np.linspace(0, 1, 100)
+    
+    # Calculate recruitment fractions at each intensity
+    fraction_results = []
+    
+    for current in currents:
+        # Get fractions directly
+        fractions = calculate_full_recruitment(
+            current, 
+            ees_recruitment_params, 
+            balance, 
+            num_muscles
+        )
+        fraction_results.append(fractions)
+      
+    # Convert results to DataFrame for easier plotting
+    df = pd.DataFrame(fraction_results)
+    
+    # Plot
+    plt.figure(figsize=(10, 6))
+    
+    # Define colors and styles for different fiber types
+    style_map = {
+        'Ia_flexor': 'r-', 'II_flexor': 'r--', 'MN_flexor': 'r-.',
+        'Ia_extensor': 'b-', 'II_extensor': 'b--', 'MN_extensor': 'b-.'
+    }
+    
+    # For non-muscle-specific case
+    single_style_map = {'Ia': 'g-', 'II': 'g--', 'MN': 'g-.'}
+    
+    for col in df.columns:
+        # Choose appropriate style
+        if col in style_map:
+            line_style = style_map[col]
+        elif col in single_style_map:
+            line_style = single_style_map[col]
+        else:
+            # Default styling
+            if "extensor" in col:
+                line_style = 'b-'  # Blue for extensors
+            else:
+                line_style = 'r-'  # Red for flexors
+        
+        plt.plot(currents, df[col], line_style, label=col)
+    
+    plt.xlabel('Normalized Current Amplitude')
+    plt.ylabel('Fraction of Fibers Recruited')
+    plt.title(f'Fiber Recruitment (Balance = {balance})')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    # Add horizontal lines at 10% and 90% recruitment
+    plt.axhline(y=0.1, color='gray', linestyle=':', alpha=0.7)
+    plt.axhline(y=0.9, color='gray', linestyle=':', alpha=0.7)
+    
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.show()
 
 
 def read_sto(filepath, columns):
