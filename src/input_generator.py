@@ -73,7 +73,7 @@ def sigmoid_recruitment(current_amplitude, threshold_10pct, saturation_90pct):
     
     return fraction
   
-def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimulation_params, neurons_population, num_muscles):
+def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stimulation_params, neurons_population, num_muscles):
     """
     Transform intensity and balance parameters into recruitment counts
     
@@ -87,20 +87,20 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimu
     Returns:
     - Dictionary with recruitment counts and frequency
     """
-    validate_ees(ees_stimulation_params,ees_recruitment_params, num_muscles, neurons_population)
+    validate_ees(ees_stimulation_profile,ees_recruitment_params, num_muscles, neurons_population)
     
     # Get fractions first
     if 'balance' in ees_stimulation_params:
         fractions = calculate_full_recruitment(
             ees_stimulation_params['intensity'], 
-            ees_recruitment_params,
+            ees_recruitment_profile,
             num_muscles,
             ees_stimulation_params['balance']   
         )
     else:
         fractions = calculate_full_recruitment(
             ees_stimulation_params['intensity'], 
-            ees_recruitment_params,
+            ees_recruitment_profile,
             num_muscles
         )   
     # Convert fractions to counts
@@ -118,7 +118,7 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_params, ees_stimu
         "freq": ees_stimulation_params['freq']
     }
 
-def calculate_full_recruitment(normalized_current, ees_recruitment_params,num_muscles, balance=0):
+def calculate_full_recruitment(normalized_current, ees_recruitment_profile,num_muscles, balance=0):
     """
     Calculate recruitment fractions for all fiber types based on normalized current and balance.
     
@@ -134,7 +134,7 @@ def calculate_full_recruitment(normalized_current, ees_recruitment_params,num_mu
     fractions = {}
 
     if num_muscles == 2:
-        for fiber_type in ees_recruitment_params.keys():
+        for fiber_type in ees_recruitment_profile.keys():
             for muscle_type in ['flexor', 'extensor']:
                 key = f"{fiber_type}_{muscle_type}"
               
@@ -144,8 +144,8 @@ def calculate_full_recruitment(normalized_current, ees_recruitment_params,num_mu
                     shift = -shift  # Reverse effect for flexors
     
                 # Apply shifts to threshold and saturation
-                threshold = ees_recruitment_params[fiber_type]['threshold_10pct'] + shift
-                saturation = ees_recruitment_params[fiber_type]['saturation_90pct'] + shift
+                threshold = ees_recruitment_profile[fiber_type]['threshold_10pct'] + shift
+                saturation = ees_recruitment_profile[fiber_type]['saturation_90pct'] + shift
     
                 # Ensure values stay in reasonable range
                 threshold = max(0.1, min(0.7, threshold))
@@ -155,9 +155,9 @@ def calculate_full_recruitment(normalized_current, ees_recruitment_params,num_mu
                 fractions[key] = sigmoid_recruitment(normalized_current, threshold, saturation)
     else:
         # Single muscle case
-        for fiber_type in ees_recruitment_params.keys():
-            threshold = ees_recruitment_params[fiber_type]['threshold_10pct'] 
-            saturation = ees_recruitment_params[fiber_type]['saturation_90pct'] 
+        for fiber_type in ees_recruitment_profile.keys():
+            threshold = ees_recruitment_profile[fiber_type]['threshold_10pct'] 
+            saturation = ees_recruitment_profile[fiber_type]['saturation_90pct'] 
             
             # Calculate recruitment fraction directly
             fractions[fiber_type] = sigmoid_recruitment(normalized_current, threshold, saturation)
@@ -246,43 +246,22 @@ def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, n
             else:
                 issues["errors"].append("EES parameters must contain 'freq' parameter")
             
-            # Check recruitment parameters
-            if 'balance' in ees_stimulation_params:
+       
+            if 'intensity' in ees_stimulation_params:
+                    if not (0 <= ees_stimulation_params["intensity"] <= 1):
+                        issues["errors"].append(f"'intensity paramter ' in ees stimulation must contains values between 0 and 1, got {val}")
+            else:
+                issues["errors"].append("EES parameters must contain 'intensity' parameter")
+              if 'balance' in ees_stimulation_params:
                     if not (-1 <= ees_stimulation_params["balance"] <= 1):
                         issues["errors"].append(f"'balance parameter ' in ees stimulation must contains values between -1 and 1, got {val}")
                     if number_muscle==1:
                         issues["warning"].append(f"'balance parameter ' in ees stimulation is for two muscles simulation only, it will be not be considered")
             else:
                 if number_muscle==2:
-                     issues["warning"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero") 
-            if 'intensity' in ees_stimulation_params:
-                    if not (0 <= ees_stimulation_params["intensity"] <= 1):
-                        issues["errors"].append(f"'intensity paramter ' in ees stimulation must contains values between 0 and 1, got {val}")
-            else:
-                issues["errors"].append("EES parameters must contain 'intensity' parameter")
+                     issues["warning"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero")
                 
-        required_keys = ['threshold_10pct', 'saturation_90pct']
-
-        for fiber, params in ees_recruitment_params.items():
-            # Check if all required keys are present
-            for key in required_keys:
-                if key not in params:
-                    raise KeyError(f"Missing or misspelled key '{key}' in parameters for '{fiber}'")
         
-            threshold = params['threshold_10pct']
-            saturation = params['saturation_90pct']
-            
-            # Check values are between 0 and 1
-            if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
-                raise ValueError(
-                    f"Values for '{fiber}' must be between 0 and 1. Got: threshold={threshold}, saturation={saturation}"
-                )
-            
-            # Check threshold < saturation
-            if threshold >= saturation:
-                raise ValueError(
-                    f"Threshold must be less than saturation for '{fiber}'. Got: threshold={threshold}, saturation={saturation}"
-                )
 
         if issues["errors"]:
             error_messages = "\n".join(issues["errors"])
