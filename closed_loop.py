@@ -11,11 +11,12 @@ from scipy.stats import gaussian_kde
 
 from neural_dynamics import run_one_muscle_neuron_simulation, run_flexor_extensor_neuron_simulation
 from activation import decode_spikes_to_activation
+from input_generator import transform_torque_params_in_array, transform_intensity_balance_in_recruitment
 
 
 def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CONNECTIONS,
-           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES, associated_joint, base_output_path, 
-            EES_PARAMS=None, TORQUE=None, fast=True, seed=42):
+           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES,NUM_MUSCLES, associated_joint, base_output_path, 
+            EES_RECRUITMENT_PARAMS,EES_STIMULATION_PARAMS=None, TORQUE=None, fast=True, seed=42):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
 
@@ -46,6 +47,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
         Biophysical model parameters
     MUSCLE_NAMES : list
         List of muscle names strings
+    NUM_MUSCLES: int
+        Lengths of the MUSCLE_NAMES list
     associated_joint : str
         Name of the associated joint
     base_output_path : str
@@ -61,21 +64,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
     csv_path = base_output_path + '.csv'
     sto_path = base_output_path + '.sto'
 
-    # Muscle configuration
-    NUM_MUSCLES = len(MUSCLE_NAMES)
-    # Validate muscle count
-    if NUM_MUSCLES > 2:
-        raise ValueError("This pipeline supports only 1 or 2 muscles!")
-
-    validate_parameters(
-            neuron_counts=NEURONS_POPULATION,
-            connections=CONNECTIONS,
-            spindle_model=SPINDLE_MODEL,
-            biophysical_params=BIOPHYSICAL_PARAMS,
-            muscle_names=MUSCLE_NAMES,
-            ees_params=EES_PARAMS,
-            torque=TORQUE
-        )
     # =============================================================================
     # Initialization
     # =============================================================================
@@ -120,14 +108,12 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
     }
     torque=None
     if TORQUE is not None:
-        if TORQUE['type']=="bump":
-            torque=bump(time_points*second,TORQUE['t_peak'], TORQUE['sigma'], 
-            TORQUE['max_amplitude'], TORQUE['sustained_amplitude'])
-        elif TORQUE['type']=="ramp":
-            torque=ramp(time_points*second, TORQUE['t_stop'], TORQUE['max_amplitude'], TORQUE['sustained_amplitude'])
-        else:
-            raise ValueError(f"{TORQUE['type']} is not implemented yet, existing type are bump or ramp")
+        torque=transform_torque_params_in_array(time_points, TORQUE)
 
+    EES_PARAMS=None
+    if EES_STIMULATION_PARAMS is not None:
+        EES_PARAMS=transform_intensity_balance_in_recruitment(
+          EES_RECRUITMENT_PARAMS, EES_STIMULATION_PARAMS, NEURONS_POPULATION, NUM_MUSCLES)
 
     # =============================================================================
     # Main Simulation Loop
@@ -142,23 +128,11 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
            print(f"frequency stance phase: {freq[1]}")
         else:
             print(f"EES frequency: {freq}")
-        if NUM_MUSCLES==2:
-            B=EES_PARAMS['B']
-            w_flexor=(1+B)/2
-            w_extensor=(1-B)/2
-            print(f"Number FLEXOR Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][0]*w_flexor*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
-            print(f"Number FLEXOR II fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][1]*w_flexor*NEURONS_POPULATION['II'])}/{NEURONS_POPULATION['II']}")
-            print(f"Number FLEXOR MN fibers recruited by EES: {int(EES_PARAMS['MN_recruited']*w_flexor*NEURONS_POPULATION['MN'])}/{NEURONS_POPULATION['MN']}")
-            print(f"Number EXTENSOR Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][0]*w_extensor*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
-            print(f"Number EXTENSOR II fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][1]*w_extensor*NEURONS_POPULATION['II'])}/{NEURONS_POPULATION['II']}")
-            print(f"Number EXTENSOR MN fibers recruited by EES: {int(EES_PARAMS['MN_recruited']*w_extensor*NEURONS_POPULATION['MN'])}/{NEURONS_POPULATION['MN']}")
-        else:       
-            if "II" in NEURONS_POPULATION and "II" in SPINDLE_MODEL:
-                print(f"Number Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][0]*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
-                print(f"Number II fibers recruited by EES: {int(EES_PARAMS['afferent_recruited'][1]*NEURONS_POPULATION['II'])}/{NEURONS_POPULATION['II']}")
-            else:
-                print(f"Number Ia fibers recruited by EES: {int(EES_PARAMS['afferent_recruited']*NEURONS_POPULATION['Ia'])}/{NEURONS_POPULATION['Ia']}")
-            print(f"Number Efferent fibers recruited by EES: {int(EES_PARAMS['MN_recruited']*NEURONS_POPULATION['MN'])}/{NEURONS_POPULATION['MN']}")
+
+        for fiber_key, fiber_recruitment in EES_PARAMS['recruitment'].items():
+
+            print(f"Number {' '.join(fiber_key.split('_')} recruited by EES: {fiber_recruitment}/{NEURONS_POPULATION[fiber_key]}")
+  
 
     # Create a simulator instance based on execution environment
     on_colab=is_running_on_colab()
@@ -512,224 +486,5 @@ def is_running_on_colab():
         return False
 
 
-def ramp (time_array,t_stop, max_amplitude, sustained_amplitude=0):
-
-    num_points = len(time_array)
-    torque_profile = np.zeros((num_points))
-    # Create the torque profile
-    for i, t in enumerate(time_array):
-        if t < t_stop:
-            # Rapid increase in torque (quick stretch phase)
-            progress = t / t_stop
-            torque_profile[i] = max_amplitude * progress
-        else:
-            # Reduced holding torque (to allow natural oscillation)
-            torque_profile[i] = sustained_amplitude
-    return torque_profile
 
 
-def bump(time_array, t_peak, sigma, max_amplitude, sustained_amplitude=0):
-
-    # Gaussian torque
-    gaussian = max_amplitude * np.exp(-0.5 * ((time_array - t_peak) / sigma) ** 2)
-
-    # Find index where the torque drops below threshold after the peak
-    i_peak = np.argmax(gaussian)
-    i_hold_start = np.where(gaussian[i_peak:] <= sustained_amplitude)[0]
-    i_hold_start = i_hold_start[0] + i_peak if len(i_hold_start) > 0 else time_array.shape[0]
-
-    # Construct the final torque profile
-    torque = np.copy(gaussian)
-    torque[i_hold_start:] = sustained_amplitude
-    return torque
-
-def validate_parameters(neuron_counts, connections, spindle_model, biophysical_params, muscle_names,ees_params, torque):
-    """
-    Validates the configuration parameters for the neural model.
-    
-    Args:
-        neuron_counts: Dictionary mapping neuron types to counts
-        connections: Dictionary mapping connection pairs to properties
-        spindle_model: Dictionary mapping neuron types to equations
-        biophysical_params: Dictionary of biophysical parameters
-        muscles_names: List of muscle names
-        ees_params: Dict to define EES stimulation
-        torque: Dict to create the time dependent torque profile
-    
-    Returns:
-        issues: Dictionary of warnings and errors found
-    """
-    issues = {"warnings": [], "errors": []}
-    
-    # Check if neuron types in neuron popultion match with those in connections and spindle_model
-    defined_neurons = set(neuron_counts.keys())
-    
-    # Check for II neurons and related conditions
-    if "II" in defined_neurons:
-        if "II" not in spindle_model:
-            issues["errors"].append("II neurons are defined in neuron population but no equation found in spindle model")
-        
-        if "exc" not in defined_neurons:
-            issues["errors"].append("When II neurons are defined, exc neurons must also be defined")
-    else:
-        if "II" in spindle_model:
-            issues["warnings"].append("Equation for II defined in spindle model but II neurons not defined in the neurons population")
-    
-    # Check for inhibitory neurons and related parameters
-    if "inh" not in defined_neurons:
-        if "E_inh" in biophysical_params or "tau_i" in biophysical_params:
-            issues["errors"].append("Inhibitory neurons not defined but E_inh or tau_i parameters present in biophysical parameters")
-    if "inh" in defined_neurons:
-        if not( "E_inh" in biophysical_params and "tau_i" in biophysical_params):
-            issues['errors'].append("you defined inhibitory neurons, but you forgot to specify one or both inhibitory synpase parameters (E_inh and tau_i)")
-
-    # Check for all mandatory neuron types when multiple muscles are defined
-    if len(muscle_names) == 2:
-        required_neurons = {"Ia", "II", "inh", "exc", "MN"}
-        missing_neurons = required_neurons - defined_neurons
-        if missing_neurons:
-            issues["errors"].append(f"For two muscles, all neuron types {required_neurons} must be defined. Missing: {missing_neurons}")
-            
-        # Check spindle model completeness for two muscles
-        required_equations = {"Ia", "II"}
-        defined_equations = set(spindle_model.keys())
-        missing_equations = required_equations - defined_equations
-        if missing_equations:
-            issues["errors"].append(f"For two muscles, both Ia and II equations must be defined in spindle model. Missing: {missing_equations}")
-        
-        # Check for proper connection naming with flexor/extensor suffix
-        for connection_pair in connections:
-            pre_neuron, post_neuron = connection_pair
-            if not (pre_neuron.endswith("_flexor") or pre_neuron.endswith("_extensor") or 
-                   post_neuron.endswith("_flexor") or post_neuron.endswith("_extensor")):
-                issues["errors"].append(f"With two muscles, connection {connection_pair} should have flexor/extensor suffix")
-    
-    # Check if all neurons used in connections are defined in NEURON_COUNTS
-    for connection_pair in connections:
-        pre_neuron, post_neuron = connection_pair
-        # Remove potential flexor/extensor suffix for checking
-        base_pre = pre_neuron.split('_')[0] if '_' in pre_neuron else pre_neuron
-        base_post = post_neuron.split('_')[0] if '_' in post_neuron else post_neuron
-        
-        if base_pre not in defined_neurons:
-            issues["errors"].append(f"Neuron type '{base_pre}' used in connection {connection_pair} but not defined in the neurons population")
-        if base_post not in defined_neurons:
-            issues["errors"].append(f"Neuron type '{base_post}' used in connection {connection_pair} but not defined in the neurons population")
-    
-    if ees_params is not None:
-        # Check if freq has hertz unit
-        if 'freq' in ees_params:
-            if not str(ees_params['freq']).endswith('Hz'):
-                issues["errors"].append("The frequency of EES must have hertz as unit")
-            
-            # Check if freq is a tuple and if so, ensure we have exactly two muscles
-            if isinstance(ees_params['freq'], tuple):
-                if len(muscle_names) != 2:
-                    issues["errors"].append("When EES frequency is a tuple, exactly two muscles must be defined")
-        else:
-            issues["errors"].append("EES parameters must contain 'freq' parameter")
-        
-        # Check afferent_recruited parameter
-        if 'afferent_recruited' in ees_params:
-            if isinstance(ees_params['afferent_recruited'], tuple):
-                # Check each value in the tuple
-                for idx, val in enumerate(ees_params['afferent_recruited']):
-                    if not (0 <= val <= 1):
-                        issues["errors"].append(f"'afferent_recruited' must contains values between 0 and 1, got {val}")
-                
-                # If tuple but no II neurons, give a warning
-                if "II" not in neuron_counts:
-                    issues["warnings"].append("'afferent_recruited' in EES parameters is a tuple but II neurons are not defined")
-            else:
-                # Single value
-                val = ees_params['afferent_recruited']
-                if not (0 <= val <= 1):
-                    issues["errors"].append(f"'afferent_recruited' in EES parameters must be between 0 and 1, got {val}")
-        else:
-            issues["errors"].append("EES parameters must contain 'afferent_recruited' parameter")
-        
-        # Check MN_recruited parameter
-        if 'MN_recruited' in ees_params:
-            val = ees_params['MN_recruited']
-            if not (0 <= val <= 1):
-                issues["errors"].append(f"'MN_recruited' in EES parameters must be between 0 and 1, got {val}")
-        else:
-            issues["errors"].append("EES parameters must contain 'MN_recruited' parameter")
-        
-        # Check B parameter
-        if 'B' in ees_params:
-            val = ees_params['B']
-            if not (-1 <= val <= 1):
-                issues["errors"].append(f"'B' in EES parameters must be between -1 and 1, got {val}")
-            if not (len(muscle_names)==2):
-                issues["warning"].append("you specify B parameter in EES Stimulation, but you set only one muscle")
-        else:
-            if (len(muscle_names)==2):
-                issues["errors"].append("EES parameters must contain 'B' parameter for 2 muscles simulation")
-
-    if torque is not None:
-        # Check if torque_profile has a type field
-        if 'type' not in torque:
-            issues["errors"].append("Torque must contain a 'type' parameter")
-        else:
-            profile_type = torque['type']
-            
-            # Common parameters for all types
-            if 'max_amplitude' not in torque:
-                issues["errors"].append("Torque must contain 'max_amplitude' parameter")
-            
-            if 'sustained_amplitude' not in torque:
-                issues["errors"].append("Torque must contain 'sustained_amplitude' parameter")
-            
-            # Type-specific parameter validation
-            if profile_type == "ramp":
-                # Required parameters for ramp type
-                if 't_stop' not in torque:
-                    issues["errors"].append("Torque with type 'ramp' must contain 't_stop' parameter")
-                else:
-                    # Check that t_stop has units
-                    t_stop_str = str(torque['t_stop'])
-                    if not (t_stop_str.endswith('ms') or t_stop_str.endswith('s')):
-                        issues["errors"].append("'t_stop' must have units (ms or second)")
-                
-                # Check for invalid parameters for this type
-                invalid_params = set(torque.keys()) - {'type', 'max_amplitude', 'sustained_amplitude', 't_stop'}
-                if invalid_params:
-                    issues["warnings"].append(f"Torque with type 'ramp' has unexpected parameters: {invalid_params}")
-                    
-            elif profile_type == "bump":
-                # Required parameters for bump type
-                if 't_peak' not in torque:
-                    issues["errors"].append("Torque with type 'bump' must contain 't_peak' parameter")
-                else:
-                    # Check that t_peak has units
-                    t_peak_str = str(torque['t_peak'])
-                    if not (t_peak_str.endswith('ms') or t_peak_str.endswith('s')):
-                        issues["errors"].append("'t_peak' must have units (ms or second)")
-                        
-                if 'sigma' not in torque:
-                    issues["errors"].append("Torque with type 'bump' must contain 'sigma' parameter")
-                else:
-                    # Check that sigma has units
-                    sigma_str = str(torque['sigma'])
-                    if not (sigma_str.endswith('ms') or sigma_str.endswith('s')):
-                        issues["errors"].append("'sigma' must have units (ms or second)")
-                
-                # Check for invalid parameters for this type
-                invalid_params = set(torque.keys()) - {'type', 'max_amplitude', 'sustained_amplitude', 't_peak', 'sigma'}
-                if invalid_params:
-                    issues["warnings"].append(f"Torque with type 'bump' has unexpected parameters: {invalid_params}")
-                    
-            else:
-                issues["errors"].append(f"For torque, type must be 'ramp' or 'bump', got '{profile_type}'")
-                
-
-    if issues["errors"]:
-        error_messages = "\n".join(issues["errors"])
-        raise ValueError(f"Configuration errors found:\n{error_messages}")
-    
-    if issues["warnings"]:
-        warning_messages = "\n".join(issues["warnings"])
-        print(f"WARNING: Configuration issues detected:\n{warning_messages}")
-    
-   
