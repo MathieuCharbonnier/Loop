@@ -17,7 +17,7 @@ class BiologicalSystem:
     handling the core simulation and analysis functionality.
     """
     
-    def __init__(self, reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint):
+    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint):
         """
         Initialize the biological system with common parameters.
         
@@ -25,7 +25,7 @@ class BiologicalSystem:
         -----------
         reaction_time : brian2.units.fundamentalunits.Quantity
             Reaction time of the system (with time units)
-        ees_recruitment_params : dict
+        ees_recruitment_profile : dict
             Dictionary containing EES recruitment parameters for different neuron types
         biophysical_params : dict
             Dictionary containing biophysical parameters for neurons
@@ -35,7 +35,7 @@ class BiologicalSystem:
             Name of the joint associated with the system
         """
         self.reaction_time = reaction_time
-        self.ees_recruitment_params = ees_recruitment_params
+        self.ees_recruitment_profile = ees_recruitment_profile
         self.biophysical_params = biophysical_params
         self.muscles_names = muscles_names
         self.number_muscles = len(muscles_names)
@@ -259,7 +259,7 @@ class BiologicalSystem:
         spikes, time_series = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
-            base_output_path=base_output_path, TORQUE=torque,EES_RECRUITMENT_PARAMS=self.ees_recruitment_params, EES_STIMULATION_PARAMS=ees_stimulation_params, fast=fast_type_mu, seed=seed
+            base_output_path=base_output_path, TORQUE=torque,EES_RECRUITMENT_PROFILE=self.ees_recruitment_profile, EES_STIMULATION_PARAMS=ees_stimulation_params, fast=fast_type_mu, seed=seed
         )
         
         # Generate standard plots
@@ -301,7 +301,7 @@ class BiologicalSystem:
             'label': 'EES Frequency '
         }
         
-        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+        return EES_stim_analysis(base_ees_params, vary_param,self.ees_stimulation_profile, n_iterations, self.reaction_time, 
                                self.neurons_population, self.connections, self.spindle_model, 
                                self.biophysical_params, self.muscles_names, time_step, seed)
     
@@ -333,7 +333,7 @@ class BiologicalSystem:
             'label': 'Afferent Fiber Co-Recruitment '
         }
         
-        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+        return EES_stim_analysis(base_ees_params, vary_param, self.ees_recruitment_profile, n_iterations, self.reaction_time, 
                                self.neurons_population, self.connections, self.spindle_model, 
                                self.biophysical_params, self.muscles_names, time_step, seed)
     
@@ -365,7 +365,7 @@ class BiologicalSystem:
             'label': 'Motoneuron Recruitment '
         }
         
-        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+        return EES_stim_analysis(base_ees_params, vary_param, self.recruitment_profile, n_iterations, self.reaction_time, 
                                self.neurons_population, self.connections, self.spindle_model, 
                                self.biophysical_params, self.muscles_names, time_step, seed)
 
@@ -406,7 +406,7 @@ class BiologicalSystem:
         return delay_excitability_MU_type_analysis(
             duration, self.reaction_time, self.neurons_population, self.connections, 
             self.spindle_model, self.biophysical_params, self.muscles_names,
-            torque_profile, ees_stimulations_params, time_step, seed)
+            torque_profile, ees_stimulations_params,ees_stimulation_profile time_step, seed)
 
     def find_ees_protocol(self, target_amplitude=15, target_period=2*second, 
                         update_interval=200*ms, prediction_horizon=1000*ms, 
