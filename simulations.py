@@ -1,623 +1,563 @@
-import os
+from brian2 import *
 import numpy as np
 import matplotlib.pyplot as plt
-import math
-from datetime import datetime
-from closed_loop import closed_loop
-from plots import plot_raster, plot_neural_dynamic, plot_activation, plot_mouvement
-from itertools import product
-import pandas as pd
+import os
 from tqdm import tqdm
-from brian2 import *
+from closed_loop import closed_loop
 
 class BiologicalSystem:
-
-    def __init__(self, REACTION_TIME, NEURONS_POPULATION, CONNECTIONS, SPINDLE_MODEL, BIOPHYSICAL_PARAMS,
-        MUSCLES_NAMES, associated_joint):
-        self.REACTION_TIME = REACTION_TIME
-        self.NEURONS_POPULATION = NEURONS_POPULATION
-        self.CONNECTIONS = CONNECTIONS  # Fixed typo: CONNECIONS -> CONNECTIONS
-        self.SPINDLE_MODEL = SPINDLE_MODEL
-        self.BIOPHYSICAL_PARAMS = BIOPHYSICAL_PARAMS
-        self.MUSCLES_NAMES = MUSCLES_NAMES
-        self.number_muscles = len(MUSCLES_NAMES)
-        self.associated_joint = associated_joint
+    """
+    Base class for neural reflex systems.
     
-    def simulations(self, base_output_path, N_ITERATIONS, TIME_STEP=0.1*ms, EES_PARAMS=None,
-                TORQUE=None, fast_type_MU=True, seed=42):
-        spikes, time_series = closed_loop(
-                N_ITERATIONS, self.REACTION_TIME, TIME_STEP, self.NEURON_COUNTS, self.CONNECTIONS,
-                self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS,
-                self.MUSCLES_NAMES, self.associated_joint, base_output_path,
-                TORQUE=TORQUE, EES_PARAMS=EES_PARAMS, fast=fast_type_MU, seed=seed)
-                    
-        plot_mouvement(time_series, self.MUSCLES_NAMES, self.associated_joint, base_output_path)
-        plot_neural_dynamic(time_series, self.MUSCLES_NAMES, base_output_path)
-        plot_raster(spikes, base_output_path)
-        plot_activation(time_series, self.MUSCLES_NAMES, base_output_path)
+    This class provides the common framework for different types of reflex systems,
+    handling the core simulation and analysis functionality.
+    """
+    
+    def __init__(self, reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint):
+        """
+        Initialize the biological system with common parameters.
         
+        Parameters:
+        -----------
+        reaction_time : brian2.units.fundamentalunits.Quantity
+            Reaction time of the system (with time units)
+        biophysical_params : dict
+            Dictionary containing biophysical parameters for neurons
+        muscles_names : list
+            List of muscle names involved in the system
+        associated_joint : str
+            Name of the joint associated with the system
+        """
+        self.reaction_time = reaction_time
+        self.biophysical_params = biophysical_params
+        self.muscles_names = muscles_names
+        self.number_muscles = len(muscles_names)
+        self.associated_joint = associated_joint
+        
+        # These will be set by subclasses
+        self.neurons_population = {}
+        self.connections = {}
+        self.spindle_model = {}
+    
+    def simulations(self, base_output_path, n_iterations, time_step=0.1*ms, ees_params=None,
+                   torque=None, fast_type_mu=True, seed=42):
+        """
+        Run simulations and generate plots.
+        
+        Parameters:
+        -----------
+        base_output_path : str
+            Base path for saving output files
+        n_iterations : int
+            Number of iterations to run
+        time_step : brian2.units.fundamentalunits.Quantity
+            Time step for the simulation
+        ees_params : dict, optional
+            Parameters for epidural electrical stimulation
+        torque : dict, optional
+            External torque applied to the joint
+        fast_type_mu : bool
+            If True, use fast twitch motor units
+        seed : int
+            Random seed for reproducibility
+        
+        Returns:
+        --------
+        tuple
+            (spikes, time_series) containing simulation results
+        """
+        spikes, time_series = closed_loop(
+            n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
+            self.spindle_model, self.biophysical_params, self.muscles_names, self.associated_joint,
+            base_output_path, TORQUE=torque, EES_PARAMS=ees_params, fast=fast_type_mu, seed=seed
+        )
+        
+        # Generate standard plots
+        plot_recruitment_curves(self.ees_recruitment_params, balance=0, num_muscles=2)
+        plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path)
+        plot_neural_dynamic(time_series, self.muscles_names, base_output_path)
+        plot_raster(spikes, base_output_path)
+        plot_activation(time_series, self.muscles_names, base_output_path)
+        
+        return spikes, time_series
 
-    def analyze_frequency_effects(self, freq_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
-        """Analyze the effects of varying EES frequency with fixed afferent and efferent recruitment."""
-      
+    def analyze_frequency_effects(self, freq_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
+        """
+        Analyze the effects of varying EES frequency with fixed afferent and efferent recruitment.
+        
+        Parameters:
+        -----------
+        freq_range : array-like
+            Range of frequencies to analyze
+        base_ees_params : dict
+            Base parameters for EES
+        n_iterations : int
+            Number of iterations for each simulation
+        time_step : brian2.units.fundamentalunits.Quantity
+            Time step for simulations
+        seed : int
+            Random seed for reproducibility
+        
+        Returns:
+        --------
+        dict
+            Analysis results
+        """
         vary_param = {
             'param_name': 'ees_freq',
             'values': freq_range,
             'label': 'EES Frequency '
         }
         
-        return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
-                                 TIME_STEP, seed)
-
-    def analyze_co_recruitment_effects(self, afferent_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
-        """Analyze the effects of varying afferent recruitment."""
-        
-        vary_param = {
-            'param_name': 'afferent_recruited',
-            'values': afferent_range,
-            'label': f'Afferent Fiber Co-Recruitment '
-        }
-
-        return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
-                                 TIME_STEP, seed)
-
-    def analyse_unbalanced_recruitment_effects(self, B_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
-        """Analyze the effects of unbalanced afferent recruitment."""
-        if (self.number_muscles != 2):  # Fixed variable name: number_muscle -> self.number_muscles
-            print("This functionality requires 2 muscles!")
-            return
-        vary_param = {
-            'param_name': 'B',
-            'values': B_range,
-            'label': f'Afferent Fiber Unbalanced Recruitment '
-        }
-
-        return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
-                                 TIME_STEP, seed)
-
-
-    def analyze_efferent_recruitment_effects(self, MN_range, base_EES_params, N_ITERATIONS=20, TIME_STEP=0.1*ms, seed=42):
-        """Analyze the effects of varying efferent (motoneuron) recruitment."""
-        
-        vary_param = {
-            'param_name': 'MN_recruited',
-            'values': MN_range,
-            'label': 'Motoneuron Recruitment '
-        }
-        
-        return EES_stim_analysis(base_EES_params, vary_param, N_ITERATIONS, self.REACTION_TIME, self.NEURON_COUNTS,
-                                 self.CONNECTIONS, self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, 
-                                 TIME_STEP, seed)
-
+        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+                               self.neurons_population, self.connections, self.spindle_model, 
+                               self.biophysical_params, self.muscles_names, time_step, seed)
     
-    def clonus_analysis(self, base_output_path, torque_profile, duration=1*second, time_step=0.1*ms,
-                    fast_type_MU=True, seed=41):
+    def analyze_co_recruitment_effects(self, afferent_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
-        Analyze clonus behavior by varying one parameter at a time and create visualization plots.
+        Analyze the effects of varying afferent recruitment.
         
         Parameters:
         -----------
-            Name of the joint to analyze
+        afferent_range : array-like
+            Range of afferent recruitment values to analyze
+        base_ees_params : dict
+            Base parameters for EES
+        n_iterations : int
+            Number of iterations for each simulation
+        time_step : brian2.units.fundamentalunits.Quantity
+            Time step for simulations
+        seed : int
+            Random seed for reproducibility
+        
+        Returns:
+        --------
+        dict
+            Analysis results
+        """
+        vary_param = {
+            'param_name': 'afferent_recruited',
+            'values': afferent_range,
+            'label': 'Afferent Fiber Co-Recruitment '
+        }
+        
+        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+                               self.neurons_population, self.connections, self.spindle_model, 
+                               self.biophysical_params, self.muscles_names, time_step, seed)
+    
+    def analyze_efferent_recruitment_effects(self, mn_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
+        """
+        Analyze the effects of varying efferent (motoneuron) recruitment.
+        
+        Parameters:
+        -----------
+        mn_range : array-like
+            Range of motoneuron recruitment values to analyze
+        base_ees_params : dict
+            Base parameters for EES
+        n_iterations : int
+            Number of iterations for each simulation
+        time_step : brian2.units.fundamentalunits.Quantity
+            Time step for simulations
+        seed : int
+            Random seed for reproducibility
+        
+        Returns:
+        --------
+        dict
+            Analysis results
+        """
+        vary_param = {
+            'param_name': 'MN_recruited',
+            'values': mn_range,
+            'label': 'Motoneuron Recruitment '
+        }
+        
+        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+                               self.neurons_population, self.connections, self.spindle_model, 
+                               self.biophysical_params, self.muscles_names, time_step, seed)
+
+      
+    def clonus_analysis(self, base_output_path, delay_values=[10, 25, 50, 75, 100]*ms,threshold_values = [-45, -50, -55]*mV,  duration=1*second, time_step=0.1*ms,
+                      fast_type_mu=True, torque_profile=None,ees_stimulations_params=None, Eseed=41):
+        """
+        Analyze clonus behavior by varying one parameter at a time.
+        
+        Parameters:
+        -----------
         base_output_path : str
             Base path for saving output files
         torque_profile : dict
             Dictionary with torque profile parameters
-        duration : int
+        duration : brian2.units.fundamentalunits.Quantity
             Duration of each simulation
-        time_step : float
-            Time step in seconds
-        fast_type_default : bool
+        time_step : brian2.units.fundamentalunits.Quantity
+            Time step for simulations
+        fast_type_mu : bool
             Default value for fast twitch parameter
         seed : int
             Random seed for reproducibility
-        
-     
         """
-        # Parameter ranges to test
-        delay_values = [10, 25, 50, 75, 100]*ms  # 10ms to 100ms
-        fast_twitch_values = [False, True]  # False for slow, True for fast
-        threshold_values = [-45, -50, -55]*mV  # -45mV to -55mV
+        return delay_excitability_MU_type_analysis( duration, self.reaction_time, 
+                               self.neurons_population, self.connections, self.spindle_model, 
+                               self.biophysical_params, self.muscles_names,torque_profile, ees_stimulations_params, time_step, seed)
         
-        # Create directory for saving figures
-        fig_dir = os.path.join(os.path.dirname(base_output_path), 'figures')
-        os.makedirs(fig_dir, exist_ok=True)
-        
-        # 1. Vary delay
-        fig1, axs1 = plt.subplots(len(delay_values), 2, figsize=(15, 4*len(delay_values)), sharex=True)
-        for i, delay in enumerate(tqdm(delay_values, desc="Varying delay")):
-            # Set reaction time to the current delay value
-            current_reaction_time = delay
-            print("current_reaction_time ", current_reaction_time)
-            # Run simulation with current parameters
-            n_iterations = int(duration/current_reaction_time) + 1
-            spikes, time_series = closed_loop(
-                n_iterations, current_reaction_time, time_step, self.NEURON_COUNTS, self.CONNECTIONS,
-                self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, self.associated_joint,
-                f"{base_output_path}_delay_{int(delay/ms)}ms",  # Fixed: delay*1000 -> delay/ms
-                TORQUE=torque_profile, fast=fast_type_MU, seed=seed
-            )
-            
-            # Plot joint angle
-            axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
-            axs1[i, 0].set_ylabel(f"Delay = {int(delay/ms)} ms\nJoint angle (deg)")  # Fixed: delay*1000 -> delay/ms
-            
-            # Plot muscle activations
-            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
-                activation_col = f"Activation_{muscle}"
-                axs1[i, 1].plot(time_series['Time'], time_series[activation_col], 
-                              label=muscle)
-            
-            axs1[i, 1].set_ylabel("Muscle activation")
-            axs1[i, 1].legend()
-        
-        axs1[-1, 0].set_xlabel("Time (s)")
-        axs1[-1, 1].set_xlabel("Time (s)")
-        fig1.suptitle("Effect of Delay on Joint Angle and Muscle Activation", fontsize=16)
-        fig1.tight_layout()
-        fig1.savefig(os.path.join(fig_dir, 'delay_variation.png'), dpi=300)
-        
-        n_iterations = int(duration/self.REACTION_TIME) + 1
-        # 2. Vary fast twitch parameter
-        fig2, axs2 = plt.subplots(len(fast_twitch_values), 2, figsize=(15, 4*len(fast_twitch_values)), sharex=True)
-        
-        for i, fast in enumerate(tqdm(fast_twitch_values, desc="Varying fast twitch parameter")):
-            
-            # Run simulation with current parameters
-            spikes, time_series = closed_loop(
-                n_iterations, self.REACTION_TIME, time_step, self.NEURON_COUNTS, self.CONNECTIONS,
-                self.SPINDLE_MODEL, self.BIOPHYSICAL_PARAMS, self.MUSCLES_NAMES, self.associated_joint,
-                f"{base_output_path}_fast_{fast}",
-                TORQUE=torque_profile, fast=fast, seed=seed
-            )
-            
-            # Plot joint angle
-            axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
-            axs2[i, 0].set_ylabel(f"Fast = {fast}\nJoint angle (deg)")
-            
-            # Plot muscle activations
-            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
-                activation_col = f"Activation_{muscle}"
-                axs2[i, 1].plot(time_series['Time'], time_series[activation_col],  # Fixed: 'time' -> 'Time'
-                              label=muscle)
-            
-            axs2[i, 1].set_ylabel("Muscle activation")
-            axs2[i, 1].legend()
-        
-        axs2[-1, 0].set_xlabel("Time (s)")
-        axs2[-1, 1].set_xlabel("Time (s)")
-        fig2.suptitle("Effect of Fast Twitch Parameter on Joint Angle and Muscle Activation", fontsize=16)
-        fig2.tight_layout()
-        fig2.savefig(os.path.join(fig_dir, 'fast_twitch_variation.png'), dpi=300)
-        
-        # 3. Vary threshold voltage
-        fig3, axs3 = plt.subplots(len(threshold_values), 2, figsize=(15, 4*len(threshold_values)), sharex=True)
-        
-        for i, threshold in enumerate(tqdm(threshold_values, desc="Varying threshold voltage")):
-            # Create a copy of biophysical params and update the threshold
-            current_biophysical_params = self.BIOPHYSICAL_PARAMS.copy()  # Fixed: self.biophysical_params -> self.BIOPHYSICAL_PARAMS
-            current_biophysical_params['threshold_v'] = threshold
-            
-            # Run simulation with current parameters
-            spikes, time_series = closed_loop(
-                n_iterations, self.REACTION_TIME, time_step, self.NEURON_COUNTS, self.CONNECTIONS,
-                self.SPINDLE_MODEL, current_biophysical_params, self.MUSCLES_NAMES, self.associated_joint,  # Fixed: self.MUSCLE_NAMES -> self.MUSCLES_NAMES
-                f"{base_output_path}_threshold_{int(threshold/mV)}mV",  # Fixed: threshold*1000 -> threshold/mV
-                TORQUE=torque_profile, fast=fast_type_MU, seed=seed
-            )
-            
-            # Plot joint angle
-            axs3[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
-            axs3[i, 0].set_ylabel(f"Threshold = {int(threshold/mV)} mV\nJoint angle (deg)")  # Fixed: threshold*1000 -> threshold/mV
-            
-            # Plot muscle activations
-            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
-                activation_col = f"Activation_{muscle}"
-                axs3[i, 1].plot(time_series['Time'], time_series[activation_col],  # Fixed: 'time' -> 'Time'
-                              label=muscle)
-            
-            axs3[i, 1].set_ylabel("Muscle activation")
-            axs3[i, 1].legend()
-        
-        axs3[-1, 0].set_xlabel("Time (s)")
-        axs3[-1, 1].set_xlabel("Time (s)")
-        fig3.suptitle("Effect of Threshold Voltage on Joint Angle and Muscle Activation", fontsize=16)
-        fig3.tight_layout()
-        fig3.savefig(os.path.join(fig_dir, 'threshold_variation.png'), dpi=300)
-        
-        # Close all figures to free memory
-        plt.close('all')
-
-
-def EES_stim_analysis(
-    param_dict,
-    vary_param,
-    N_ITERATIONS,
-    REACTION_TIME, 
-    NEURON_COUNTS, 
-    CONNECTIONS,
-    SPINDLE_MODEL, 
-    BIOPHYSICAL_PARAMS, 
-    MUSCLES_NAMES,
-    TIME_STEP=0.1*ms,
-    seed=42
-):
+class MonosynapticReflex(BiologicalSystem):
     """
-    Generalized EES stimulation analysis that can vary any parameter of interest.
+    Specialized class for monosynaptic reflexes.
     
-    Parameters:
-    -----------
-    param_dict : dict
-        Dictionary containing all EES parameters with their default values
-        Expected keys: 'ees_freq', 'afferent_recruited', 'MN_recruited', 'B'
-    vary_param : dict
-        Dictionary specifying which parameter to vary with its range of values
-        Format: {'param_name': [values_to_test], 'label': 'Display Label'}
-        Example: {'param_name': 'ees_freq', 'values': [10, 20, 30], 'label': 'EES Frequency (Hz)'}
+    Monosynaptic reflexes involve a direct connection from afferent (Ia) neurons
+    to motor neurons (MN) without intermediate interneurons.
     """
-
-    # Create a directory for saving plots if it doesn't exist
-    save_dir = "stimulation_analysis"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-        print(f"Created directory '{save_dir}' for saving plots")
     
-    # Create a base output path
-    base_path = os.path.join(save_dir, "output")  # Added base_path definition that was missing
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    num_muscles = len(MUSCLES_NAMES)
-    
-    # Define a custom color palette for muscles
-    # Using a colorblind-friendly palette
-    muscle_colors = {
-        MUSCLES_NAMES[i]: plt.cm.tab10(i % 10) for i in range(num_muscles)  # Fixed: num_muscle -> num_muscles
-    }
-    
-    # Define a custom style for the plots
-    plt.style.use('ggplot')
-    plt.rcParams.update({
-        'font.size': 12,
-        'axes.titlesize': 14,
-        'axes.labelsize': 12,
-        'xtick.labelsize': 10,
-        'ytick.labelsize': 10,
-        'legend.fontsize': 10,
-        'figure.titlesize': 16,
-        'figure.figsize': (15, 4),
-        'figure.dpi': 100
-    })
-    
-    time_series_to_plot = ['Ia_rate', 'II_rate', 'MN_rate', 'Raster_MN', 'Activation', 'Stretch', 'Joints']
-    
-    # Get parameter info
-    param_name = vary_param['param_name']
-    param_values = vary_param['values']
-    param_label = vary_param['label']
-    
-    n_rows = len(param_values)
-    
-    # Initialize figures and axes
-    figs = {}
-    axs_dict = {}
-    for var in time_series_to_plot:
-        fig, axs = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True, sharey=True)
-        if n_rows == 1:
-            axs = [axs]  # Ensure axs is always a list
-        figs[var] = fig
-        axs_dict[var] = axs
-      
-    if (num_muscles == 2):  # coactivation analysis
-        # Preallocate activities array
-        activities = None  # Will initialize inside loop
-    
-    # Define fast parameter for closed_loop call
-    fast = True  # Added default value for fast parameter
-    
-    # Run simulations for each parameter value
-    for i, value in enumerate(param_values):
-        # Create a copy of the base parameters
-        current_params = param_dict.copy()
+    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
+                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
+                custom_spindle=None, custom_ees_recruitment_params):
+        """
+        Initialize a monosynaptic reflex system with default or custom parameters.
         
-        # Update the parameter we're varying
-        current_params[param_name] = value
-        
-        # Create a descriptive name for the output file
-        param_str_parts = []
-        for key in current_params.keys():
-            param_str_parts.append(f"{key}_{current_params[key]}")
-        
-        param_str = '_'.join(param_str_parts)
-        sto_name = f'All_opensim_{param_str}_{timestamp}_{seed}.sto'
-        sto_path = os.path.join(save_dir, sto_name)
-    
-        # --- Run simulation ---
-        spikes, main_data = closed_loop(
-            N_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,  # Fixed parameter order
-            SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLES_NAMES, associated_joint=param_dict.get('associated_joint', 'ankle'),  # Added missing parameter
-            base_path=base_path,  # Used proper base_path
-            EES_PARAMS=current_params, fast=fast, seed=seed)
-        
-        # Extract time from the dataframe
-        time_data = main_data['Time']
-        
-        # Get time length for preallocation on first iteration
-        if num_muscles == 2 and activities is None:
-            T = len(time_data)
-            activities = np.zeros((len(MUSCLES_NAMES), n_rows, T))  # Fixed: muscles_names -> MUSCLES_NAMES
-    
-        # --- Plot each variable ---
-        for var in time_series_to_plot:
-            # Get the axis for this variable and parameter value
-            ax = axs_dict[var][i]
+        Parameters:
+        -----------
+        reaction_time : brian2.units.fundamentalunits.Quantity, optional
+            Reaction time of the system (default: 25ms)
+        biophysical_params : dict, optional
+            Custom biophysical parameters for neurons (if None, use defaults)
+        muscles_names : list, optional
+            List of muscle names (default: ["soleus_r"])
+        associated_joint : str, optional
+            Name of the associated joint (default: "ankle_angle_r")
+        custom_neurons : dict, optional
+            Custom neuron population counts (if None, use defaults)
+        custom_connections : dict, optional
+            Custom neural connections (if None, use defaults)
+        custom_spindle : dict, optional
+            Custom spindle model equations (if None, use defaults)
+        """
+        # Set default parameters if not provided
+        if muscles_names is None:
+            muscles_names = ["soleus_r"]
             
-            # Set title with parameter information
-            ax.set_title(f"{param_label}: {value} ", fontweight='bold')
+        if biophysical_params is None:
+            biophysical_params = {
+                'T_refr': 5 * ms,  # Refractory period
+                'Eleaky': -70*mV,
+                'gL': 10*nS,
+                'Cm': 0.3*nF,  
+                'E_ex': 0*mV,
+                'tau_e': 0.5*ms,
+                'threshold_v': -50*mV
+            }
+        if custom_ees_recruitment_params is None:
+              ees_recruitment_params = 
+              {
+                  'Ia': {
+                      'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                      'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                  },
+                  'II': {
+                      'threshold_10pct': 0.4,  # Type II fibers have higher threshold
+                      'saturation_90pct': 0.8  # and higher saturation point
+                  },
+                  'MN':{
+                      'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
+                      'saturation_90pct': 0.9  
+              }
+        # Initialize the base class
+        super().__init__(reaction_time,custom_ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        
+        # Set default neuron populations
+        self.neurons_population = {
+            "Ia": 60,       # Type Ia afferent neurons
+            "MN": 169       # Motor neurons
+        }
+        
+        # Override with custom values if provided
+        if custom_neurons is not None:
+            self.neurons_population.update(custom_neurons)
             
-            ax.set_xlabel("Time (s)", fontweight='bold')
-            if "rate" in var:
-                ax.set_ylabel(var.replace('_', ' ').title() + " (hertz)", fontweight='bold')
-            else:
-                ax.set_ylabel(var.replace('_', ' ').title() + " (dimless)", fontweight='bold')
+        # Set default connections
+        self.connections = {
+            ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9}
+        }
+        
+        # Override with custom connections if provided
+        if custom_connections is not None:
+            self.connections.update(custom_connections)
             
-            # Add a light background grid for better readability
-            ax.grid(True, linestyle='--', alpha=0.3)
-    
-            if var == 'Joints':
-                # Check if 'Joints' column exists, otherwise use 'Joint_ankle' or similar
-                joint_col = 'Joints' if 'Joints' in main_data.columns else f"Joint_{param_dict.get('associated_joint', 'ankle')}"
-                if joint_col in main_data.columns:
-                    ax.plot(time_data, main_data[joint_col], color='darkred', 
-                           label='Ankle Angle', linewidth=2.5)
-                    ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
-    
-            elif var == 'Raster_MN':
-                # Add different colors for each muscle in the raster plot
-                for idx, muscle_name in enumerate(MUSCLES_NAMES):  # Fixed: muscles_names -> MUSCLES_NAMES
-                    if muscle_name in spikes:
-                        color = muscle_colors[muscle_name]
-                        
-                        # Plot spikes for this muscle with a distinct color
-                        for neuron_id, neuron_spikes in spikes[muscle_name]['MN'].items():
-                            if neuron_spikes:
-                                ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), 
-                                       '.', markersize=4, color=color)
-                        
-                        # Add a label for this muscle at its position
-                        ax.text(0.01 + idx*0.09, 1.05, muscle_name, 
-                               transform=ax.get_xaxis_transform(), color=color,
-                               fontweight='bold', verticalalignment='center')
-                
-                # Add a more descriptive y-axis label for raster plot
-                ax.set_ylabel("Neuron ID ", fontweight='bold')
-                    
-            else:
-                # Plot data for each muscle with consistent colors
-                for idx, muscle_name in enumerate(MUSCLES_NAMES):  # Fixed: muscles_names -> MUSCLES_NAMES
-                    # Construct column name with muscle suffix
-                    col_name = f"{var}_{muscle_name}"
-                    
-                    if col_name in main_data.columns:
-                        ax.plot(time_data, main_data[col_name], label=muscle_name, 
-                               color=muscle_colors[muscle_name], linewidth=2.0, alpha=0.8)
-                        
-                        # Store mean activation for coactivation analysis
-                        if var == 'Activation' and num_muscles == 2:
-                            activities[idx, i, :] = main_data[col_name].values
-                
-            # Add legend with improved styling
-            if var != 'Raster_MN':  # Raster plot has text labels instead
-                legend = ax.legend(frameon=True, fancybox=True, framealpha=0.9, 
-                                  loc='upper right', ncol=1, fontsize='x-large')
-                legend.get_frame().set_edgecolor('lightgray')
-    
-    # --- Final layout adjustments, saving, and display ---
-    
-    # Process all figures
-    for var in time_series_to_plot:
-        # Add a main title to each figure with improved styling
-        figs[var].suptitle(f"{var.replace('_', ' ').title()} Response Across {param_label} Values", 
-                          fontsize=16, fontweight='bold', y=0.98)
+        # Set default spindle model
+        self.spindle_model = {
+            "Ia": "clip(0.1*(1.6*joint+joint_velocity),0, 100)"
+        }
         
-        # Make sure all plots have data and proper formatting
-        for ax in axs_dict[var]:
-            # If the axis is empty (no lines plotted), add a dummy invisible line
-            if not ax.lines:
-                ax.plot([0], [0], alpha=0)
-                ax.text(0.5, 0.5, 'No data available', 
-                       horizontalalignment='center',
-                       verticalalignment='center',
-                       transform=ax.transAxes,
-                       fontsize=12, fontweight='bold')
-        
-        # Add a global x-label at the bottom of the figure
-        figs[var].text(0.5, 0.04, 'Time (seconds)', ha='center', 
-                      fontsize=14, fontweight='bold')
-        
-        # Add a global y-label for the entire figure
-        if var != 'Raster_MN':
-            figs[var].text(0.04, 0.5, f"{var.replace('_', ' ').title()}", 
-                          va='center', rotation='vertical', 
-                          fontsize=14, fontweight='bold')
-        else:
-            figs[var].text(0.04, 0.5, "Motor Neuron Activity", 
-                          va='center', rotation='vertical', 
-                          fontsize=14, fontweight='bold')
-        
-        # Adjust layout
-        figs[var].tight_layout(rect=[0.08, 0.08, 0.98, 0.95])
-        
-        # Create a meaningful filename
-        var_name = var.replace('_', '-')
-        param_range = f"{param_name}_{min(param_values)}to{max(param_values)}"
-        filename = f"{var_name}_{param_range}_{timestamp}_{seed}.png"
-        filepath = os.path.join(save_dir, filename)
-        
-        # Save the figure with high resolution
-        figs[var].savefig(filepath, dpi=300, bbox_inches='tight')
-        print(f"Saved plot: {filename}")
-    
-    # Return activities if this was a coactivation analysis
-    if num_muscles == 2:
-        return activities
-    
-    # Display all figures
-    plt.show()
+        # Override with custom spindle model if provided
+        if custom_spindle is not None:
+            self.spindle_model.update(custom_spindle)
 
-    print(f"Simulation and plotting complete! All plots saved to '{save_dir}' directory.")
+
+class TrisynapticSystem(BiologicalSystem):
+    """
+    Specialized class for trisynaptic reflexes.
     
-    # Co-activation analysis if we have 2 muscles 
-    if num_muscles == 2:
-        # ===== Flexor-Extensor Activation Analysis =====
-        print("\nPerforming flexor-extensor activation analysis...")
+    Trisynaptic reflexes involve connections from afferent neurons (Ia and II)
+    to motor neurons (MN) through excitatory interneurons.
+    """
+    
+    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
+                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
+                custom_spindle=None, custom_ees_recruitment_params=None):
+        """
+        Initialize a trisynaptic reflex system with default or custom parameters.
         
-        # Define activation threshold
-        activation_threshold = 0.1  # Threshold to consider a muscle as "active"
-        
-        flexor_idx = 0  # tib_ant_r (tibialis anterior - flexor)
-        extensor_idx = 1  # med_gas_r (medial gastrocnemius - extensor)
-        
-        # Calculate grid layout (e.g., 2 rows if there are more than 3 parameter values)
-        n_cols = 2  # or choose based on space
-        n_rows = math.ceil(len(param_values) / n_cols)
-        
-        # Create scatter plot grid with multiple rows
-        fig_scatter, axs_scatter = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 5 * n_rows))
-        fig_scatter.suptitle("Flexor vs Extensor Activity", fontsize=16)
-        
-        # Ensure axs_scatter is 2D array
-        axs_scatter = np.atleast_2d(axs_scatter)
-        
-        # Create a figure for coactivation metrics
-        fig_coact, axs_coact = plt.subplots(1, 2, figsize=(15, 6))
-        fig_coact.suptitle("Coactivation Analysis", fontsize=16)
-        
-        # Create a figure for activation time analysis
-        fig_time, axs_time = plt.subplots(1, 2, figsize=(15, 6))
-        fig_time.suptitle("Muscle Activation Time Analysis", fontsize=16)
-        
-        # Arrays to store metrics across parameter values
-        min_coactivation = np.zeros(len(param_values))
-        product_coactivation = np.zeros(len(param_values))
-        flexor_active_time = np.zeros(len(param_values))
-        extensor_active_time = np.zeros(len(param_values))
-        
-        # Get total simulation time
-        time_array = main_data['Time']
-        total_time = time_array.iloc[-1] if hasattr(time_array, 'iloc') else time_array[-1]
-        
-        # Analyze each parameter value
-        for i, value in enumerate(param_values):
-            # Get flexor and extensor activation data
-            flexor_activation = activities[flexor_idx, i, :]
-            extensor_activation = activities[extensor_idx, i, :]
+        Parameters:
+        -----------
+        reaction_time : brian2.units.fundamentalunits.Quantity, optional
+            Reaction time of the system (default: 25ms)
+        biophysical_params : dict, optional
+            Custom biophysical parameters for neurons (if None, use defaults)
+        muscles_names : list, optional
+            List of muscle names (default: ["tib_ant_r"])
+        associated_joint : str, optional
+            Name of the associated joint (default: "ankle_angle_r")
+        custom_neurons : dict, optional
+            Custom neuron population counts (if None, use defaults)
+        custom_connections : dict, optional
+            Custom neural connections (if None, use defaults)
+        custom_spindle : dict, optional
+            Custom spindle model equations (if None, use defaults)
+        """
+        # Set default parameters if not provided
+        if muscles_names is None:
+            muscles_names = ["tib_ant_r"]
             
-            # Calculate time step for integration
-            dt = time_array[1] - time_array[0] if len(time_array) > 1 else 0.001
+        if biophysical_params is None:
+            biophysical_params = {
+                'T_refr': 5 * ms,
+                'Eleaky': -70*mV,
+                'gL': 10*nS,
+                'Cm': 0.3*nF,
+                'E_ex': 0*mV,
+                'tau_e': 0.5*ms,
+                'threshold_v': -50*mV
+            }
+        if custom_ees_recruitment_params is None:
+              ees_recruitment_params = 
+              {
+                  'Ia': {
+                      'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                      'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                  },
+                  'II': {
+                      'threshold_10pct': 0.4,  # Type II fibers have higher threshold
+                      'saturation_90pct': 0.8  # and higher saturation point
+                  },
+                  'MN':{
+                      'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
+                      'saturation_90pct': 0.9  
+              }  
+        # Initialize the base class
+        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        
+        # Set default neuron populations
+        self.neurons_population = {
+            "Ia": 60,       # Type Ia afferent neurons
+            "II": 60,       # Type II afferent neurons
+            "exc": 196,     # Excitatory interneurons
+            "MN": 169       # Motor neurons
+        }
+        
+        # Override with custom values if provided
+        if custom_neurons is not None:
+            self.neurons_population.update(custom_neurons)
             
-            # 1. Flexor vs Extensor Scatter Plot
-            row = i // n_cols
-            col = i % n_cols
-            ax = axs_scatter[row, col]
+        # Set default connections
+        self.connections = {
+            ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9},
+            ("II", "exc"): {"w": 2*3.64*nS, "p": 0.9},
+            ("exc", "MN"): {"w": 2*2.1*nS, "p": 0.9}
+        }
         
-            # Plot scatter
-            ax.scatter(flexor_activation, extensor_activation, alpha=0.6, s=10)
-            ax.set_xlabel("Flexor Activation")
-            ax.set_ylabel("Extensor Activation")
-            ax.set_title(f"{param_label}: {value}")
-            ax.grid(True, linestyle='--', alpha=0.7)
-        
-            # Diagonal reference line
-            max_val = max(np.max(flexor_activation), np.max(extensor_activation))
-            ax.plot([0, max_val], [0, max_val], 'r--', alpha=0.5)
+        # Override with custom connections if provided
+        if custom_connections is not None:
+            self.connections.update(custom_connections)
             
-            # 2. Calculate coactivation metrics
-            # Minimum-based coactivation: integral(min(flexor, extensor)dt)/total_time
-            min_coact = np.sum(np.minimum(flexor_activation, extensor_activation)) * dt / total_time
-            min_coactivation[i] = min_coact
-            
-            # Product-based coactivation: integral(flexor*extensor dt)/total_time
-            prod_coact = np.sum(flexor_activation * extensor_activation) * dt / total_time
-            product_coactivation[i] = prod_coact
-            
-            # 3. Calculate activation time (time above threshold)
-            flexor_active = np.sum(flexor_activation > activation_threshold) * dt / total_time
-            extensor_active = np.sum(extensor_activation > activation_threshold) * dt / total_time
-            
-            flexor_active_time[i] = flexor_active
-            extensor_active_time[i] = extensor_active
+        # Set default spindle model
+        self.spindle_model = {
+            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
+            "II": "20 + 13.5*stretch"
+        }
         
-        # Plot coactivation metrics vs parameter value
-        axs_coact[0].plot(param_values, min_coactivation, 'o-', linewidth=2)
-        axs_coact[0].set_xlabel(param_label)
-        axs_coact[0].set_ylabel("Min-based Coactivation")
-        axs_coact[0].set_title("Coactivation: min(flexor, extensor)")
-        axs_coact[0].grid(True)
-        
-        axs_coact[1].plot(param_values, product_coactivation, 'o-', linewidth=2, color='orange')
-        axs_coact[1].set_xlabel(param_label)
-        axs_coact[1].set_ylabel("Product-based Coactivation")
-        axs_coact[1].set_title("Coactivation: flexor * extensor")
-        axs_coact[1].grid(True)
-        
-        # Plot activation time metrics vs parameter value
-        axs_time[0].plot(param_values, flexor_active_time, 'o-', linewidth=2, color='blue', label='Flexor')
-        axs_time[0].plot(param_values, extensor_active_time, 'o-', linewidth=2, color='green', label='Extensor')
-        axs_time[0].set_xlabel(param_label)
-        axs_time[0].set_ylabel("Fraction of Time Active")
-        axs_time[0].set_title(f"Time Active (threshold = {activation_threshold})")
-        axs_time[0].legend()
-        axs_time[0].grid(True)
-        
-        # Plot activation time ratio (flexor/extensor)
-        ratio = np.divide(flexor_active_time, extensor_active_time, 
-                         out=np.ones_like(flexor_active_time), 
-                         where=extensor_active_time!=0)
-        axs_time[1].plot(param_values, ratio, 'o-', linewidth=2, color='purple')
-        axs_time[1].axhline(y=1.0, color='r', linestyle='--', alpha=0.5)  # Reference line at ratio=1
-        axs_time[1].set_xlabel(param_label)
-        axs_time[1].set_ylabel("Flexor/Extensor Ratio")
-        axs_time[1].set_title("Balance of Activation")
-        axs_time[1].grid(True)
-        
-        # Hide any unused subplots
-        for j in range(len(param_values), n_rows * n_cols):
-            row = j // n_cols
-            col = j % n_cols
-            axs_scatter[row, col].axis('off')
-        
-        # Adjust layout for all figures
-        for fig in [fig_scatter, fig_coact, fig_time]:
-            fig.tight_layout()
-            fig.subplots_adjust(top=0.9)
-        
-        # Save these new figures
-        for fig, name in zip([fig_scatter, fig_coact, fig_time], 
-                            ["flexor_vs_extensor", "coactivation_metrics", "activation_time"]):
-            filename = f"{name}_{param_name}_{min(param_values)}to{max(param_values)}_{timestamp}_{seed}.png"
-            filepath = os.path.join(save_dir, filename)
-            fig.savefig(filepath, dpi=300, bbox_inches='tight')
-            print(f"Saved analysis plot: {filename}")
-        
-        # Display all figures
-        plt.show()
-
-        print("Flexor-extensor activation analysis complete!")
+        # Override with custom spindle model if provided
+        if custom_spindle is not None:
+            self.spindle_model.update(custom_spindle)
 
 
-
-
-
-
-
-
-
-
-
-
-
+class ReciprocalInhibition(BiologicalSystem):
+    """
+    Specialized class for reciprocal inhibition reflexes.
     
-  
-
+    Reciprocal inhibition reflexes involve complex connections between two antagonistic
+    muscle systems, with both excitatory and inhibitory connections.
+    """
+    
+    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
+                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
+                custom_spindle=None, custom_ees_recruitment_params=None):
+        """
+        Initialize a reciprocal inhibition system with default or custom parameters.
+        
+        Parameters:
+        -----------
+        reaction_time : brian2.units.fundamentalunits.Quantity, optional
+            Reaction time of the system (default: 25ms)
+        biophysical_params : dict, optional
+            Custom biophysical parameters for neurons (if None, use defaults)
+        muscles_names : list, optional
+            List of muscle names (default: ["tib_ant_r", "med_gas_r"])
+        associated_joint : str, optional
+            Name of the associated joint (default: "ankle_angle_r")
+        custom_neurons : dict, optional
+            Custom neuron population counts (if None, use defaults)
+        custom_connections : dict, optional
+            Custom neural connections (if None, use defaults)
+        custom_spindle : dict, optional
+            Custom spindle model equations (if None, use defaults)
+        """
+        # Set default parameters if not provided
+        if muscles_names is None:
+            muscles_names = ["tib_ant_r", "med_gas_r"]
+        elif len(muscles_names) != 2:
+            raise ValueError("Reciprocal inhibition requires exactly 2 muscles")
+            
+        if biophysical_params is None:
+            biophysical_params = {
+                'T_refr': 5 * ms,
+                'Eleaky': -70*mV,
+                'gL': 10*nS,
+                'Cm': 0.3*nF,
+                'E_ex': 0*mV,
+                'tau_e': 0.5*ms,
+                'E_inh': -75*mV,
+                'tau_i': 5*ms,
+                'threshold_v': -50*mV
+            }
+        if custom_ees_recruitment_params is None:
+              ees_recruitment_params = 
+              {
+                  'Ia': {
+                      'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                      'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                  },
+                  'II': {
+                      'threshold_10pct': 0.4,  # Type II fibers have higher threshold
+                      'saturation_90pct': 0.8  # and higher saturation point
+                  },
+                  'MN':{
+                      'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
+                      'saturation_90pct': 0.9  
+              }    
+        # Initialize the base class
+        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        
+        # Get muscle names for clarity in connection definitions
+        flexor_muscle = muscles_names[0]  # First muscle is flexor (e.g., tib_ant_r)
+        extensor_muscle = muscles_names[1]  # Second muscle is extensor (e.g., med_gas_r)
+        
+        # Setup specialized neuron populations for reciprocal inhibition
+        self.neurons_population = {
+            # Afferents for each muscle
+            f"Ia_{flexor_muscle}": 60,
+            f"II_{flexor_muscle}": 60,
+            f"Ia_{extensor_muscle}": 60,
+            f"II_{extensor_muscle}": 60,
+            
+            # Interneurons
+            f"exc_{flexor_muscle}": 196,
+            f"exc_{extensor_muscle}": 196,
+            f"inh_{flexor_muscle}": 196,
+            f"inh_{extensor_muscle}": 196,
+            
+            # Motor neurons
+            f"MN_{flexor_muscle}": 169,
+            f"MN_{extensor_muscle}": 169
+        }
+        
+        # Override with custom values if provided
+        if custom_neurons is not None:
+            self.neurons_population.update(custom_neurons)
+            
+        # Set default connections with reciprocal inhibition pattern
+        self.connections = {
+            # Direct pathways
+            (f"Ia_{flexor_muscle}", f"MN_{flexor_muscle}"): {"w": 2*2.1*nS, "p": 0.9},
+            (f"Ia_{extensor_muscle}", f"MN_{extensor_muscle}"): {"w": 2*2.1*nS, "p": 0.9},
+            
+            # Ia inhibition pathways
+            (f"Ia_{flexor_muscle}", f"inh_{flexor_muscle}"): {"w": 2*3.64*nS, "p": 0.9},
+            (f"Ia_{extensor_muscle}", f"inh_{extensor_muscle}"): {"w": 2*3.64*nS, "p": 0.9},
+            
+            # Type II excitation pathways
+            (f"II_{flexor_muscle}", f"exc_{flexor_muscle}"): {"w": 2*1.65*nS, "p": 0.9},
+            (f"II_{extensor_muscle}", f"exc_{extensor_muscle}"): {"w": 2*1.65*nS, "p": 0.9},
+            
+            # Type II inhibition pathways
+            (f"II_{flexor_muscle}", f"inh_{flexor_muscle}"): {"w": 2*2.19*nS, "p": 0.9},
+            (f"II_{extensor_muscle}", f"inh_{extensor_muscle}"): {"w": 2*2.19*nS, "p": 0.9},
+            
+            # Excitatory interneuron to motoneuron pathways
+            (f"exc_{flexor_muscle}", f"MN_{flexor_muscle}"): {"w": 2*0.7*nS, "p": 0.6},
+            (f"exc_{extensor_muscle}", f"MN_{extensor_muscle}"): {"w": 2*0.7*nS, "p": 0.6},
+            
+            # Reciprocal inhibition pathways
+            (f"inh_{flexor_muscle}", f"MN_{extensor_muscle}"): {"w": 2*0.2*nS, "p": 0.8},
+            (f"inh_{extensor_muscle}", f"MN_{flexor_muscle}"): {"w": 2*0.2*nS, "p": 0.8},
+            
+            # Inhibitory interneuron interactions
+            (f"inh_{flexor_muscle}", f"inh_{extensor_muscle}"): {"w": 2*0.76*nS, "p": 0.3},
+            (f"inh_{extensor_muscle}", f"inh_{flexor_muscle}"): {"w": 2*0.76*nS, "p": 0.3}
+        }
+        
+        # Override with custom connections if provided
+        if custom_connections is not None:
+            self.connections.update(custom_connections)
+            
+        # Set default spindle model - need to handle specific muscle names
+        self.spindle_model = {}
+        for muscle in muscles_names:
+            self.spindle_model[f"Ia_{muscle}"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+            self.spindle_model[f"II_{muscle}"] = "20 + 13.5*stretch"
+        
+        # Override with custom spindle model if provided
+        if custom_spindle is not None:
+            self.spindle_model.update(custom_spindle)
+    
+    def analyse_unbalanced_recruitment_effects(self, b_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
+        """
+        Analyze the effects of unbalanced afferent recruitment between antagonistic muscles.
+        
+        Parameters:
+        -----------
+        b_range : array-like
+            Range of balance values to analyze (0-1 where 0.5 is balanced)
+        base_ees_params : dict
+            Base parameters for EES
+        n_iterations : int
+            Number of iterations for each simulation
+        time_step : brian2.units.fundamentalunits.Quantity
+            Time step for simulations
+        seed : int
+            Random seed for reproducibility
+        
+        Returns:
+        --------
+        dict
+            Analysis results
+        """
+        vary_param = {
+            'param_name': 'B',
+            'values': b_range,
+            'label': 'Afferent Fiber Unbalanced Recruitment'
+        }
+        
+        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+                               self.neurons_population, self.connections, self.spindle_model, 
+                               self.biophysical_params, self.muscles_names, time_step, seed)
