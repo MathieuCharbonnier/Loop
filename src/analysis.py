@@ -55,13 +55,11 @@ def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration
         """
         # Create base_output_path for results
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_dir = "clonus_analysis"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        print(f"Created directory '{save_dir}' for saving plots")
+        fig_dir = "clonus_analysis"
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
+        print(f"Created directory '{fig_dir}' for saving plots")
     
-        # Create a base output path
-        fig_dir = os.path.join(save_dir, timestamp)
     
         fast_twitch_values = [False, True]  # False for slow, True for fast
     
@@ -83,12 +81,12 @@ def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration
                     muscles_names,
                     num_muscles, 
                     associated_joint,
-                    f"{fig_dir}_delay",
                     ees_recruitment_profile,
                     ees_stimulation_params,
                     torque_profile, 
                     fast_type_mu, 
-                    seed
+                    seed,
+                    None
                 )
             
             # Plot joint angle
@@ -106,9 +104,9 @@ def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration
         
         axs1[-1, 0].set_xlabel("Time (s)")
         axs1[-1, 1].set_xlabel("Time (s)")
-        fig1.suptitle("Effect of Delay on Joint Angle and Muscle Activation", fontsize=16)
-        fig1.tight_layout()
-        fig1.savefig(os.path.join(fig_dir, 'delay_variation.png'), dpi=300)
+        fig1.suptitle("Joint Angle and Muscle Activation for different reaction times", fontsize=16)
+        fig1.tight_layout(rect=[0, 0, 1, 0.95])
+        fig1.savefig(os.path.join(fig_dir, f'delay_variation_{timestamp}.png'), dpi=300)
         
         n_iterations = int(duration/reaction_time) 
         # 2. Vary fast twitch parameter
@@ -129,18 +127,21 @@ def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration
                 muscles_names,
                 num_muscles, 
                 associated_joint,
-                f"{fig_dir}_delay",
                 ees_recruitment_profile,
                 ees_stimulation_params,
                 torque_profile, 
                 fast, 
-                seed
+                seed,
+                None
             )
             
             # Plot joint angle
             axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
-            axs2[i, 0].set_ylabel(f"Fast = {fast}\nJoint angle (deg)")
-            
+            if fast:
+                axs2[i, 0].set_ylabel(f"Fast type Motor Unit\nJoint angle (deg)")
+            else:
+                axs2[i, 0].set_ylabel(f"Slow type Motor Unit\nJoint angle (deg)")
+
             # Plot muscle activations
             for muscle in muscles_names :  
                 activation_col = f"Activation_{muscle}"
@@ -152,9 +153,9 @@ def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration
         
         axs2[-1, 0].set_xlabel("Time (s)")
         axs2[-1, 1].set_xlabel("Time (s)")
-        fig2.suptitle("Effect of Fast Twitch Parameter on Joint Angle and Muscle Activation", fontsize=16)
-        fig2.tight_layout()
-        fig2.savefig(os.path.join(fig_dir, 'fast_twitch_variation.png'), dpi=300)
+        fig2.suptitle("Joint Angle and Muscle Activation of Slow and Fast type motor units", fontsize=16)
+        fig2.tight_layout(rect=[0, 0, 1, 0.95])
+        fig2.savefig(os.path.join(fig_dir, f'fast_twitch_variation_{timestamp}.png'), dpi=300)
         
         # 3. Vary threshold voltage
         fig3, axs3 = plt.subplots(len(threshold_values), 2, figsize=(15, 4*len(threshold_values)), sharex=True)
@@ -177,12 +178,12 @@ def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration
                 muscles_names,
                 num_muscles, 
                 associated_joint,
-                f"{fig_dir}_threshold",
                 ees_recruitment_profile,
                 ees_stimulation_params,
                 torque_profile, 
                 fast_type_mu, 
-                seed
+                seed,
+                None
             )
             
             # Plot joint angle
@@ -200,12 +201,11 @@ def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration
         
         axs3[-1, 0].set_xlabel("Time (s)")
         axs3[-1, 1].set_xlabel("Time (s)")
-        fig3.suptitle("Effect of Threshold Voltage on Joint Angle and Muscle Activation", fontsize=16)
-        fig3.tight_layout()
-        fig3.savefig(os.path.join(fig_dir, 'threshold_variation.png'), dpi=300)
+        fig3.suptitle("Effect of neuron excitability on Joint Angle and Muscle Activation", fontsize=16)
+        fig3.tight_layout(rect=[0, 0, 1, 0.95])
+        fig3.savefig(os.path.join(fig_dir, f'threshold_variation_{timestamp}.png'), dpi=300)
         
-        # Close all figures to free memory
-        plt.close('all')
+        plt.show()
 
 def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time, 
                      neurons_population, connections, spindle_model, biophysical_params, 
@@ -253,9 +253,6 @@ def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time,
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         print(f"Created directory '{save_dir}' for saving plots")
-    
-    # Create a base output path
-    base_path = os.path.join(save_dir, "output")
   
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -279,7 +276,7 @@ def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time,
         'figure.dpi': 100
     })
     
-    time_series_to_plot = ['Ia_rate', 'II_rate', 'MN_rate', 'Raster_MN', 'Activation', 'Stretch', 'Joints']
+    time_series_to_plot = ['Ia_rate_baseline', 'II_rate_baseline', 'MN_rate', 'Raster_MN', 'Activation', 'Stretch', 'Joint']
     
     # Get parameter info
     param_name = vary_param['param_name']
@@ -318,9 +315,6 @@ def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time,
         for key in current_params.keys():
             param_str_parts.append(f"{key}_{current_params[key]}")
         
-        param_str = '_'.join(param_str_parts)
-        sto_name = f'All_opensim_{param_str}_{timestamp}_{seed}.sto'
-        sto_path = os.path.join(save_dir, sto_name)
     
         # --- Run simulation ---
            
@@ -335,12 +329,12 @@ def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time,
             muscles_names,
             num_muscles, 
             associated_joint,
-            base_path,
             ees_recruitment_profile,
             current_params, # EES_STIMULATION_PARAMS
             None,  # TORQUE 
             fast, 
-            seed
+            seed,
+            None
         )
  
         
@@ -369,13 +363,10 @@ def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time,
             # Add a light background grid for better readability
             ax.grid(True, linestyle='--', alpha=0.3)
     
-            if var == 'Joints':
-                # Check if 'Joints' column exists, otherwise use 'Joint_ankle' or similar
-                joint_col = 'Joints' if 'Joints' in main_data.columns else f"Joint_{param_dict.get('associated_joint', 'ankle')}"
-                if joint_col in main_data.columns:
-                    ax.plot(time_data, main_data[joint_col], color='darkred', 
+            if var == f'Joints_{associated_joint}':
+                ax.plot(time_data, main_data[f'Joints_{associated_joint}'], color='darkred', 
                            label='Ankle Angle', linewidth=2.5)
-                    ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
+                ax.set_ylabel(var.replace('_', ' ').title() + " (degree)", fontweight='bold')
     
             elif var == 'Raster_MN':
                 # Add different colors for each muscle in the raster plot
