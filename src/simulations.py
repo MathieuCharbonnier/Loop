@@ -146,15 +146,15 @@ class BiologicalSystem:
                 issues["errors"].append(f"Neuron '{post_neuron}' used in connection {connection_pair} but not defined in the neurons population")
 
         # Validate EES recruitment parameters
-        if self.ees_recruitment_params:
+        if self.ees_recruitment_profile:
             # Check if all required neuron types have recruitment parameters
             for neuron_type in neuron_types:
-                if neuron_type in ["Ia", "II", "MN"] and neuron_type not in self.ees_recruitment_params:
+                if neuron_type in ["Ia", "II", "MN"] and neuron_type not in self.ees_recruitment_profile:
                     issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
 
             
             # Check each recruitment parameter set
-            for neuron_type, params in self.ees_recruitment_params.items():
+            for neuron_type, params in self.ees_recruitment_profile.items():
                 required_params = ["threshold_10pct", "saturation_90pct"]
                 for param in required_params:
                     if param not in params:
@@ -263,8 +263,8 @@ class BiologicalSystem:
         )
         
         # Generate standard plots
-        if ees_params is not None:
-            plot_recruitment_curves(self.ees_recruitment_params, current_current=ees_params.get('intensity'), balance=ees_params.get('balance', 0), num_muscles=self.number_muscles, save=save)
+        if ees_stimulation_params is not None:
+            plot_recruitment_curves(self.ees_recruitment_profile, current_current=ees_stimulation_params.get('intensity'),base_output_path, balance=ees_stimulation_params.get('balance', 0), num_muscles=self.number_muscles, save=save)
             
         plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path, save=save)
         plot_neural_dynamic(time_series, self.muscles_names, base_output_path, save=save)
@@ -406,7 +406,7 @@ class BiologicalSystem:
         return delay_excitability_MU_type_analysis(
             duration, self.reaction_time, self.neurons_population, self.connections, 
             self.spindle_model, self.biophysical_params, self.muscles_names,
-            torque_profile, ees_stimulations_params,ees_stimulation_profile time_step, seed)
+            torque_profile, ees_stimulations_params,ees_stimulation_profile, time_step, seed)
 
     def find_ees_protocol(self, target_amplitude=15, target_period=2*second, 
                         update_interval=200*ms, prediction_horizon=1000*ms, 
@@ -506,7 +506,7 @@ class Monosynaptic(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if custom_ees_recruitment_params is None:
+        if custom_ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
                     'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
