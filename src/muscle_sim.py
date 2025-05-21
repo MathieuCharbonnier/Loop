@@ -34,7 +34,7 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
         Path to save final state as JSON
     """
 
-    model = osim.Model("../Model/gait2392_millard2012_pelvislocked.osim")
+    model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
     time_array = np.arange(0, T, dt)
     # Add muscle controller if activation provided
     if activation_array is not None:
