@@ -87,7 +87,7 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     Returns:
     - Dictionary with recruitment counts and frequency
     """
-    validate_ees(ees_stimulation_profile,ees_recruitment_params, num_muscles, neurons_population)
+    validate_ees(ees_stimulation_params,ees_recruitment_profile, num_muscles, neurons_population)
     
     # Get fractions first
     if 'balance' in ees_stimulation_params:
@@ -252,7 +252,8 @@ def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, n
                         issues["errors"].append(f"'intensity paramter ' in ees stimulation must contains values between 0 and 1, got {val}")
             else:
                 issues["errors"].append("EES parameters must contain 'intensity' parameter")
-              if 'balance' in ees_stimulation_params:
+
+            if 'balance' in ees_stimulation_params:
                     if not (-1 <= ees_stimulation_params["balance"] <= 1):
                         issues["errors"].append(f"'balance parameter ' in ees stimulation must contains values between -1 and 1, got {val}")
                     if number_muscle==1:
