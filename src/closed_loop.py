@@ -14,54 +14,61 @@ from activation import decode_spikes_to_activation
 from input_generator import transform_torque_params_in_array, transform_intensity_balance_in_recruitment
 
 
-def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CONNECTIONS,
-           SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLE_NAMES,NUM_MUSCLES, associated_joint, base_output_path, 
-            EES_RECRUITMENT_PROFILE,EES_STIMULATION_PARAMS=None, TORQUE=None, fast=True, seed=42):
+def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
+              spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, 
+              base_output_path, ees_recruitment_profile, ees_stimulation_params=None, 
+              torque=None, fast=True, seed=42):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
-
+    
     This script runs a neuromuscular simulation that integrates:
     1. EES stimulation
     2. Spike-to-activation decoding
     3. Muscle length/velocity simulation via OpenSim
     4. Proprioceptive feedback
     5. Initial dorsiflexion perturbation for clonus simulation
-
+    
     Parameters:
     -----------
-    NUM_ITERATIONS : int
+    n_iterations : int
         Number of simulation iterations to run
-    REACTION_TIME : brian2.unit.second
+    reaction_time : brian2.unit.second
         Duration of each simulation iteration
-    TIME_STEP : brian2.unit.second
+    time_step : brian2.unit.second
         Time step size for simulation
-    EES_RECRUITMENT_PROFILE : dict
-        Parameters to define recruitment curve
-    EES_STIMULATION_PROFILE : dict
-        Parameters for electrical epidural stimulation
-    NEURONS_POPULATION : dict
+    neurons_population : dict
         Number of neurons for each type
-    CONNECTIONS : dict
+    connections : dict
         Neural connection configuration
-    SPINDLE_MODEL : dict
+    spindle_model : dict
         Model parameters for muscle spindles
-    BIOPHYSICAL_PARAMS : dict
+    biophysical_params : dict
         Biophysical model parameters
-    MUSCLE_NAMES : list
+    muscles_names : list
         List of muscle names strings
-    NUM_MUSCLES: int
-        Lengths of the MUSCLE_NAMES list
+    num_muscles : int
+        Number of muscles (length of muscles_names list)
     associated_joint : str
         Name of the associated joint
     base_output_path : str
         Base path for output files
-    TORQUE : dict, optional
+    ees_recruitment_profile : dict
+        Parameters to define recruitment curve
+    ees_stimulation_params : dict, optional
+        Parameters for electrical epidural stimulation
+    torque : dict, optional
         Parameter to create the external torque profile applied at each time step
     fast : bool, optional
         Whether to use the fast spike-to-activation decoding algorithm (default: True)
     seed : int, optional
         Random seed for simulation reproducibility (default: 42)
+    
+    Returns:
+    --------
+    tuple
+        (spikes, time_series) - Neuronal spikes and simulation time series data
     """
+
     # Create CSV and STO paths 
     csv_path = base_output_path + '.csv'
     sto_path = base_output_path + '.sto'
@@ -71,13 +78,18 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
     # =============================================================================
 
     # Discretization configuration + vector initialization
-    nb_points = int(REACTION_TIME/TIME_STEP)
-    activations = np.zeros((NUM_MUSCLES, nb_points))
-    total_time_points = nb_points * NUM_ITERATIONS
+
+    time_=np.arange(0, REACTION_TIME, TIME_STEP)
+    nb_points=len(time_)
+    activations = np.zeros((NUM_MUSCLES,nb_points ))
     time_points = np.arange(0, REACTION_TIME*NUM_ITERATIONS, TIME_STEP)
-    joint_all = np.zeros((total_time_points))
-    joint_velocity_all=np.zeros((total_time_points))
-    activations_all = np.zeros((NUM_MUSCLES, total_time_points))
+    joint_all = np.zeros((len(time_points)))
+    activations_all = np.zeros((NUM_MUSCLES, len(time_points)))
+
+    print('reaction time ', REACTION_TIME)
+    print('n iteration ', NUM_ITERATIONS)
+    print('nb_points ', nb_points)
+    print('nb_total_time ', len(time_points))
 
     initial_potentials = {
         "exc": BIOPHYSICAL_PARAMS['Eleaky'],
@@ -313,8 +325,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
         # Compute Ia firing rate using spindle model
         Ia_rate = eval(SPINDLE_MODEL['Ia'], 
                        {"__builtins__": {'sign': np.sign, 'abs': np.abs, 'clip': np.clip}}, 
-                       {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
-                        "joint": joint_all, "joint_velocity": joint_velocity_all})
+                       {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values}
+                       )
         
         df[f'Ia_rate_baseline_{muscle_name}'] = Ia_rate
 
@@ -322,8 +334,8 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
         if "II" in NEURONS_POPULATION and "II" in SPINDLE_MODEL:
             II_rate = eval(SPINDLE_MODEL['II'], 
                           {"__builtins__": {}}, 
-                          {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values,
-                           "joint": joint_all, "joint_velocity": joint_velocity_all})
+                          {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values}
+                           )
 
             df[f'II_rate_baseline_{muscle_name}'] = II_rate
 
