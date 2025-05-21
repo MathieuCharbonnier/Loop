@@ -544,7 +544,7 @@ class Monosynaptic(BiologicalSystem):
             
         # Set default spindle model
         self.spindle_model = {
-            "Ia": "clip(0.1*(1.6*joint+joint_velocity),0, 100)"
+            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
         }
         
         # Override with custom spindle model if provided
