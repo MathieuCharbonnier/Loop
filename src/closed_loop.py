@@ -79,24 +79,24 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     # Discretization configuration + vector initialization
 
-    time_=np.arange(0, REACTION_TIME, TIME_STEP)
+    time_=np.arange(0, reaction_time, time_step)
     nb_points=len(time_)
-    activations = np.zeros((NUM_MUSCLES,nb_points ))
-    time_points = np.arange(0, REACTION_TIME*NUM_ITERATIONS, TIME_STEP)
+    activations = np.zeros((num_muscles, nb_points))
+    time_points = np.arange(0, reaction_time*n_iterations, time_step)
     joint_all = np.zeros((len(time_points)))
-    activations_all = np.zeros((NUM_MUSCLES, len(time_points)))
+    activations_all = np.zeros((num_muscles, len(time_points)))
 
-    print('reaction time ', REACTION_TIME)
-    print('n iteration ', NUM_ITERATIONS)
+    print('reaction time ', reaction_time)
+    print('n iteration ', n_iterations)
     print('nb_points ', nb_points)
     print('nb_total_time ', len(time_points))
 
     initial_potentials = {
-        "exc": BIOPHYSICAL_PARAMS['Eleaky'],
-        "MN": BIOPHYSICAL_PARAMS['Eleaky']
+        "exc": biophysical_params['Eleaky'],
+        "MN": biophysical_params['Eleaky']
     }
-    if NUM_MUSCLES == 2:
-        initial_potentials["inh"] = BIOPHYSICAL_PARAMS['Eleaky']
+    if num_muscles == 2:
+        initial_potentials["inh"] = biophysical_params['Eleaky']
 
     # Initialize parameters for each motoneuron
     initial_params = [
@@ -105,37 +105,37 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             'c0': [0.0, 0.0],    # Initial calcium concentration state
             'P0': 0.0,           # Initial calcium-troponin binding state
             'a0': 0.0            # Initial activation state
-        } for _ in range(NEURONS_POPULATION['MN'])]
-        for _ in range(NUM_MUSCLES)]
+        } for _ in range(neurons_population['MN'])]
+        for _ in range(num_muscles)]
 
     # Containers for simulation data
-    muscle_data = [[] for _ in range(NUM_MUSCLES)]
-    resting_lengths = [None] * NUM_MUSCLES
+    muscle_data = [[] for _ in range(num_muscles)]
+    resting_lengths = [None] * num_muscles
 
  
     spike_data = {
         muscle_name: {
             neuron_type: defaultdict(list)
-            for neuron_type in NEURONS_POPULATION.keys()
+            for neuron_type in neurons_population.keys()
         }
-        for muscle_name in MUSCLE_NAMES
+        for muscle_name in muscles_names
     }
-    torque=None
-    if TORQUE is not None:
-        torque=transform_torque_params_in_array(time_points, TORQUE)
+    torque_array = None
+    if torque is not None:
+        torque_array = transform_torque_params_in_array(time_points, torque)
 
-    EES_PARAMS=None
-    if EES_STIMULATION_PARAMS is not None:
-        EES_PARAMS=transform_intensity_balance_in_recruitment(
-          EES_RECRUITMENT_PROFILE, EES_STIMULATION_PARAMS, NEURONS_POPULATION, NUM_MUSCLES)
+    ees_params = None
+    if ees_stimulation_params is not None:
+        ees_params = transform_intensity_balance_in_recruitment(
+          ees_recruitment_profile, ees_stimulation_params, neurons_population, num_muscles)
 
     # =============================================================================
     # Main Simulation Loop
     # =============================================================================
 
     print("Start Simulation:")
-    if EES_PARAMS is not None:
-        freq= EES_PARAMS['freq']
+    if ees_params is not None:
+        freq = ees_params['freq']
         if isinstance(freq, tuple):
            print("Phase specific EES modulation")
            print(f"frequency swing phase: {freq[0]}")
@@ -143,9 +143,9 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         else:
             print(f"EES frequency: {freq}")
 
-        for fiber_key, fiber_recruitment in EES_PARAMS['recruitment'].items():
+        for fiber_key, fiber_recruitment in ees_params['recruitment'].items():
 
-            print(f"Number {' '.join(fiber_key.split('_'))} recruited by EES: {fiber_recruitment}/{NEURONS_POPULATION[fiber_key]}")
+            print(f"Number {' '.join(fiber_key.split('_'))} recruited by EES: {fiber_recruitment}/{neurons_population[fiber_key]}")
   
 
     # Create a simulator instance based on execution environment
@@ -153,24 +153,24 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     simulator = CoLabSimulator() if on_colab else LocalSimulator()
 
                        
-    for iteration in range(NUM_ITERATIONS):
-            print(f"--- Iteration {iteration+1} of {NUM_ITERATIONS} ---")
+    for iteration in range(n_iterations):
+            print(f"--- Iteration {iteration+1} of {n_iterations} ---")
 
             # Prepare torque if provided
             current_torque = None
-            if torque is not None:
+            if torque_array is not None:
                 start_idx = iteration * nb_points
                 end_idx = (iteration + 1) * nb_points
-                current_torque = torque[start_idx:end_idx]
+                current_torque = torque_array[start_idx:end_idx]
 
             # Run muscle simulation with file paths
             fiber_lengths, joint = simulator.run_muscle_simulation(
-                TIME_STEP/second,
-                REACTION_TIME/second,
-                MUSCLE_NAMES,
+                time_step/second,
+                reaction_time/second,
+                muscles_names,
                 associated_joint,
                 activation=activations,
-                torque= current_torque
+                torque=current_torque
                 )
                 
             # Process muscle simulation results
@@ -183,53 +183,53 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 resting_lengths = fiber_lengths[:, 0]
 
             # Calculate stretch and velocity for all muscles
-            stretch = np.zeros((NUM_MUSCLES, nb_points))
-            stretch_velocity = np.zeros((NUM_MUSCLES, nb_points))
+            stretch = np.zeros((num_muscles, nb_points))
+            stretch_velocity = np.zeros((num_muscles, nb_points))
                 
-            for muscle_idx in range(NUM_MUSCLES):
+            for muscle_idx in range(num_muscles):
                 # Calculate stretch and velocity
                 stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
                 stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points[iteration*nb_points:(iteration+1)*nb_points])
 
 
             # Run neural simulation based on muscle count
-            if NUM_MUSCLES == 1:
+            if num_muscles == 1:
             
                 # Determine if we need a II/excitatory pathway simulation
                 has_II_pathway = (
-                    'II' in SPINDLE_MODEL and 
-                    'II' in NEURONS_POPULATION and 
-                    'exc' in NEURONS_POPULATION
+                    'II' in spindle_model and 
+                    'II' in neurons_population and 
+                    'exc' in neurons_population
                 )
             
                 if has_II_pathway:
                     all_spikes, final_potentials, state_monitors = run_trisynaptic_simulation(
-                        stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, 
-                        TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
-                        initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
+                        stretch, stretch_velocity, neurons_population, connections, 
+                        time_step, reaction_time, spindle_model, seed,
+                        initial_potentials, **biophysical_params, ees_params=ees_params
                     )
                 else:
                     all_spikes, final_potentials, state_monitors = run_monosynaptic_simulation(
-                        stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, 
-                        TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
-                        initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
+                        stretch, stretch_velocity, neurons_population, connections, 
+                        time_step, reaction_time, spindle_model, seed,
+                        initial_potentials, **biophysical_params, ees_params=ees_params
                     )
             
-            else:  # NUM_MUSCLES == 2
+            else:  # num_muscles == 2
                 # Adjust EES frequency based on muscle activation if phase-dependent
-                EES_PARAMS_copy = None
+                ees_params_copy = None
             
-                if EES_PARAMS is not None:
-                    EES_PARAMS_copy = EES_PARAMS.copy()
+                if ees_params is not None:
+                    ees_params_copy = ees_params.copy()
             
-                    freq = EES_PARAMS.get("freq")
+                    freq = ees_params.get("freq")
                     if isinstance(freq, tuple) and len(freq) == 2:
                         dominant = 0 if np.mean(activations[0]) >= np.mean(activations[1]) else 1
-                        EES_PARAMS_copy["freq"] = freq[dominant]
+                        ees_params_copy["freq"] = freq[dominant]
             
                 all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
-                    stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, TIME_STEP, REACTION_TIME, 
-                    SPINDLE_MODEL, seed, initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS_copy
+                    stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
+                    spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
                 )
 
                 
@@ -237,17 +237,17 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             initial_potentials.update(final_potentials)
 
             # Store spike times for visualization
-            for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
+            for muscle_idx, muscle_name in enumerate(muscles_names):
                 muscle_spikes = all_spikes[muscle_idx]
                 for fiber_type, fiber_spikes in muscle_spikes.items():
                     for neuron_id, spikes in fiber_spikes.items():
                         # Adjust spike times by iteration offset
-                        adjusted_spikes = spikes/second + iteration * REACTION_TIME/second
+                        adjusted_spikes = spikes/second + iteration * reaction_time/second
                         spike_data[muscle_name][fiber_type][neuron_id].extend(adjusted_spikes)
 
             # Initialize arrays for mean values of all neurons per muscle
             mean_e, mean_u, mean_c, mean_P, mean_activation = [
-                np.zeros((NUM_MUSCLES, int(REACTION_TIME/TIME_STEP))) for _ in range(5)
+                np.zeros((num_muscles, int(reaction_time/time_step))) for _ in range(5)
             ]
 
             # Process motor neuron spikes to get muscle activations
@@ -259,8 +259,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     # Decode spikes to muscle activations
                     e, u, c, P, activations_result, final_values = decode_spikes_to_activation(
                         mn_spikes_sec,
-                        TIME_STEP/second,
-                        REACTION_TIME/second,
+                        time_step/second,
+                        reaction_time/second,
                         initial_params[muscle_idx],
                         fast=fast
                     )
@@ -285,19 +285,19 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     # Create batch data for current iteration
                     batch_data = {
                         'Time': time_points[iteration*nb_points:(iteration+1)*nb_points],
-                        f'Fiber_length_{MUSCLE_NAMES[muscle_idx]}': fiber_lengths[muscle_idx],
-                        f'Stretch_{MUSCLE_NAMES[muscle_idx]}': stretch[muscle_idx],
-                        f'Stretch_Velocity_{MUSCLE_NAMES[muscle_idx]}': stretch_velocity[muscle_idx],
-                        f'mean_e_{MUSCLE_NAMES[muscle_idx]}': mean_e[muscle_idx],
-                        f'mean_u_{MUSCLE_NAMES[muscle_idx]}': mean_u[muscle_idx],
-                        f'mean_c_{MUSCLE_NAMES[muscle_idx]}': mean_c[muscle_idx],
-                        f'mean_P_{MUSCLE_NAMES[muscle_idx]}': mean_P[muscle_idx],
-                        f'Activation_{MUSCLE_NAMES[muscle_idx]}': mean_activation[muscle_idx],
+                        f'Fiber_length_{muscles_names[muscle_idx]}': fiber_lengths[muscle_idx],
+                        f'Stretch_{muscles_names[muscle_idx]}': stretch[muscle_idx],
+                        f'Stretch_Velocity_{muscles_names[muscle_idx]}': stretch_velocity[muscle_idx],
+                        f'mean_e_{muscles_names[muscle_idx]}': mean_e[muscle_idx],
+                        f'mean_u_{muscles_names[muscle_idx]}': mean_u[muscle_idx],
+                        f'mean_c_{muscles_names[muscle_idx]}': mean_c[muscle_idx],
+                        f'mean_P_{muscles_names[muscle_idx]}': mean_P[muscle_idx],
+                        f'Activation_{muscles_names[muscle_idx]}': mean_activation[muscle_idx],
                     }
                     
                     # Add state monitor data with muscle name as suffix
                     for key, value in state_monitors[muscle_idx].items():
-                        batch_data[f'{key}_{MUSCLE_NAMES[muscle_idx]}'] = value
+                        batch_data[f'{key}_{muscles_names[muscle_idx]}'] = value
 
                     # Store batch data for this muscle
                     muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
@@ -310,7 +310,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     all_data_dfs = []
     
     # Process data for each muscle
-    for muscle_idx, muscle_name in enumerate(MUSCLE_NAMES):
+    for muscle_idx, muscle_name in enumerate(muscles_names):
           
         # Combine all iteration data for this muscle
         df = pd.concat(muscle_data[muscle_idx], ignore_index=True)
@@ -323,7 +323,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         time = df['Time'].values
         
         # Compute Ia firing rate using spindle model
-        Ia_rate = eval(SPINDLE_MODEL['Ia'], 
+        Ia_rate = eval(spindle_model['Ia'], 
                        {"__builtins__": {'sign': np.sign, 'abs': np.abs, 'clip': np.clip}}, 
                        {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values}
                        )
@@ -331,8 +331,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         df[f'Ia_rate_baseline_{muscle_name}'] = Ia_rate
 
         # Compute II firing rate if applicable
-        if "II" in NEURONS_POPULATION and "II" in SPINDLE_MODEL:
-            II_rate = eval(SPINDLE_MODEL['II'], 
+        if "II" in neurons_population and "II" in spindle_model:
+            II_rate = eval(spindle_model['II'], 
                           {"__builtins__": {}}, 
                           {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values}
                            )
@@ -365,8 +365,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     # Add joint and torque if torque is applied
     combined_df[f'Joint_{associated_joint}'] = joint_all
     combined_df[f'Joint_Velocity_{associated_joint}'] = np.gradient(joint_all, time_points)
-    if torque is not None:
-        combined_df['Torque'] = torque
+    if torque_array is not None:
+        combined_df['Torque'] = torque_array
 
     # Save the combined dataframe to CSV
     combined_df.to_csv(csv_path, index=False)
@@ -380,12 +380,12 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
   
     # Run final simulation for visualization
     fiber_lengths, joint=simulator.run_muscle_simulation(
-            TIME_STEP/second,
-            REACTION_TIME/second * NUM_ITERATIONS,
-            MUSCLE_NAMES,
+            time_step/second,
+            reaction_time/second * n_iterations,
+            muscles_names,
             associated_joint,
             activations_all,
-            torque,
+            torque_array,
             sto_path
         )
     """
@@ -396,8 +396,6 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     """
 
     return spike_data, combined_df
-
-
 
 class SimulatorBase:
     """Base class for simulation strategies"""
@@ -492,7 +490,7 @@ class LocalSimulator(SimulatorBase):
         self.current_state = {}  # Store simulation state in memory
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
-                              activation,torque ):
+                              activation, torque):
         """Run a single muscle simulation iteration using direct function call with in-memory state"""
         from muscle_sim import run_simulation
         # Run simulation directly with in-memory state
@@ -513,7 +511,3 @@ def is_running_on_colab():
         return True
     except ImportError:
         return False
-
-
-
-
