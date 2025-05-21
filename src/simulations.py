@@ -259,7 +259,7 @@ class BiologicalSystem:
         spikes, time_series = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
-            base_output_path=base_output_path, TORQUE=torque,EES_RECRUITMENT_PROFILE=self.ees_recruitment_profile, EES_STIMULATION_PARAMS=ees_stimulation_params, fast=fast_type_mu, seed=seed
+            base_output_path=base_output_path, torque=torque,ees_recruitment_profile=self.ees_recruitment_profile,ees_stimulation_params=ees_stimulation_params, fast=fast_type_mu, seed=seed
         )
         
         # Generate standard plots
@@ -313,7 +313,7 @@ class BiologicalSystem:
             self.muscles_names,
             self.number_muscles,
             self.associated_joint,
-            self.ees_recruitment_profile
+            self.ees_recruitment_profile,
             time_step, 
             seed
         )
@@ -394,8 +394,10 @@ class BiologicalSystem:
         dict
             Analysis results
         """
-        # No need for base_output_path as function creates its own folder
+       
         return delay_excitability_MU_type_analysis(
+            delay_values,
+            threshold_values,
             duration,
             time_step, 
             self.reaction_time, 
@@ -832,7 +834,20 @@ class ReciprocalInhibition(BiologicalSystem):
             'label': 'Afferent Fiber Unbalanced Recruitment'
         }
         
-        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
-                               self.neurons_population, self.connections, self.spindle_model, 
-                               self.biophysical_params, self.muscles_names, time_step, seed)
+        return EES_stim_analysis(
+                    base_ees_params,
+                    vary_param, 
+                    n_iterations,
+                    self.reaction_time, 
+                    self.neurons_population, 
+                    self.connections,
+                    self.spindle_model, 
+                    self.biophysical_params, 
+                    self.muscles_names,
+                    self.number_muscles,
+                    self.associated_joint,
+                    self.recruitment_profile,
+                    time_step, 
+            seed
+        )
                     
