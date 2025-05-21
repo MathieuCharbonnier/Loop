@@ -3,7 +3,7 @@ import numpy as np
 import os
 from typing import Dict, List, Union, Tuple, Optional
 
-def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_input, joint_velocity_input, 
+def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,  
                                 neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
                                 initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                                 ees_params=None):
@@ -16,10 +16,6 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_inp
         Stretch inputs.
     stretch_velocity_input : list of arrays
         Velocity inputs.
-    joint_input : array
-        Joint inputs.
-    joint_velocity_input : array
-        Joint velocity inputs.
     neuron_pop : dict
         Dictionary with counts of different neuron populations ('Ia', 'MN').
     connections: dict
@@ -68,8 +64,6 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_inp
     # Create TimedArray inputs
     stretch_array = TimedArray(stretch_input[0], dt=dt_run)
     stretch_velocity_array = TimedArray(stretch_velocity_input[0], dt=dt_run)
-    joint_array = TimedArray(joint_input, dt=dt_run)
-    joint_velocity_array = TimedArray(joint_velocity_input, dt=dt_run)
   
     # Extract EES parameters
     Ia_recruited = 0
@@ -78,7 +72,6 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_inp
         freq = ees_params['freq']
         Ia_recruited = ees_params['recruitment']['Ia']
     
-    print("Ia_recruited ", Ia_recruited)
     
     # Create Ia afferent neurons
     n_Ia = neuron_pop['Ia']
@@ -86,8 +79,6 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_inp
     equation_baseline = """
         stretch = stretch_array(t): 1
         stretch_velocity = stretch_velocity_array(t): 1
-        joint = joint_array(t): 1
-        joint_velocity = joint_velocity_array(t): 1
         """
 
     if freq > 0 and Ia_recruited > 0:
@@ -95,7 +86,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_inp
             n_Ia, 
             equation_baseline + f'''
             is_ees = (i < {Ia_recruited}): boolean
-            rate = ({equation})*hertz + {freq} * int(is_ees): Hz
+            rate = ({equation})*hertz + freq * int(is_ees): Hz
             ''', 
             threshold='rand() < rate*dt', 
             refractory=T_refr, 
@@ -158,8 +149,9 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_inp
                       method='exact')
         
         syn.connect(p=p)
-        syn.w = np.clip(weight + 0.2 * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        
+        noise=0.2
+        syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
+        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         net.add(syn)
         synapses[key] = syn
     
@@ -207,7 +199,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input, joint_inp
     return [result], final_potentials, state_monitors
 
 
-def run_trisynaptic_simulation(stretch_input, stretch_velocity_input, joint_input, joint_velocity_input, 
+def run_trisynaptic_simulation(stretch_input, stretch_velocity_input,  
                              neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
                              initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                              ees_params=None):
@@ -220,10 +212,6 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input, joint_inpu
         Stretch inputs.
     stretch_velocity_input : list of arrays
         Velocity inputs.
-    joint_input : array
-        Joint inputs.
-    joint_velocity_input : array
-        Joint velocity inputs.
     neuron_pop : dict
         Dictionary with counts of different neuron populations ('Ia', 'II', 'MN', 'exc').
     connections: dict
@@ -272,8 +260,7 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input, joint_inpu
     # Create TimedArray inputs
     stretch_array = TimedArray(stretch_input[0], dt=dt_run)
     stretch_velocity_array = TimedArray(stretch_velocity_input[0], dt=dt_run)
-    joint_array = TimedArray(joint_input, dt=dt_run)
-    joint_velocity_array = TimedArray(joint_velocity_input, dt=dt_run)
+
   
     # Extract EES parameters
     Ia_recruited = 0
@@ -285,15 +272,11 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input, joint_inpu
         if 'II' in ees_params:
             II_recruited = ees_params['recruitment']['II']
                             
-    print("Ia_recruited ", Ia_recruited)
-    print("II_recruited ", II_recruited)
     
     # Create common equation baseline for afferent neurons
     equation_baseline = """
         stretch = stretch_array(t): 1
         stretch_velocity = stretch_velocity_array(t): 1
-        joint = joint_array(t): 1
-        joint_velocity = joint_velocity_array(t): 1
         """
     
     # Create Ia afferent neurons
@@ -305,7 +288,7 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input, joint_inpu
             n_Ia, 
             equation_baseline + f'''
             is_ees = (i < {Ia_recruited}): boolean
-            rate = ({equation_Ia})*hertz + {freq} * int(is_ees): Hz
+            rate = ({equation_Ia})*hertz + freq * int(is_ees): Hz
             ''', 
             threshold='rand() < rate*dt', 
             refractory=T_refr, 
@@ -423,8 +406,9 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input, joint_inpu
                       method='exact')
         
         syn.connect(p=p)
-        syn.w = np.clip(weight + 0.2 * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        
+        noise=0.2
+        syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
+        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         net.add(syn)
         synapses[key] = syn
     
@@ -473,47 +457,8 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input, joint_inpu
     
     return [result], final_potentials, state_monitors
 
-
-
-
-def run_one_muscle_neuron_simulation(stretch_input, stretch_velocity_input, joint_input, joint_velocity_input, 
-                                     neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
-                                     initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
-                                     ees_params=None):
-    """
-    Run a simulation of flexor-extensor neuron dynamics.
-    This is a wrapper function that chooses between monosynaptic and disynaptic simulations.
-    
-    Parameters:
-    ----------
-    See specific simulation functions for parameter details.
-
-    Returns:
-    -------
-    tuple
-        Results from the appropriate simulation function.
-    """
-    # Determine if we need a disynaptic pathway simulation
-    has_II_pathway = ('II' in spindle_model and 'II' in neuron_pop and 'exc' in neuron_pop)
-    
-    if has_II_pathway:
-        return run_trisynaptic_simulation(
-            stretch_input, stretch_velocity_input, joint_input, joint_velocity_input,
-            neuron_pop, connections, dt_run, T, spindle_model, seed_run,
-            initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
-            ees_params
-        )
-    else:
-        return run_monosynaptic_simulation(
-            stretch_input, stretch_velocity_input, joint_input, joint_velocity_input,
-            neuron_pop, connections, dt_run, T, spindle_model, seed_run,
-            initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
-            ees_params
-        )
-
  
     
-
 def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input, neuron_pop, connections, dt_run, T,
                                           spindle_model, seed_run, initial_potentials, 
                                           Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
