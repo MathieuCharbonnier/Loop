@@ -43,11 +43,10 @@ def plot_raster(spikes, base_output_path):
                 if neuron_spikes:
                     axs[j, i].plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), '.', markersize=3, color='black')
             axs[j, i].set(title=f"{muscle}_{fiber_type}", ylabel="Neuron Index")
-            axs[j, i].tick_params(labelsize=11)
             axs[j, i].grid(True)
 
-    axs[-1, 0].set_xlabel("Time (s)", fontsize=11)
-    fig.suptitle('Spikes Raster Plot', fontsize=16)
+    axs[-1, 0].set_xlabel("Time (s)")
+    fig.suptitle('Spikes Raster Plot')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     
     if base_output_path is not None:
@@ -104,19 +103,18 @@ def plot_neural_dynamic(df, muscle_names, base_output_path):
         else:
             ylabel = base_label  # fallback
 
-        ax.set_ylabel(ylabel, fontsize=11)
-        ax.set_title(base_label, fontsize=13)
+        ax.set_ylabel(ylabel)
+        ax.set_title(base_label)
 
         for muscle in muscle_names:
             full_col = f"{base_label}_{muscle}"
             if full_col in df.columns:
                 ax.plot(time, df[full_col], label=muscle)
 
-        ax.legend(fontsize=9)
-        ax.tick_params(labelsize=11)
+        ax.legend()
 
-    axs[-1].set_xlabel('Time (s)', fontsize=11)
-    fig.suptitle('Neural Dynamics', fontsize=16)
+    axs[-1].set_xlabel('Time (s)')
+    fig.suptitle('Neural Dynamics')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     if base_output_path is not None:
@@ -151,12 +149,11 @@ def plot_activation(df, muscle_names, base_output_path):
                            label=f'{muscle_name}', 
                            color=colorblind_friendly_colors[color_keys[j % len(color_keys)]])
         
-        axs[i].set_ylabel(base_label, fontsize=11)
-        axs[i].legend(fontsize=11)
-        axs[i].tick_params(labelsize=11)
+        axs[i].set_ylabel(base_label)
+        axs[i].legend()
     
-    axs[-1].set_xlabel('Time (s)', fontsize=11)
-    fig.suptitle("Activation Dynamics ", fontsize=16)
+    axs[-1].set_xlabel('Time (s)')
+    fig.suptitle("Activation Dynamics ")
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     if base_output_path is not None:
@@ -192,25 +189,24 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
     # Plot torque first, if available
     if has_torque:
         axs[current_axis].plot(time, df[torque_column], label=f'Torque {joint_name}', color='tab:red')
-        axs[current_axis].set_ylabel("Torque (Nm)", fontsize=11)
-        axs[current_axis].legend(fontsize=11)
-        axs[current_axis].tick_params(labelsize=10)
+        axs[current_axis].set_ylabel("Torque (Nm)")
+        axs[current_axis].legend()
         current_axis += 1
 
     # Plot joint angle
     joint_column = f"Joint_{joint_name}"
     axs[current_axis].plot(time, df[joint_column], label=joint_name)
-    axs[current_axis].set_ylabel("Joint Angle (°)", fontsize=11)
-    axs[current_axis].set_xlabel('Time (s)', fontsize=11)
-    axs[current_axis].legend(fontsize=11)
+    axs[current_axis].set_ylabel("Joint Angle (°)")
+    axs[current_axis].set_xlabel('Time (s)')
+    axs[current_axis].legend()
     current_axis += 1
 
     # Plot joint Velocity
     joint_column = f"Joint_Velocity_{joint_name}"
     axs[current_axis].plot(time, df[joint_column], label=joint_name+ " velocity")
-    axs[current_axis].set_ylabel("Joint Velocity (°/s)", fontsize=11)
-    axs[current_axis].set_xlabel('Time (s)', fontsize=11)
-    axs[current_axis].legend(fontsize=11)
+    axs[current_axis].set_ylabel("Joint Velocity (°/s)")
+    axs[current_axis].set_xlabel('Time (s)')
+    axs[current_axis].legend()
     current_axis += 1
 
 
@@ -225,11 +221,10 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
                 axs[current_axis].plot(time, df[column_name],
                                        label=f'{muscle_name}',
                                        color=colorblind_friendly_colors[color_keys[j % len(color_keys)]])
-        axs[current_axis].set_ylabel(ylabel, fontsize=11)
-        axs[current_axis].legend(fontsize=11)
-        axs[current_axis].tick_params(labelsize=10)
+        axs[current_axis].set_ylabel(ylabel)
+        axs[current_axis].legend()
         current_axis+=1
-    fig.suptitle("Movement", fontsize=16)
+    fig.suptitle("Movement")
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     if base_output_path is not None:
@@ -370,7 +365,7 @@ def plot_from_sto(filepath, columns_wanted, base_output_path, title=None):
         axs = [axs]
     
     if title is not None:
-        fig.suptitle(title, fontsize=16)
+        fig.suptitle(title)
 
     for i, (name_df, name_label) in enumerate(columns_wanted.items()):
         col_name = f"{name_df}/value"
