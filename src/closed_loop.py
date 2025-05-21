@@ -133,7 +133,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
 
         for fiber_key, fiber_recruitment in EES_PARAMS['recruitment'].items():
 
-            print(f"Number {' '.join(fiber_key.split('_')} recruited by EES: {fiber_recruitment}/{NEURONS_POPULATION[fiber_key]}")
+            print(f"Number {' '.join(fiber_key.split('_'))} recruited by EES: {fiber_recruitment}/{NEURONS_POPULATION[fiber_key]}")
   
 
     # Create a simulator instance based on execution environment
@@ -165,8 +165,6 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
             fiber_lengths = fiber_lengths[:, :nb_points]
             joint = joint[:nb_points]
             joint_all[iteration*nb_points: (iteration+1)*nb_points] = joint
-            joint_velocity = np.gradient(joint, time_points[iteration*nb_points: (iteration+1)*nb_points])
-            joint_velocity_all[iteration*nb_points: (iteration+1)*nb_points]=joint_velocity
             
             # Set resting lengths on first iteration
             if resting_lengths[0] is None:
@@ -182,45 +180,45 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
                 stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points[iteration*nb_points:(iteration+1)*nb_points])
 
 
-           # Run neural simulation based on muscle count
-           if NUM_MUSCLES == 1:
-           
-               # Determine if we need a II/excitatory pathway simulation
-               has_II_pathway = (
-                   'II' in SPINDLE_MODEL and 
-                   'II' in NEURONS_POPULATION and 
-                   'exc' in NEURONS_POPULATION
-               )
-           
-               if has_II_pathway:
-                   all_spikes, final_potentials, state_monitors = run_trisynaptic_simulation(
-                       stretch, stretch_velocity, joint, joint_velocity, NEURONS_POPULATION, CONNECTIONS, 
-                       TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
-                       initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
-                   )
-               else:
-                   all_spikes, final_potentials, state_monitors = run_monosynaptic_simulation(
-                       stretch, stretch_velocity, joint, joint_velocity, NEURONS_POPULATION, CONNECTIONS, 
-                       TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
-                       initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
-                   )
-           
-           else:  # NUM_MUSCLES == 2
-               # Adjust EES frequency based on muscle activation if phase-dependent
-               EES_PARAMS_copy = None
-           
-               if EES_PARAMS is not None:
-                   EES_PARAMS_copy = EES_PARAMS.copy()
-           
-                   freq = EES_PARAMS.get("freq")
-                   if isinstance(freq, tuple) and len(freq) == 2:
-                       dominant = 0 if np.mean(activations[0]) >= np.mean(activations[1]) else 1
-                       EES_PARAMS_copy["freq"] = freq[dominant]
-           
-               all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
-                   stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, TIME_STEP, REACTION_TIME, 
-                   SPINDLE_MODEL, seed, initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS_copy
-               )
+            # Run neural simulation based on muscle count
+            if NUM_MUSCLES == 1:
+            
+                # Determine if we need a II/excitatory pathway simulation
+                has_II_pathway = (
+                    'II' in SPINDLE_MODEL and 
+                    'II' in NEURONS_POPULATION and 
+                    'exc' in NEURONS_POPULATION
+                )
+            
+                if has_II_pathway:
+                    all_spikes, final_potentials, state_monitors = run_trisynaptic_simulation(
+                        stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, 
+                        TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
+                        initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
+                    )
+                else:
+                    all_spikes, final_potentials, state_monitors = run_monosynaptic_simulation(
+                        stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, 
+                        TIME_STEP, REACTION_TIME, SPINDLE_MODEL, seed,
+                        initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS
+                    )
+            
+            else:  # NUM_MUSCLES == 2
+                # Adjust EES frequency based on muscle activation if phase-dependent
+                EES_PARAMS_copy = None
+            
+                if EES_PARAMS is not None:
+                    EES_PARAMS_copy = EES_PARAMS.copy()
+            
+                    freq = EES_PARAMS.get("freq")
+                    if isinstance(freq, tuple) and len(freq) == 2:
+                        dominant = 0 if np.mean(activations[0]) >= np.mean(activations[1]) else 1
+                        EES_PARAMS_copy["freq"] = freq[dominant]
+            
+                all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
+                    stretch, stretch_velocity, NEURONS_POPULATION, CONNECTIONS, TIME_STEP, REACTION_TIME, 
+                    SPINDLE_MODEL, seed, initial_potentials, **BIOPHYSICAL_PARAMS, ees_params=EES_PARAMS_copy
+                )
 
                 
             # Update initial potentials for next iteration
@@ -354,7 +352,7 @@ def closed_loop(NUM_ITERATIONS, REACTION_TIME, TIME_STEP, NEURONS_POPULATION, CO
 
     # Add joint and torque if torque is applied
     combined_df[f'Joint_{associated_joint}'] = joint_all
-    combined_df[f'Joint_Velocity_{associated_joint}'] = joint_velocity_all
+    combined_df[f'Joint_Velocity_{associated_joint}'] = np.gradient(joint_all, time_points)
     if torque is not None:
         combined_df['Torque'] = torque
 
