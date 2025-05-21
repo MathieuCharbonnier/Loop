@@ -259,17 +259,18 @@ class BiologicalSystem:
         spikes, time_series = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
-            base_output_path=base_output_path, torque=torque,ees_recruitment_profile=self.ees_recruitment_profile,ees_stimulation_params=ees_stimulation_params, fast=fast_type_mu, seed=seed
-        )
+             torque=torque,ees_recruitment_profile=self.ees_recruitment_profile,ees_stimulation_params=ees_stimulation_params,
+             fast=fast_type_mu, seed=seed, base_output_path=base_output_path)
         
         # Generate standard plots
         if ees_stimulation_params is not None:
-            plot_recruitment_curves(self.ees_recruitment_profile, current_current=ees_stimulation_params.get('intensity'),base_output_path=base_output_path, balance=ees_stimulation_params.get('balance', 0), num_muscles=self.number_muscles, save=save)
+            plot_recruitment_curves(self.ees_recruitment_profile, current_current=ees_stimulation_params.get('intensity'),
+            base_output_path=base_output_path, balance=ees_stimulation_params.get('balance', 0), num_muscles=self.number_muscles)
             
-        plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path, save=save)
-        plot_neural_dynamic(time_series, self.muscles_names, base_output_path, save=save)
-        plot_raster(spikes, base_output_path,save=save)
-        plot_activation(time_series, self.muscles_names, base_output_path, save=save)
+        plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path)
+        plot_neural_dynamic(time_series, self.muscles_names, base_output_path)
+        plot_raster(spikes, base_output_path)
+        plot_activation(time_series, self.muscles_names, base_output_path)
         
         return spikes, time_series
 
@@ -358,7 +359,7 @@ class BiologicalSystem:
             self.muscles_names,
             self.number_muscles,
             self.associated_joint,
-            self.recruitment_profile,
+            self.ees_recruitment_profile,
             time_step, 
             seed
         )
@@ -834,20 +835,7 @@ class ReciprocalInhibition(BiologicalSystem):
             'label': 'Afferent Fiber Unbalanced Recruitment'
         }
         
-        return EES_stim_analysis(
-                    base_ees_params,
-                    vary_param, 
-                    n_iterations,
-                    self.reaction_time, 
-                    self.neurons_population, 
-                    self.connections,
-                    self.spindle_model, 
-                    self.biophysical_params, 
-                    self.muscles_names,
-                    self.number_muscles,
-                    self.associated_joint,
-                    self.recruitment_profile,
-                    time_step, 
-            seed
-        )
+        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
+                               self.neurons_population, self.connections, self.spindle_model, 
+                               self.biophysical_params, self.muscles_names, time_step, seed)
                     
