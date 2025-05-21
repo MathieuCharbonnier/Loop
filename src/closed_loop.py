@@ -16,8 +16,8 @@ from input_generator import transform_torque_params_in_array, transform_intensit
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
               spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, 
-              base_output_path, ees_recruitment_profile, ees_stimulation_params=None, 
-              torque=None, fast=True, seed=42):
+              ees_recruitment_profile, ees_stimulation_params=None, 
+              torque=None, fast=True, seed=42,base_output_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
     
@@ -50,8 +50,6 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         Number of muscles (length of muscles_names list)
     associated_joint : str
         Name of the associated joint
-    base_output_path : str
-        Base path for output files
     ees_recruitment_profile : dict
         Parameters to define recruitment curve
     ees_stimulation_params : dict, optional
@@ -62,16 +60,14 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         Whether to use the fast spike-to-activation decoding algorithm (default: True)
     seed : int, optional
         Random seed for simulation reproducibility (default: 42)
+    base_output_path : str
+        Base path for output files
     
     Returns:
     --------
     tuple
         (spikes, time_series) - Neuronal spikes and simulation time series data
     """
-
-    # Create CSV and STO paths 
-    csv_path = base_output_path + '.csv'
-    sto_path = base_output_path + '.sto'
 
     # =============================================================================
     # Initialization
@@ -86,10 +82,6 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     joint_all = np.zeros((len(time_points)))
     activations_all = np.zeros((num_muscles, len(time_points)))
 
-    print('reaction time ', reaction_time)
-    print('n iteration ', n_iterations)
-    print('nb_points ', nb_points)
-    print('nb_total_time ', len(time_points))
 
     initial_potentials = {
         "exc": biophysical_params['Eleaky'],
@@ -247,7 +239,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
             # Initialize arrays for mean values of all neurons per muscle
             mean_e, mean_u, mean_c, mean_P, mean_activation = [
-                np.zeros((num_muscles, int(reaction_time/time_step))) for _ in range(5)
+                np.zeros((num_muscles, nb_points)) for _ in range(5)
             ]
 
             # Process motor neuron spikes to get muscle activations
@@ -348,7 +340,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 if len(all_spike_times) > 1:
                     kde = gaussian_kde(all_spike_times, bw_method=0.3)
                     firing_rate = kde(time) * len(all_spike_times) / max(len(fiber_spikes), 1)
-                df[f'{fiber_name}_rate_measured_{muscle_name}'] = firing_rate
+                df[f'{fiber_name}_rate_{muscle_name}'] = firing_rate
         all_data_dfs.append(df)
     
     # Combine all muscle data into a single dataframe
@@ -367,27 +359,35 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     combined_df[f'Joint_Velocity_{associated_joint}'] = np.gradient(joint_all, time_points)
     if torque_array is not None:
         combined_df['Torque'] = torque_array
-
-    # Save the combined dataframe to CSV
-    combined_df.to_csv(csv_path, index=False)
-    print(f"Saved combined data to {csv_path}")
+    
+    if base_output_path is not None:
+ 
+        csv_path = base_output_path + '.csv'
+  
+        # Save the combined dataframe to CSV
+        combined_df.to_csv(csv_path, index=False)
+        print(f"Saved combined data to {csv_path}")
 
     # ====================================================================================================
     # Run Complete Muscle Simulation for visualization of the dynamic on opensim
     # ======================================================================================================
-    # Recreate a simulator since we want to start the simulation from the beginning
-    simulator = CoLabSimulator() if on_colab else LocalSimulator()
-  
-    # Run final simulation for visualization
-    fiber_lengths, joint=simulator.run_muscle_simulation(
-            time_step/second,
-            reaction_time/second * n_iterations,
-            muscles_names,
-            associated_joint,
-            activations_all,
-            torque_array,
-            sto_path
-        )
+    
+    if base_output_path is not None:
+
+        sto_path = base_output_path + '.sto'
+        # Recreate a simulator since we want to start the simulation from the beginning
+        simulator = CoLabSimulator() if on_colab else LocalSimulator()
+      
+        # Run final simulation for visualization
+        fiber_lengths, joint=simulator.run_muscle_simulation(
+                time_step/second,
+                reaction_time/second * n_iterations,
+                muscles_names,
+                associated_joint,
+                activations_all,
+                torque_array,
+                sto_path
+            )
     """
     plt.plot(time_points, joint_all, label='loop simulation')
     plt.plot(time_points, joint[:len(joint_all)], label='final simulation')
