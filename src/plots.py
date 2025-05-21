@@ -18,7 +18,7 @@ colorblind_friendly_colors = {
 color_keys = list(colorblind_friendly_colors.keys())
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-def plot_raster(spikes, base_output_path, save=True):
+def plot_raster(spikes, base_output_path):
     """
     Plot raster plot of spikes for different neuron types and muscles.
     
@@ -50,14 +50,14 @@ def plot_raster(spikes, base_output_path, save=True):
     fig.suptitle('Spikes Raster Plot', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     
-    if save:
+    if base_output_path is not None:
         fig_path = base_output_path+ f'RASTER_{timestamp}.png'
         plt.savefig(fig_path)
     plt.show()
 
 
 
-def plot_neural_dynamic(df, muscle_names, base_output_path, save=True):
+def plot_neural_dynamic(df, muscle_names, base_output_path):
     """
     Plot neural dynamics from a combined dataframe.
 
@@ -119,14 +119,14 @@ def plot_neural_dynamic(df, muscle_names, base_output_path, save=True):
     fig.suptitle('Neural Dynamics', fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    if save:
+    if base_output_path is not None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         fig_path = f"{base_output_path}NEURONS_DYNAMICS_{timestamp}.png"
         plt.savefig(fig_path)
     plt.show()
 
 
-def plot_activation(df, muscle_names, base_output_path, save=True):
+def plot_activation(df, muscle_names, base_output_path):
     """
     Plot activation dynamics from a combined dataframe.
     
@@ -159,13 +159,13 @@ def plot_activation(df, muscle_names, base_output_path, save=True):
     fig.suptitle("Activation Dynamics ", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    if save:
+    if base_output_path is not None:
         fig_path = base_output_path+ f'ACTIVATIONS_{timestamp}.png'
         plt.savefig(fig_path)
     plt.show()
 
 
-def plot_mouvement(df, muscle_names, joint_name, base_output_path, save=True):
+def plot_mouvement(df, muscle_names, joint_name, base_output_path):
     """
     Plot movement dynamics from a combined dataframe.
 
@@ -232,12 +232,12 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path, save=True):
     fig.suptitle("Movement", fontsize=16)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    if save:
+    if base_output_path is not None:
         fig_path = base_output_path+ f'MOUVEMENT_{timestamp}.png'
         plt.savefig(fig_path)
     plt.show()
 
-def plot_recruitment_curves(ees_recruitment_params, current_current, base_output_path, balance=0, num_muscles=2, save=True):
+def plot_recruitment_curves(ees_recruitment_params, current_current, base_output_path, balance=0, num_muscles=1):
     """
     Plot recruitment curves for all fiber types using the threshold-based sigmoid.
     Only shows fractions of population, not absolute counts.
@@ -309,7 +309,7 @@ def plot_recruitment_curves(ees_recruitment_params, current_current, base_output
     plt.xlim(0, 1)
     plt.ylim(0, 1)
 
-    if save:
+    if base_output_path is not None:
         fig_path = base_output_path+ f'RECUITMENT_CURVES_{timestamp}.png'
         plt.savefig(fig_path)
     plt.show()
