@@ -230,7 +230,7 @@ class BiologicalSystem:
         return True  # Return True if validation passes
     
     def run_simulation(self, base_output_path, n_iterations, time_step=0.1*ms, ees_stimulation_params=None,
-                   torque=None, fast_type_mu=True, seed=42, save=True):
+                   torque_profile=None, fast_type_mu=True, seed=42, save=True):
         """
         Run simulations and generate plots.
         
@@ -244,7 +244,7 @@ class BiologicalSystem:
             Time step for the simulation
         ees_params : dict, optional
             Parameters for epidural electrical stimulation
-        torque : dict, optional
+        torque_profile : dict, optional
             External torque applied to the joint
         fast_type_mu : bool
             If True, use fast twitch motor units
@@ -259,7 +259,7 @@ class BiologicalSystem:
         spikes, time_series = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
-             torque=torque,ees_recruitment_profile=self.ees_recruitment_profile,ees_stimulation_params=ees_stimulation_params,
+             torque=torque_profile,ees_recruitment_profile=self.ees_recruitment_profile,ees_stimulation_params=ees_stimulation_params,
              fast=fast_type_mu, seed=seed, base_output_path=base_output_path)
         
         # Generate standard plots
