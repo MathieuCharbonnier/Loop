@@ -264,7 +264,7 @@ class BiologicalSystem:
         
         # Generate standard plots
         if ees_stimulation_params is not None:
-            plot_recruitment_curves(self.ees_recruitment_profile, current_current=ees_stimulation_params.get('intensity'),base_output_path, balance=ees_stimulation_params.get('balance', 0), num_muscles=self.number_muscles, save=save)
+            plot_recruitment_curves(self.ees_recruitment_profile, current_current=ees_stimulation_params.get('intensity'),base_output_path=base_output_path, balance=ees_stimulation_params.get('balance', 0), num_muscles=self.number_muscles, save=save)
             
         plot_mouvement(time_series, self.muscles_names, self.associated_joint, base_output_path, save=save)
         plot_neural_dynamic(time_series, self.muscles_names, base_output_path, save=save)
@@ -298,21 +298,34 @@ class BiologicalSystem:
         vary_param = {
             'param_name': 'ees_freq',
             'values': freq_range,
-            'label': 'EES Frequency '
+            'label': 'EES Frequency'
         }
         
-        return EES_stim_analysis(base_ees_params, vary_param,self.ees_stimulation_profile, n_iterations, self.reaction_time, 
-                               self.neurons_population, self.connections, self.spindle_model, 
-                               self.biophysical_params, self.muscles_names, time_step, seed)
-    
-    def analyze_co_recruitment_effects(self, afferent_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
+        return EES_stim_analysis(
+            base_ees_params,
+            vary_param,
+            n_iterations,
+            self.reaction_time, 
+            self.neurons_population, 
+            self.connections,
+            self.spindle_model, 
+            self.biophysical_params, 
+            self.muscles_names,
+            self.number_muscles,
+            self.associated_joint,
+            self.ees_recruitment_profile
+            time_step, 
+            seed
+        )
+
+    def analyze_intensity_effects(self, intensity_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
         Analyze the effects of varying afferent recruitment.
         
         Parameters:
         -----------
-        afferent_range : array-like
-            Range of afferent recruitment values to analyze
+        intensity_range : array-like
+            Range of normalized intensity values to analyze
         base_ees_params : dict
             Base parameters for EES
         n_iterations : int
@@ -328,59 +341,37 @@ class BiologicalSystem:
             Analysis results
         """
         vary_param = {
-            'param_name': 'afferent_recruited',
-            'values': afferent_range,
-            'label': 'Afferent Fiber Co-Recruitment '
+            'param_name': 'intensity',
+            'values': intensity_range,
+            'label': 'Increase stimulation amplitude'
         }
         
-        return EES_stim_analysis(base_ees_params, vary_param, self.ees_recruitment_profile, n_iterations, self.reaction_time, 
-                               self.neurons_population, self.connections, self.spindle_model, 
-                               self.biophysical_params, self.muscles_names, time_step, seed)
-    
-    def analyze_efferent_recruitment_effects(self, mn_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
-        """
-        Analyze the effects of varying efferent (motoneuron) recruitment.
-        
-        Parameters:
-        -----------
-        mn_range : array-like
-            Range of motoneuron recruitment values to analyze
-        base_ees_params : dict
-            Base parameters for EES
-        n_iterations : int
-            Number of iterations for each simulation
-        time_step : brian2.units.fundamentalunits.Quantity
-            Time step for simulations
-        seed : int
-            Random seed for reproducibility
-        
-        Returns:
-        --------
-        dict
-            Analysis results
-        """
-        vary_param = {
-            'param_name': 'MN_recruited',
-            'values': mn_range,
-            'label': 'Motoneuron Recruitment '
-        }
-        
-        return EES_stim_analysis(base_ees_params, vary_param, self.recruitment_profile, n_iterations, self.reaction_time, 
-                               self.neurons_population, self.connections, self.spindle_model, 
-                               self.biophysical_params, self.muscles_names, time_step, seed)
-
+        return EES_stim_analysis(
+            base_ees_params,
+            vary_param, 
+            n_iterations,
+            self.reaction_time, 
+            self.neurons_population, 
+            self.connections,
+            self.spindle_model, 
+            self.biophysical_params, 
+            self.muscles_names,
+            self.number_muscles,
+            self.associated_joint,
+            self.recruitment_profile,
+            time_step, 
+            seed
+        )
       
-    def clonus_analysis(self, base_output_path, delay_values=[10, 25, 50, 75, 100]*ms, 
+    def clonus_analysis(self, delay_values=[10, 25, 50, 75, 100]*ms, 
                         threshold_values=[-45, -50, -55]*mV, duration=1*second, 
                         time_step=0.1*ms, fast_type_mu=True, torque_profile=None, 
-                        ees_stimulations_params=None, seed=41):
+                        ees_stimulation_params=None, seed=41):
         """
         Analyze clonus behavior by varying one parameter at a time.
         
         Parameters:
         -----------
-        base_output_path : str
-            Base path for saving output files
         delay_values : list
             List of delay values to test
         threshold_values : list
@@ -393,7 +384,7 @@ class BiologicalSystem:
             If True, use fast twitch motor units
         torque_profile : dict
             Dictionary with torque profile parameters
-        ees_stimulations_params : dict
+        ees_stimulation_params : dict
             Parameters for EES stimulation
         seed : int
             Random seed for reproducibility
@@ -403,10 +394,24 @@ class BiologicalSystem:
         dict
             Analysis results
         """
+        # No need for base_output_path as function creates its own folder
         return delay_excitability_MU_type_analysis(
-            duration, self.reaction_time, self.neurons_population, self.connections, 
-            self.spindle_model, self.biophysical_params, self.muscles_names,
-            torque_profile, ees_stimulations_params,ees_stimulation_profile, time_step, seed)
+            duration,
+            time_step, 
+            self.reaction_time, 
+            self.neurons_population, 
+            self.connections, 
+            self.spindle_model, 
+            self.biophysical_params, 
+            self.muscles_names,
+            self.number_muscles, 
+            self.associated_joint,
+            torque_profile, 
+            ees_stimulation_params,
+            self.ees_recruitment_profile,
+            fast_type_mu,
+            seed
+        )
 
     def find_ees_protocol(self, target_amplitude=15, target_period=2*second, 
                         update_interval=200*ms, prediction_horizon=1000*ms, 
