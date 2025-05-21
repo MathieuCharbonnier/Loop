@@ -5,73 +5,95 @@ import pandas as pd
 import os
 from datetime import datetime
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+from closed_loop import closed_loop
 
-def delay_excitability_MU_type_analysis( DURATION, REACTION_TIME, NEURONS_POPULATION, CONNECTIONS,SPINDLE_MODEL,BIOPHYSICAL_PARAMS, MUSCLES_NAMES,
-                                        associated_joint, torque_profile, ees_stimulation_params,fast_type_MU, base_output_path, seed=41):
-                
+def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration, time_step, reaction_time, neurons_population, connections, 
+                                      spindle_model, biophysical_params, muscles_names, num_muscles,
+                                      associated_joint, torque_profile, ees_stimulation_params, 
+                                      ees_recruitment_profile, fast_type_mu, seed=41):
         """
         Analyze clonus behavior by varying one parameter at a time and create visualization plots.
         
         Parameters:
         -----------
+        delay_values:list
+            list of reaction time to test
+        threshold_values
+            list of spikes threshold potential to test
         duration: brian2.unit
-            duration of the simulation 
+            Duration of the simulation 
+        time_step: brian2.unit
+            Time step for simulation
         reaction_time: brian2.unit
-            feedback time
+            Feedback time
         neurons_population: dict
-            neurons count for each fiber type
+            Neurons count for each fiber type
         connections: dict
-            connections between neurons
-        spindle model: dict
-            equations to transform stretch or joint angle into afferent firing rate
-        biophysical params
-            parameters for neural dynamics simulations
-        associated_joint
+            Connections between neurons
+        spindle_model: dict
+            Equations to transform stretch or joint angle into afferent firing rate
+        biophysical_params: dict
+            Parameters for neural dynamics simulations
+        muscles_names: list
+            List of muscle names
+        num_muscles: int
+            Number of muscles
+        associated_joint: str
             Name of the joint to analyze
-        base_output_path : str
-            Base path for saving output files
-        torque_profile : dict
+        torque_profile: dict
             Dictionary with torque profile parameters
-
-        time_step : float
-            Time step in seconds
-        fast_type_default : bool
-            Default value for fast twitch parameter
-        seed : int
+        ees_stimulation_params: dict
+            Parameters for EES stimulation
+        ees_recruitment_profile: dict
+            Parameters for recruitment profiles
+        fast_type_mu: bool
+            Whether to use fast twitch motor units
+        seed: int
             Random seed for reproducibility
-        
-     
         """
-        # Parameter ranges to test
-        delay_values = [10, 25, 50, 75, 100]*ms  # 10ms to 100ms
+        # Create base_output_path for results
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_output_path = f"clonus_analysis_{timestamp}"
+    
         fast_twitch_values = [False, True]  # False for slow, True for fast
-        threshold_values = [-45, -50, -55]*mV  # -45mV to -55mV
-        
+  
         # Create directory for saving figures
         fig_dir = os.path.join(os.path.dirname(base_output_path), 'figures')
         os.makedirs(fig_dir, exist_ok=True)
-        
+    
         # 1. Vary delay
         fig1, axs1 = plt.subplots(len(delay_values), 2, figsize=(15, 4*len(delay_values)), sharex=True)
         for i, delay in enumerate(tqdm(delay_values, desc="Varying delay")):
             # Set reaction time to the current delay value
             current_reaction_time = delay
-            print("current_reaction_time ", current_reaction_time)
             # Run simulation with current parameters
-            n_iterations = int(duration/current_reaction_time) + 1
-            spikes, time_series = closed_loop(
-                n_iterations, current_reaction_time, time_step, NEURONS_POPULATION, CONNECTIONS,
-                SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLES_NAMES, associated_joint,
-                f"{base_output_path}_delay_{int(delay/ms)}ms",  # Fixed: delay*1000 -> delay/ms
-                TORQUE=torque_profile, fast=fast_type_MU, seed=seed
-            )
+            n_iterations = int(duration/reaction_time) + 1
+                spikes, time_series = closed_loop(
+                    n_iterations, 
+                    reaction_time, 
+                    time_step, 
+                    neurons_population, 
+                    connections,
+                    spindle_model, 
+                    biophysical_params, 
+                    muscles_names,
+                    num_muscles, 
+                    associated_joint,
+                    f"{base_output_path}_delay_{int(delay/ms)}ms",
+                    ees_recruitment_profile,
+                    ees_stimulation_params,
+                    torque_profile, 
+                    fast_type_mu, 
+                    seed
+                )
             
             # Plot joint angle
-            axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
+            axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
             axs1[i, 0].set_ylabel(f"Delay = {int(delay/ms)} ms\nJoint angle (deg)")  # Fixed: delay*1000 -> delay/ms
             
             # Plot muscle activations
-            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
+            for muscle in MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
                 activation_col = f"Activation_{muscle}"
                 axs1[i, 1].plot(time_series['Time'], time_series[activation_col], 
                               label=muscle)
@@ -92,21 +114,34 @@ def delay_excitability_MU_type_analysis( DURATION, REACTION_TIME, NEURONS_POPULA
         for i, fast in enumerate(tqdm(fast_twitch_values, desc="Varying fast twitch parameter")):
             
             # Run simulation with current parameters
+            n_iterations = int(duration/reaction_time) + 1
             spikes, time_series = closed_loop(
-                n_iterations, REACTION_TIME, time_step, NEURONS_POPULATION, CONNECTIONS,
-                SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLES_NAMES, associated_joint,
-                f"{base_output_path}_fast_{fast}",
-                TORQUE=torque_profile, fast=fast, seed=seed
+                n_iterations, 
+                reaction_time, 
+                time_step, 
+                neurons_population, 
+                connections,
+                spindle_model, 
+                biophysical_params, 
+                muscles_names,
+                num_muscles, 
+                associated_joint,
+                f"{base_output_path}_delay_{int(delay/ms)}ms",
+                ees_recruitment_profile,
+                ees_stimulation_params,
+                torque_profile, 
+                fast, 
+                seed
             )
             
             # Plot joint angle
-            axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{self.associated_joint}'], 'b-')
+            axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
             axs2[i, 0].set_ylabel(f"Fast = {fast}\nJoint angle (deg)")
             
             # Plot muscle activations
-            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
+            for muscle in MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
                 activation_col = f"Activation_{muscle}"
-                axs2[i, 1].plot(time_series['Time'], time_series[activation_col],  # Fixed: 'time' -> 'Time'
+                axs2[i, 1].plot(time_series['Time'], time_series[activation_col], 
                               label=muscle)
             
             axs2[i, 1].set_ylabel("Muscle activation")
@@ -127,11 +162,24 @@ def delay_excitability_MU_type_analysis( DURATION, REACTION_TIME, NEURONS_POPULA
             current_biophysical_params['threshold_v'] = threshold
             
             # Run simulation with current parameters
+            n_iterations = int(duration/reaction_time) + 1
             spikes, time_series = closed_loop(
-                n_iterations, REACTION_TIME, time_step, NEURONS_POPULATION, CONNECTIONS,
-                SPINDLE_MODEL, current_biophysical_params, MUSCLES_NAMES, associated_joint, 
-                f"{base_output_path}_threshold_{int(threshold/mV)}mV",  # Fixed: threshold*1000 -> threshold/mV
-                TORQUE=torque_profile, fast=fast_type_MU, seed=seed
+                n_iterations, 
+                reaction_time, 
+                time_step, 
+                neurons_population, 
+                connections,
+                spindle_model, 
+                current_biophysical_params, 
+                muscles_names,
+                num_muscles, 
+                associated_joint,
+                f"{base_output_path}_delay_{int(delay/ms)}ms",
+                ees_recruitment_profile,
+                ees_stimulation_params,
+                torque_profile, 
+                fast_type_mu, 
+                seed
             )
             
             # Plot joint angle
@@ -139,9 +187,9 @@ def delay_excitability_MU_type_analysis( DURATION, REACTION_TIME, NEURONS_POPULA
             axs3[i, 0].set_ylabel(f"Threshold = {int(threshold/mV)} mV\nJoint angle (deg)")  
             
             # Plot muscle activations
-            for muscle in self.MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
+            for muscle in MUSCLES_NAMES:  # Fixed: muscles_names -> self.MUSCLES_NAMES
                 activation_col = f"Activation_{muscle}"
-                axs3[i, 1].plot(time_series['Time'], time_series[activation_col],  # Fixed: 'time' -> 'Time'
+                axs3[i, 1].plot(time_series['Time'], time_series[activation_col],  
                               label=muscle)
             
             axs3[i, 1].set_ylabel("Muscle activation")
@@ -156,23 +204,10 @@ def delay_excitability_MU_type_analysis( DURATION, REACTION_TIME, NEURONS_POPULA
         # Close all figures to free memory
         plt.close('all')
 
-
-
-
-
-def EES_stim_analysis(
-    param_dict,
-    vary_param,
-    N_ITERATIONS,
-    REACTION_TIME, 
-    NEURON_COUNTS, 
-    CONNECTIONS,
-    SPINDLE_MODEL, 
-    BIOPHYSICAL_PARAMS, 
-    MUSCLES_NAMES,
-    TIME_STEP=0.1*ms,
-    seed=42
-):
+def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time, 
+                     neurons_population, connections, spindle_model, biophysical_params, 
+                     muscles_names, num_muscles, associated_joint, ees_recruitment_profile, 
+                     time_step=0.1*ms, seed=42):
     """
     Generalized EES stimulation analysis that can vary any parameter of interest.
     
@@ -185,8 +220,31 @@ def EES_stim_analysis(
         Dictionary specifying which parameter to vary with its range of values
         Format: {'param_name': [values_to_test], 'label': 'Display Label'}
         Example: {'param_name': 'ees_freq', 'values': [10, 20, 30], 'label': 'EES Frequency (Hz)'}
+    n_iterations : int
+        Number of iterations for each simulation
+    reaction_time : brian2.unit
+        Feedback time
+    neurons_population : dict
+        Neurons count for each fiber type
+    connections : dict
+        Connections between neurons
+    spindle_model : dict
+        Equations to transform stretch or joint angle into afferent firing rate
+    biophysical_params : dict
+        Parameters for neural dynamics simulations
+    muscles_names : list
+        List of muscle names
+    num_muscles : int
+        Number of muscles
+    associated_joint : str
+        Name of the joint to analyze
+    ees_recruitment_profile: dict
+        threshold and saturations to define the recruitment curves
+    time_step : brian2.unit
+        Time step for simulation
+    seed : int
+        Random seed for reproducibility
     """
-
     # Create a directory for saving plots if it doesn't exist
     save_dir = "stimulation_analysis"
     if not os.path.exists(save_dir):
@@ -194,7 +252,8 @@ def EES_stim_analysis(
         print(f"Created directory '{save_dir}' for saving plots")
     
     # Create a base output path
-    base_path = os.path.join(save_dir, "output")  # Added base_path definition that was missing
+    base_path = os.path.join(save_dir, "output")
+    
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     num_muscles = len(MUSCLES_NAMES)
@@ -263,6 +322,25 @@ def EES_stim_analysis(
         sto_path = os.path.join(save_dir, sto_name)
     
         # --- Run simulation ---
+           
+        spikes, main_data = closed_loop(
+            n_iterations, 
+            reaction_time, 
+            time_step, 
+            neurons_population, 
+            connections,
+            spindle_model, 
+            biophysical_params, 
+            muscles_names,
+            num_muscles, 
+            associated_joint,
+            base_path,
+            ees_recruitment_profile
+            current_params, # EES_STIMULATION_PARAMS
+            None,  # TORQUE 
+            fast, 
+            seed
+        )
         spikes, main_data = closed_loop(
             N_ITERATIONS, REACTION_TIME, TIME_STEP, NEURON_COUNTS, CONNECTIONS,  # Fixed parameter order
             SPINDLE_MODEL, BIOPHYSICAL_PARAMS, MUSCLES_NAMES, associated_joint=param_dict.get('associated_joint', 'ankle'),  # Added missing parameter
