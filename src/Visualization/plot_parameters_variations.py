@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
-def plot_delays_results(delay_results, delay_values, muscle_names, associated_joint, output_dir="clonus_analysis"):
+def plot_delay_results(delay_results, delay_values, muscle_names, associated_joint, output_dir="clonus_analysis"):
 
     
     # Create output directory
@@ -74,7 +74,7 @@ def plot_twitch_results(fast_twitch_results,  muscle_names, associated_joint, ou
     fig2.tight_layout(rect=[0, 0, 1, 0.95])
     fig2.savefig(os.path.join(output_dir, f'fast_twitch_variation_{timestamp}.png'))
 
-def plot_excitation_results(threshold_results, threshold_values, muscles_names, associated_joint, output_dir="clonus_analysis"):
+def plot_excitability_results(threshold_results, threshold_values, muscles_names, associated_joint, output_dir="clonus_analysis"):
 
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
