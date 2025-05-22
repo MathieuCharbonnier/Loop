@@ -436,7 +436,7 @@ class CoLabSimulator(SimulatorBase):
         
         # Build command for OpenSim muscle simulation
         cmd = [
-            'conda', 'run', '-n', 'opensim_env', 'python', 'src/muscle_sim.py',
+            'conda', 'run', '-n', 'opensim_env', 'python', 'src/Loop/muscle_sim.py',
             '--dt', str(dt),
             '--T', str(T),
             '--muscles_names', ','.join(muscle_names),
