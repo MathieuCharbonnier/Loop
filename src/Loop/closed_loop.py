@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from scipy.stats import gaussian_kde
 
-from neural_dynamics import run_monosynaptic_simulation, run_trisynaptic_simulation, run_flexor_extensor_neuron_simulation
-from activation import decode_spikes_to_activation
+from .neural_dynamics import run_monosynaptic_simulation, run_trisynaptic_simulation, run_flexor_extensor_neuron_simulation
+from .activation import decode_spikes_to_activation
 
 
 
