@@ -1,3 +1,5 @@
+from brian2 import *
+
 from .BiologicalSystem import BiologicalSystem
 
 class Monosynaptic(BiologicalSystem):
