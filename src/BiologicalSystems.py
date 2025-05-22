@@ -8,6 +8,7 @@ from closed_loop import closed_loop
 from analysis import delay_excitability_MU_type_analysis, EES_stim_analysis
 from controller import HierarchicalAnkleController
 from plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
+from input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
 
 class BiologicalSystem:
     """
@@ -46,188 +47,7 @@ class BiologicalSystem:
         self.connections = {}
         self.spindle_model = {}
     
-    def validate_parameters(self):
-        """
-        Validates the configuration parameters for the neural model.
-        
-        Checks for consistency between neurons, connections, spindle models,
-        and biophysical parameters.
-        
-        Raises:
-            ValueError: If critical errors are found in the configuration
-        """
-        issues = {"warnings": [], "errors": []}
-        
-        # Check if neuron types in neuron population match with those in connections and spindle_model
-        defined_neurons = set(self.neurons_population.keys())
-        
-        # Validate muscle count
-        if self.number_muscles > 2:
-            issues["errors"].append("This pipeline supports only 1 or 2 muscles!")
-        
-        # If there are Ia or II neurons, check if their equations are properly defined
-        neuron_types = {n.split('_')[0] if '_' in n else n for n in defined_neurons}
-        
-        # Check for II neurons and related conditions
-        if "II" in neuron_types:
-            # Check if II equations are defined in spindle model
-            has_ii_equation = False
-            for key in self.spindle_model:
-                if key == "II" or key.startswith("II_"):
-                    has_ii_equation = True
-                    break
-                    
-            if not has_ii_equation:
-                issues["errors"].append("II neurons are defined in neuron population but no equation found in spindle model")
-                
-            if "exc" not in neuron_types:
-                issues["warnings"].append("When II neurons are defined, exc neurons are typically also defined")
-        else:
-            # Check if II equation is defined but II neurons are not
-            for key in self.spindle_model:
-                if key == "II" or key.startswith("II_"):
-                    issues["warnings"].append("Equation for II defined in spindle model but II neurons not defined in the neurons population")
-                    break
-        
-        # Check for inhibitory neurons and related parameters
-        if "inh" in neuron_types:
-            if "E_inh" not in self.biophysical_params or "tau_i" not in self.biophysical_params:
-                issues["errors"].append("You defined inhibitory neurons, but you forgot to specify one or both inhibitory synapse parameters (E_inh and tau_i)")
-        else:
-            if "E_inh" in self.biophysical_params or "tau_i" in self.biophysical_params:
-                issues["warnings"].append("Inhibitory neuron parameters (E_inh or tau_i) present but no inhibitory neurons defined")
-        
-        # Check for all mandatory neuron types when multiple muscles are defined
-        if self.number_muscles == 2:
-            required_types = {"Ia", "MN"}  # Minimum required types
-            recommended_types = {"Ia", "II", "inh", "exc", "MN"}  # Recommended for full reciprocal inhibition
-            
-            defined_types = neuron_types
-            missing_required = required_types - defined_types
-            
-            if missing_required:
-                issues["errors"].append(f"For two muscles, at minimum the neuron types {required_types} must be defined. Missing: {missing_required}")
-            
-            missing_recommended = recommended_types - defined_types
-            if missing_recommended:
-                issues["warnings"].append(f"For full reciprocal inhibition, all neuron types {recommended_types} are recommended. Missing: {missing_recommended}")
-                
-            # Check spindle model completeness for two muscles
-            if "Ia" in defined_types:
-                has_ia_equation = False
-                for key in self.spindle_model:
-                    if key == "Ia" or key.startswith("Ia_"):
-                        has_ia_equation = True
-                        break
-                
-                if not has_ia_equation:
-                    issues["errors"].append("Ia neurons defined but no Ia equation found in spindle model")
-        
-        # Check if all neurons used in connections are defined in neurons_population
-        for connection_pair in self.connections:
-            pre_neuron, post_neuron = connection_pair
-            
-            # For two muscles, check if connection neurons have proper muscle suffix
-            if self.number_muscles == 2:
-                if not any(muscle in pre_neuron for muscle in self.muscles_names) and '_' not in pre_neuron:
-                    issues["warnings"].append(f"With two muscles, pre-neuron '{pre_neuron}' in connection {connection_pair} should typically specify which muscle it belongs to")
-                
-                if not any(muscle in post_neuron for muscle in self.muscles_names) and '_' not in post_neuron:
-                    issues["warnings"].append(f"With two muscles, post-neuron '{post_neuron}' in connection {connection_pair} should typically specify which muscle it belongs to")
-            
-            # Check if neuron types exist in the population
-            pre_type = pre_neuron.split('_')[0] if '_' in pre_neuron else pre_neuron
-            post_type = post_neuron.split('_')[0] if '_' in post_neuron else post_neuron
-            
-            if pre_neuron not in self.neurons_population and pre_type not in self.neurons_population:
-                issues["errors"].append(f"Neuron '{pre_neuron}' used in connection {connection_pair} but not defined in the neurons population")
-            
-            if post_neuron not in self.neurons_population and post_type not in self.neurons_population:
-                issues["errors"].append(f"Neuron '{post_neuron}' used in connection {connection_pair} but not defined in the neurons population")
-
-        # Validate EES recruitment parameters
-        if self.ees_recruitment_profile:
-            # Check if all required neuron types have recruitment parameters
-            for neuron_type in neuron_types:
-                if neuron_type in ["Ia", "II", "MN"] and neuron_type not in self.ees_recruitment_profile:
-                    issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
-
-            
-            # Check each recruitment parameter set
-            for neuron_type, params in self.ees_recruitment_profile.items():
-                required_params = ["threshold_10pct", "saturation_90pct"]
-                for param in required_params:
-                    if param not in params:
-                        issues["errors"].append(f"Missing '{param}' in EES recruitment parameters for '{neuron_type}'")
-                
-                # Check if threshold is less than saturation
-                if "threshold_10pct" in params and "saturation_90pct" in params:
-                    threshold = params['threshold_10pct']
-                    saturation = params['saturation_90pct']
-                    
-                    # Check values are between 0 and 1
-                    if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
-                        raise ValueError(
-                            f"Values for '{fiber}' must be between 0 and 1. Got: threshold={threshold}, saturation={saturation}"
-                        )
-                    if threshold >= saturation:
-                        issues["errors"].append(f"Threshold (10%) must be less than saturation (90%) for '{neuron_type}'")
-
-        # Define expected units for each parameter
-        expected_units = {
-            'T_refr': second,
-            'Eleaky': volt,
-            'gL': siemens,  
-            'Cm': farad,
-            'E_ex': volt,
-            'tau_e': second,
-            'threshold_v': volt
-        }
-        
-        # Check all expected parameters are defined
-        for param, expected_unit in expected_units.items():
-            if param not in self.biophysical_params:
-                issues["errors"].append(f"Missing mandatory biophysical parameter: '{param}'")
-                continue
-        
-            value = self.biophysical_params[param]
-
-            # Check unit compatibility
-            if not value.dim == expected_unit.dim:
-
-                issues["errors"].append(
-                    f"Parameter '{param}' has incorrect unit. "
-                    f"Expected unit compatible with {expected_unit}, but got {value.unit}"
-                )
-        
-        # Check inhibitory parameters 
-        if 'tau_i' in self.biophysical_params:
-            value = self.biophysical_params['tau_i']
-            if not hasattr(value, 'unit') or not value.unit.is_compatible_with(second):
-                issues["errors"].append(
-                    f"Parameter 'tau_i' has incorrect unit. "
-                    f"Expected unit compatible with second, but got {value.unit if hasattr(value, 'unit') else 'no unit'}"
-                )
-        
-        if 'E_inh' in self.biophysical_params:
-            value = self.biophysical_params['E_inh']
-            if not hasattr(value, 'unit') or not value.unit.is_compatible_with(volt):
-                issues["errors"].append(
-                    f"Parameter 'E_inh' has incorrect unit. "
-                    f"Expected unit compatible with volt, but got {value.unit if hasattr(value, 'unit') else 'no unit'}"
-                )
-
-        # Raise error if there are critical issues
-        if issues["errors"]:
-            error_messages = "\n".join(issues["errors"])
-            raise ValueError(f"Configuration errors found:\n{error_messages}")
-        
-        # Print warnings if any
-        if issues["warnings"]:
-            warning_messages = "\n".join(issues["warnings"])
-            print(f"WARNING: Configuration issues detected:\n{warning_messages}")
-            
-        return True  # Return True if validation passes
+  
     
     def run_simulation(self, base_output_path, n_iterations, time_step=0.1*ms, ees_stimulation_params=None,
                    torque_profile=None, fast_type_mu=True, seed=42, save=True):
@@ -256,10 +76,22 @@ class BiologicalSystem:
         tuple
             (spikes, time_series) containing simulation results
         """
+        
+        torque_array = None
+        if torque_profile is not None:
+            time_points = np.arange(0, self.reaction_time*n_iterations, time_step)
+            torque_array = transform_torque_params_in_array(time_points, torque_profile)
+        
+        ees_params = None
+        if ees_stimulation_params is not None:
+            ees_params = transform_intensity_balance_in_recruitment(
+            self.ees_recruitment_profile, ees_stimulation_params, 
+            self.neurons_population, self.num_muscles)
+        
         spikes, time_series = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
-             torque=torque_profile,ees_recruitment_profile=self.ees_recruitment_profile,ees_stimulation_params=ees_stimulation_params,
+             torque_array=torque_array,ees_params=ees_params,
              fast=fast_type_mu, seed=seed, base_output_path=base_output_path)
         
         # Generate standard plots
@@ -290,38 +122,36 @@ class BiologicalSystem:
             Time step for simulations
         seed : int
             Random seed for reproducibility
+        plot_results : bool
+            Whether to automatically generate plots
         
         Returns:
         --------
         dict
-            Analysis results
+            Analysis results containing simulation data and computed metrics
         """
         vary_param = {
             'param_name': 'ees_freq',
             'values': freq_range,
-            'label': 'EES Frequency'
+            'label': 'EES Frequency (Hz)'
         }
-        
-        return EES_stim_analysis(
+
+        # Compute parameter sweep
+        results = self._compute_ees_parameter_sweep(
             base_ees_params,
             vary_param,
             n_iterations,
-            self.reaction_time, 
-            self.neurons_population, 
-            self.connections,
-            self.spindle_model, 
-            self.biophysical_params, 
-            self.muscles_names,
-            self.number_muscles,
-            self.associated_joint,
-            self.ees_recruitment_profile,
             time_step, 
             seed
         )
+        
+        plot_ees_analysis_results(results, save_dir="frequency_analysis", seed=seed)
+        
+        return results
 
     def analyze_intensity_effects(self, intensity_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
-        Analyze the effects of varying afferent recruitment.
+        Analyze the effects of varying stimulation intensity.
         
         Parameters:
         -----------
@@ -335,39 +165,153 @@ class BiologicalSystem:
             Time step for simulations
         seed : int
             Random seed for reproducibility
+        plot_results : bool
+            Whether to automatically generate plots
         
         Returns:
         --------
         dict
-            Analysis results
+            Analysis results containing simulation data and computed metrics
         """
         vary_param = {
             'param_name': 'intensity',
             'values': intensity_range,
-            'label': 'Increase stimulation amplitude'
+            'label': 'Stimulation Intensity'
         }
         
-        return EES_stim_analysis(
+        # Compute parameter sweep
+        results = self._compute_ees_parameter_sweep(
             base_ees_params,
             vary_param, 
             n_iterations,
-            self.reaction_time, 
-            self.neurons_population, 
-            self.connections,
-            self.spindle_model, 
-            self.biophysical_params, 
-            self.muscles_names,
-            self.number_muscles,
-            self.associated_joint,
-            self.ees_recruitment_profile,
             time_step, 
             seed
         )
-      
-    def clonus_analysis(self, delay_values=[10, 25, 50, 75, 100]*ms, 
-                        threshold_values=[-45, -50, -55]*mV, duration=1*second, 
-                        time_step=0.1*ms, fast_type_mu=True, torque_profile=None, 
-                        ees_stimulation_params=None, seed=41):
+        
+
+        plot_ees_analysis_results(results, save_dir="intensity_analysis", seed=seed)
+        
+        return results
+
+    def _compute_ees_parameter_sweep(self, param_dict, vary_param, n_iterations, time_step=0.1*ms, seed=42):
+        """
+        Compute EES stimulation analysis by varying a parameter of interest.
+        
+        Parameters:
+        -----------
+        param_dict : dict
+            Dictionary containing all EES parameters with their default values
+        vary_param : dict
+            Dictionary specifying which parameter to vary with its range of values
+            Format: {'param_name': [values_to_test], 'label': 'Display Label'}
+        n_iterations : int
+            Number of iterations for each simulation
+        time_step : brian2.unit
+            Time step for simulation
+        seed : int
+            Random seed for reproducibility
+            
+        Returns:
+        --------
+        dict
+            Dictionary containing:
+            - 'param_values': list of parameter values tested
+            - 'param_name': name of the varied parameter
+            - 'param_label': display label for the parameter
+            - 'time_data': time array from simulations
+            - 'simulation_data': list of main_data dictionaries for each parameter value
+            - 'spikes_data': list of spikes dictionaries for each parameter value
+            - 'activities': numpy array of muscle activities (if num_muscles == 2)
+            - 'muscle_names': list of muscle names
+            - 'associated_joint': joint name
+        """
+        
+        # Get parameter info
+        param_name = vary_param['param_name']
+        param_values = vary_param['values']
+        param_label = vary_param['label']
+        
+        # Initialize storage for results
+        simulation_data = []
+        spikes_data = []
+        time_data = None
+        activities = None
+        
+        print(f"Running parameter sweep for {param_label}...")
+        
+        # Run simulations for each parameter value
+        for i, value in enumerate(param_values):
+            print(f"  Computing {param_label} = {value} ({i+1}/{len(param_values)})")
+            
+            # Create a copy of the base parameters
+            current_params = param_dict.copy()
+            
+            # Update the parameter we're varying
+            current_params[param_name] = value
+            
+            ees_params = transform_intensity_balance_in_recruitment(
+            self.ees_recruitment_profile, current_params, 
+            self.neurons_population, self.num_muscles)
+            
+            # Run simulation
+            spikes, main_data = closed_loop(
+                n_iterations, 
+                self.reaction_time, 
+                time_step, 
+                self.neurons_population, 
+                self.connections,
+                self.spindle_model, 
+                self.biophysical_params, 
+                self.muscles_names,
+                self.number_muscles, 
+                self.associated_joint,
+                ees_params, # EES_STIMULATION_PARAMS
+                None,  # TORQUE 
+                True, 
+                seed,
+                None
+            )
+            
+            # Store results
+            simulation_data.append(main_data)
+            spikes_data.append(spikes)
+            
+            # Extract time data (same for all simulations)
+            if time_data is None:
+                time_data = main_data['Time']
+                
+                # Initialize activities array for coactivation analysis
+                if self.number_muscles == 2:
+                    T = len(time_data)
+                    activities = np.zeros((self.number_muscles, len(param_values), T))
+            
+            # Store activation data for coactivation analysis
+            if self.number_muscles == 2:
+                for muscle_idx, muscle_name in enumerate(self.muscles_names):
+                    col_name = f"Activation_{muscle_name}"
+                    if col_name in main_data.columns:
+                        activities[muscle_idx, i, :] = main_data[col_name].values
+        
+        
+        # Return comprehensive results dictionary
+        results = {
+            'param_values': param_values,
+            'param_name': param_name,
+            'param_label': param_label,
+            'time_data': time_data,
+            'simulation_data': simulation_data,
+            'spikes_data': spikes_data,
+            'activities': activities,
+            'muscle_names': self.muscles_names,
+            'associated_joint': self.associated_joint,
+            'num_muscles': self.number_muscles
+        }
+        
+        return results
+        
+    def clonus_analysis(self, torque_profile, delay_values=[10, 25, 50, 75, 100]*ms, 
+                    threshold_values=[-45, -50, -55]*mV, duration=1*second, 
+                    time_step=0.1*ms, fast_type_mu=True, , seed=41):
         """
         Analyze clonus behavior by varying one parameter at a time.
         
@@ -385,36 +329,121 @@ class BiologicalSystem:
             If True, use fast twitch motor units
         torque_profile : dict
             Dictionary with torque profile parameters
-        ees_stimulation_params : dict
-            Parameters for EES stimulation
         seed : int
             Random seed for reproducibility
             
         Returns:
         --------
         dict
-            Analysis results
+            Analysis results containing:
+            - delay_results: list of (delay_value, spikes, time_series) tuples
+            - fast_twitch_results: list of (fast_twitch_bool, spikes, time_series) tuples
+            - threshold_results: list of (threshold_value, spikes, time_series) tuples
         """
-       
-        return delay_excitability_MU_type_analysis(
-            delay_values,
-            threshold_values,
-            duration,
-            time_step, 
-            self.reaction_time, 
-            self.neurons_population, 
-            self.connections, 
-            self.spindle_model, 
-            self.biophysical_params, 
-            self.muscles_names,
-            self.number_muscles, 
-            self.associated_joint,
-            torque_profile, 
-            ees_stimulation_params,
-            self.ees_recruitment_profile,
-            fast_type_mu,
-            seed
-        )
+
+        results = {
+            'delay_results': [],
+            'fast_twitch_results': [],
+            'threshold_results': [],
+            'parameters': {
+                'delay_values': delay_values,
+                'threshold_values': threshold_values,
+                'duration': duration,
+                'time_step': time_step,
+                'reaction_time': self.reaction_time,
+                'muscles_names': self.muscles_names,
+                'associated_joint': self.associated_joint,
+                'fast_type_mu': fast_type_mu,
+                'seed': seed
+            }
+        }
+        
+        # 1. Vary delay (reaction time)
+        print("Running delay variation analysis...")
+        for delay in tqdm(delay_values, desc="Varying delay"):
+            current_reaction_time = delay
+            n_iterations = int(duration/current_reaction_time)
+ 
+            time_points = np.arange(0, self.reaction_time*n_iterations, time_step)
+            torque_array = transform_torque_params_in_array(time_points, torque_profile)
+            
+            spikes, time_series = closed_loop(
+                n_iterations, 
+                current_reaction_time, 
+                time_step, 
+                self.neurons_population, 
+                self.connections,
+                self.spindle_model, 
+                self.biophysical_params, 
+                self.muscles_names,
+                self.number_muscles, 
+                self.associated_joint,
+                None,
+                torque_array,
+                fast_type_mu, 
+                seed,
+                None
+            )
+            
+            results['delay_results'].append((delay, spikes, time_series))
+            
+        n_iterations = int(duration/self.reaction_time)
+        time_points = np.arange(0, self.reaction_time*n_iterations, time_step)
+        torque_array = transform_torque_params_in_array(time_points, torque_profile)
+                        
+        # 2. Vary fast twitch parameter
+        print("Running fast twitch variation analysis...")
+        fast_twitch_values = [False, True]
+        
+        for fast in tqdm(fast_twitch_values, desc="Varying fast twitch parameter"):
+            spikes, time_series = closed_loop(
+                n_iterations, 
+                self.reaction_time, 
+                time_step, 
+                self.neurons_population, 
+                self.connections,
+                self.spindle_model, 
+                self.biophysical_params, 
+                self.muscles_names,
+                self.number_muscles, 
+                self.associated_joint,
+                None,
+                torque_profile,
+                fast, 
+                seed,
+                None
+            )
+            
+            results['fast_twitch_results'].append((fast, spikes, time_series))
+        
+        # 3. Vary threshold voltage
+        print("Running threshold variation analysis...")
+        for threshold in tqdm(threshold_values, desc="Varying threshold voltage"):
+            current_biophysical_params = self.biophysical_params.copy()
+            current_biophysical_params['threshold_v'] = threshold
+            
+            n_iterations = int(duration/self.reaction_time)
+            spikes, time_series = closed_loop(
+                n_iterations, 
+                self.reaction_time, 
+                time_step, 
+                self.neurons_population, 
+                self.connections,
+                self.spindle_model, 
+                current_biophysical_params, 
+                self.muscles_names,
+                self.number_muscles, 
+                self.associated_joint,
+                None,
+                torque_profile,
+                fast_type_mu, 
+                seed,
+                None
+            )
+            
+            results['threshold_results'].append((threshold, spikes, time_series))
+        
+        return results
 
     def find_ees_protocol(self, target_amplitude=15, target_period=2*second, 
                         update_interval=200*ms, prediction_horizon=1000*ms, 
@@ -465,10 +494,12 @@ class BiologicalSystem:
         
         return controller.get_optimal_protocol()
 
-    def sensitivity_analysis(self, base_output_path, n_iterations=20, n_samples=50, time_step=0.1*ms, 
-                      base_ees_params=None, torque_profile=None, method='morris', seed=42):
+    def sensitivity_analysis(self, base_output_path, n_iterations=20, n_samples=50, 
+                           time_step=0.1, base_ees_params=None, torque_profile=None, 
+                           method='morris', seed=42):
         """
-        Perform sensitivity analysis on the biological system, focusing on joint angle dynamics.
+        Wrapper method to perform sensitivity analysis on the biological system.
+        
         
         Parameters:
         -----------
@@ -478,7 +509,7 @@ class BiologicalSystem:
             Number of iterations for each simulation
         n_samples : int
             Number of parameter samples to generate
-        time_step : brian2.units.fundamentalunits.Quantity
+        time_step : float or brian2.units
             Time step for the simulation
         base_ees_params : dict, optional
             Base parameters for epidural electrical stimulation
@@ -494,445 +525,22 @@ class BiologicalSystem:
         dict
             Sensitivity analysis results containing sensitivity indices and feature importances
         """
+        # Import the function from the separate module
+        from sensitivity_analysis import sensitivity_analysis as sensitivity_analysis_func
+        
+        # Call the function with self as the first parameter and all other parameters
+        return sensitivity_analysis_func(
+            biological_system=self,
+            base_output_path=base_output_path,
+            n_iterations=n_iterations,
+            n_samples=n_samples,
+            time_step=time_step,
+            base_ees_params=base_ees_params,
+            torque_profile=torque_profile,
+            method=method,
+            seed=seed
+        )
 
-        from SALib.sample import morris as morris_sample
-        from SALib.analyze import morris as morris_analyze
-        from SALib.sample import saltelli
-        from SALib.analyze import sobol
-        from SALib.sample import fast_sampler
-        from SALib.analyze import fast
-        from copy import deepcopy
-        import pickle
-        from tqdm import tqdm
-        
-        # Define parameter ranges for sensitivity analysis
-        # These would need to be adjusted based on your specific model parameters
-        problem = {
-            'num_vars': 0,  # Will be updated based on parameters
-            'names': [],    # Will be populated with parameter names
-            'bounds': []    # Will be populated with parameter bounds
-        }
-        
-        # Add biophysical parameters to the problem
-        for param, value in self.biophysical_params.items():
-            # Skip parameters that shouldn't be varied
-            if param in ['gL', 'Cm']:  # These are typically fixed physical constraints
-                continue
-                
-            problem['names'].append(f'biophysical_{param}')
-            
-            # Set bounds based on parameter type (with appropriate units)
-            if param == 'Eleaky':  # Resting membrane potential
-                problem['bounds'].append([-80*mV, -60*mV])
-            elif param == 'T_refr':    # Leak conductance
-                problem['bounds'].append([0*ms, 20*ms])
-            elif param == 'E_ex':  # Excitatory reversal potential
-                problem['bounds'].append([0*mV, 20*mV])
-            elif param == 'E_inh': # Inhibitory reversal potential
-                problem['bounds'].append([-80*mV, -60*mV])
-            elif param == 'tau_e': # Excitatory time constant
-                problem['bounds'].append([3*ms, 7*ms])
-            elif param == 'tau_i': # Inhibitory time constant
-                problem['bounds'].append([5*ms, 15*ms])
-            elif param == 'threshold_v': # Threshold voltage
-                problem['bounds'].append([-55*mV, -45*mV])
-            else:
-                # For other parameters, use ±30% around nominal value
-                lower_bound = float(value) * 0.7
-                upper_bound = float(value) * 1.3
-                problem['bounds'].append([lower_bound, upper_bound])
-
-        
-        # Add connection strengths
-        for connection_pair, weight in self.connections.items():
-            param_name = f'conn_{connection_pair[0]}_{connection_pair[1]}'
-            problem['names'].append(param_name)
-            # Connection weights typically vary by ±50%
-            if hasattr(weight, 'value'):
-                lower_bound = float(weight) * 0.5
-                upper_bound = float(weight) * 1.5
-            else:
-                lower_bound = weight * 0.5
-                upper_bound = weight * 1.5
-            problem['bounds'].append([lower_bound, upper_bound])
-        
-        # Update number of variables
-        problem['num_vars'] = len(problem['names'])
-        
-        print(f"Performing sensitivity analysis with {problem['num_vars']} parameters")
-        
-        # Create output directory for sensitivity analysis
-        sa_output_path = os.path.join(base_output_path, 'sensitivity_analysis')
-        os.makedirs(sa_output_path, exist_ok=True)
-        
-        # Generate parameter samples based on the selected method
-        if method == 'morris':
-            param_values = morris_sample.sample(problem, N=n_samples, num_levels=4, optimal_trajectories=None)
-        elif method == 'sobol':
-            param_values = saltelli.sample(problem, n_samples)
-        elif method == 'fast':
-            param_values = fast_sampler.sample(problem, n_samples)
-        else:
-            raise ValueError(f"Unknown sensitivity analysis method: {method}")
-        
-        # Extract joint name from associated_joint
-        joint_name = self.associated_joint
-        
-        # Initialize array to store features extracted from joint angle time series
-        features = {
-            'max_angle': [],           # Maximum joint angle
-            'min_angle': [],           # Minimum joint angle
-            'range_of_motion': [],     # Range of motion (max - min)
-            'mean_angle': [],          # Mean joint angle
-            'std_angle': [],           # Standard deviation of angle
-            'time_to_max': [],         # Time to reach maximum angle
-            'time_to_steady': [],      # Time to reach steady state
-            'steady_state_angle': [],  # Steady state angle
-            'oscillation_freq': [],    # Frequency of oscillation if any
-            'oscillation_amp': []      # Amplitude of oscillation if any
-        }
-        
-        # Function to extract features from joint angle time series
-        def extract_angle_features(angle_series, time_vector):
-            import numpy as np
-            from scipy import signal
-            
-            features_dict = {}
-            
-            # Basic statistics
-            features_dict['max_angle'] = np.max(angle_series)
-            features_dict['min_angle'] = np.min(angle_series)
-            features_dict['range_of_motion'] = features_dict['max_angle'] - features_dict['min_angle']
-            features_dict['mean_angle'] = np.mean(angle_series)
-            features_dict['std_angle'] = np.std(angle_series)
-            
-            # Time to max angle
-            max_idx = np.argmax(angle_series)
-            features_dict['time_to_max'] = time_vector[max_idx]
-            
-            # Steady state analysis
-            # Use the last 20% of the signal as steady state
-            steady_start_idx = int(0.8 * len(angle_series))
-            steady_state = angle_series[steady_start_idx:]
-            features_dict['steady_state_angle'] = np.mean(steady_state)
-            
-            # Time to reach steady state (within 5% of final value)
-            final_value = features_dict['steady_state_angle']
-            steady_threshold = 0.05 * features_dict['range_of_motion']
-            for i, val in enumerate(angle_series):
-                if abs(val - final_value) <= steady_threshold:
-                    features_dict['time_to_steady'] = time_vector[i]
-                    break
-            else:
-                features_dict['time_to_steady'] = time_vector[-1]  # Never reached steady state
-            
-            # Frequency analysis (for oscillations)
-            if len(angle_series) > 10:  # Need sufficient data points
-                # Detrend the signal
-                detrended = signal.detrend(angle_series)
-                
-                # Compute power spectral density
-                freqs, psd = signal.welch(detrended, fs=1/float(time_vector[1]-time_vector[0]), 
-                                         nperseg=min(256, len(detrended)//2))
-                
-                # Find dominant frequency excluding DC component
-                if len(freqs) > 1:
-                    peak_idx = np.argmax(psd[1:]) + 1  # Skip DC component
-                    features_dict['oscillation_freq'] = freqs[peak_idx]
-                    
-                    # Estimate oscillation amplitude using Fourier transform
-                    fft_vals = np.abs(np.fft.rfft(detrended))
-                    features_dict['oscillation_amp'] = np.max(fft_vals[1:]) * 2 / len(detrended)
-                else:
-                    features_dict['oscillation_freq'] = 0
-                    features_dict['oscillation_amp'] = 0
-            else:
-                features_dict['oscillation_freq'] = 0
-                features_dict['oscillation_amp'] = 0
-                
-            return features_dict
-        
-        # Save problem definition
-        with open(os.path.join(sa_output_path, 'problem_definition.pkl'), 'wb') as f:
-            pickle.dump(problem, f)
-        
-        # Run simulations for each parameter combination
-        print(f"Running {len(param_values)} simulations...")
-        
-        # Store failed simulations
-        failed_sims = []
-        
-        # Create a directory to store time series data
-        time_series_dir = os.path.join(sa_output_path, 'time_series')
-        os.makedirs(time_series_dir, exist_ok=True)
-        
-        for i, params in enumerate(tqdm(param_values)):
-            # Update parameters for this simulation
-            modified_system = deepcopy(self)
-            
-            # Apply parameter values
-            param_idx = 0
-            
-            # Update biophysical parameters
-            for orig_param in list(self.biophysical_params.keys()):
-                if f'biophysical_{orig_param}' in problem['names']:
-                    idx = problem['names'].index(f'biophysical_{orig_param}')
-                    # Need to preserve units
-                    if hasattr(self.biophysical_params[orig_param], 'unit'):
-                        unit = self.biophysical_params[orig_param].unit
-                        modified_system.biophysical_params[orig_param] = params[idx] * unit
-                    else:
-                        modified_system.biophysical_params[orig_param] = params[idx]
-   
-            
-            # Update connection strengths
-            for conn_pair in self.connections:
-                param_name = f'conn_{conn_pair[0]}_{conn_pair[1]}'
-                if param_name in problem['names']:
-                    idx = problem['names'].index(param_name)
-                    if hasattr(self.connections[conn_pair], 'unit'):
-                        unit = self.connections[conn_pair].unit
-                        modified_system.connections[conn_pair] = params[idx] * unit
-                    else:
-                        modified_system.connections[conn_pair] = params[idx]
-            
-            try:
-                # Run simulation with modified parameters
-                sim_output_path = os.path.join(sa_output_path, f'sim_{i}')
-                
-                # Run with minimal output (no plotting)
-                spikes, time_series = modified_system.run_simulation(
-                    sim_output_path, 
-                    n_iterations, 
-                    time_step=time_step, 
-                    ees_stimulation_params=base_ees_params,
-                    torque_profile=torque_profile,
-                    seed=seed
-                )
-                
-                # Extract joint angle time series
-                joint_col = f'joint_{joint_name}'
-                if joint_col in time_series.columns:
-                    joint_angle = time_series[joint_col].values
-                    time_vector = time_series['time'].values
-                    
-                    # Extract features from joint angle
-                    angle_features = extract_angle_features(joint_angle, time_vector)
-                    
-                    # Store features
-                    for feature_name, value in angle_features.items():
-                        features[feature_name].append(value)
-                    
-                    # Save time series for this simulation
-                    time_series[[joint_col, 'time']].to_csv(os.path.join(time_series_dir, f'joint_angle_{i}.csv'))
-                else:
-                    print(f"Warning: Joint column '{joint_col}' not found in time series")
-                    failed_sims.append(i)
-                    # Add NaN values for this simulation
-                    for feature_name in features:
-                        features[feature_name].append(np.nan)
-                        
-            except Exception as e:
-                print(f"Simulation {i} failed: {str(e)}")
-                failed_sims.append(i)
-                # Add NaN values for this simulation
-                for feature_name in features:
-                    features[feature_name].append(np.nan)
-        
-        # Convert features to DataFrame
-        features_df = pd.DataFrame(features)
-        
-        # Save features
-        features_df.to_csv(os.path.join(sa_output_path, 'angle_features.csv'))
-        
-        # Analyze sensitivity using selected method
-        sensitivity_results = {}
-        
-        # Remove rows with NaN values
-        valid_rows = ~features_df.isna().any(axis=1)
-        
-        if sum(valid_rows) < 10:
-            print(f"Warning: Only {sum(valid_rows)} valid simulations out of {len(param_values)}")
-            return {
-                'error': 'Too few valid simulations for sensitivity analysis',
-                'features': features_df
-            }
-        
-        for feature in features_df.columns:
-            feature_values = features_df[feature].values[valid_rows]
-            valid_params = param_values[valid_rows]
-            
-            # Perform sensitivity analysis using selected method
-            try:
-                if method == 'morris':
-                    Si = morris_analyze.analyze(
-                        problem, 
-                        valid_params, 
-                        feature_values, 
-                        print_to_console=False
-                    )
-                    sensitivity_results[feature] = {
-                        'mu': Si['mu'],
-                        'mu_star': Si['mu_star'],
-                        'sigma': Si['sigma'],
-                        'mu_star_conf': Si['mu_star_conf'],
-                        'parameter_names': problem['names']
-                    }
-                elif method == 'sobol':
-                    Si = sobol.analyze(
-                        problem, 
-                        feature_values, 
-                        print_to_console=False
-                    )
-                    sensitivity_results[feature] = {
-                        'S1': Si['S1'],
-                        'S1_conf': Si['S1_conf'],
-                        'ST': Si['ST'],
-                        'ST_conf': Si['ST_conf'],
-                        'parameter_names': problem['names']
-                    }
-                elif method == 'fast':
-                    Si = fast.analyze(
-                        problem, 
-                        feature_values, 
-                        print_to_console=False
-                    )
-                    sensitivity_results[feature] = {
-                        'S1': Si['S1'],
-                        'S1_conf': Si['S1_conf'],
-                        'parameter_names': problem['names']
-                    }
-            except Exception as e:
-                print(f"Sensitivity analysis failed for feature {feature}: {str(e)}")
-                sensitivity_results[feature] = {'error': str(e)}
-        
-        # Save sensitivity results
-        with open(os.path.join(sa_output_path, 'sensitivity_results.pkl'), 'wb') as f:
-            pickle.dump(sensitivity_results, f)
-        
-        # Create plots for each feature
-        plot_dir = os.path.join(sa_output_path, 'plots')
-        os.makedirs(plot_dir, exist_ok=True)
-        
-        for feature, results in sensitivity_results.items():
-            if 'error' in results:
-                continue
-                
-            plt.figure(figsize=(12, 8))
-            
-            if method == 'morris':
-                # Morris method: plot mu* (mean absolute elementary effects)
-                y_pos = np.arange(len(problem['names']))
-                plt.barh(y_pos, results['mu_star'], xerr=results['mu_star_conf'], align='center')
-                plt.yticks(y_pos, problem['names'])
-                plt.xlabel('μ* (Mean Absolute Elementary Effects)')
-            elif method == 'sobol':
-                # Sobol method: plot total effects
-                y_pos = np.arange(len(problem['names']))
-                plt.barh(y_pos, results['ST'], xerr=results['ST_conf'], align='center')
-                plt.yticks(y_pos, problem['names'])
-                plt.xlabel('Total Effects Sensitivity Index')
-            elif method == 'fast':
-                # FAST method: plot first-order effects
-                y_pos = np.arange(len(problem['names']))
-                plt.barh(y_pos, results['S1'], xerr=results['S1_conf'], align='center')
-                plt.yticks(y_pos, problem['names'])
-                plt.xlabel('First-Order Sensitivity Index')
-            
-            plt.title(f'Sensitivity Analysis for {feature}')
-            plt.tight_layout()
-            plt.savefig(os.path.join(plot_dir, f'sensitivity_{feature}.png'))
-            plt.close()
-        
-        # Create summary plot with top 5 parameters for each feature
-        plt.figure(figsize=(15, 10))
-        n_features = len(sensitivity_results)
-        cols = 2
-        rows = (n_features + 1) // 2
-        
-        feature_idx = 0
-        for feature, results in sensitivity_results.items():
-            if 'error' in results:
-                continue
-                
-            plt.subplot(rows, cols, feature_idx + 1)
-            
-            if method == 'morris':
-                # Sort parameters by mu*
-                sorted_indices = np.argsort(results['mu_star'])[-5:]  # Top 5 parameters
-                param_names = [problem['names'][i] for i in sorted_indices]
-                sensitivity = results['mu_star'][sorted_indices]
-                
-                plt.barh(np.arange(len(sorted_indices)), sensitivity, align='center')
-                plt.yticks(np.arange(len(sorted_indices)), param_names)
-                plt.xlabel('μ*')
-            elif method == 'sobol':
-                # Sort parameters by total effects
-                sorted_indices = np.argsort(results['ST'])[-5:]  # Top 5 parameters
-                param_names = [problem['names'][i] for i in sorted_indices]
-                sensitivity = results['ST'][sorted_indices]
-                
-                plt.barh(np.arange(len(sorted_indices)), sensitivity, align='center')
-                plt.yticks(np.arange(len(sorted_indices)), param_names)
-                plt.xlabel('Total Effects')
-            elif method == 'fast':
-                # Sort parameters by first-order effects
-                sorted_indices = np.argsort(results['S1'])[-5:]  # Top 5 parameters
-                param_names = [problem['names'][i] for i in sorted_indices]
-                sensitivity = results['S1'][sorted_indices]
-                
-                plt.barh(np.arange(len(sorted_indices)), sensitivity, align='center')
-                plt.yticks(np.arange(len(sorted_indices)), param_names)
-                plt.xlabel('First-Order Effects')
-            
-            plt.title(f'Top Parameters for {feature}')
-            feature_idx += 1
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(plot_dir, 'sensitivity_summary.png'))
-        plt.close()
-        
-        # Create time series visualization for a few representative samples
-        # Select a few samples with diverse parameter values
-        if len(features_df) > 0:
-            plt.figure(figsize=(12, 8))
-            
-            # Sort simulations based on range of motion
-            if 'range_of_motion' in features_df.columns:
-                sorted_indices = features_df['range_of_motion'].sort_values().index
-                # Take a few simulations from different parts of the distribution
-                sample_indices = [
-                    sorted_indices[0],  # Min range
-                    sorted_indices[len(sorted_indices)//4],  # 25th percentile
-                    sorted_indices[len(sorted_indices)//2],  # Median
-                    sorted_indices[3*len(sorted_indices)//4],  # 75th percentile
-                    sorted_indices[-1]  # Max range
-                ]
-                
-                for idx in sample_indices:
-                    if idx < len(param_values):
-                        try:
-                            ts_df = pd.read_csv(os.path.join(time_series_dir, f'joint_angle_{idx}.csv'))
-                            joint_col = f'joint_{joint_name}'
-                            if joint_col in ts_df.columns:
-                                plt.plot(ts_df['time'], ts_df[joint_col], label=f'Sim {idx}')
-                        except Exception as e:
-                            print(f"Could not plot time series for simulation {idx}: {str(e)}")
-                
-                plt.xlabel('Time (s)')
-                plt.ylabel(f'{joint_name} Joint Angle')
-                plt.title('Representative Joint Angle Time Series')
-                plt.legend()
-                plt.savefig(os.path.join(plot_dir, 'representative_time_series.png'))
-                plt.close()
-        
-        # Return results
-        return {
-            'sensitivity_results': sensitivity_results,
-            'features': features_df,
-            'problem_definition': problem,
-            'output_path': sa_output_path
-        }
 class Monosynaptic(BiologicalSystem):
     """
     Specialized class for monosynaptic reflexes.
