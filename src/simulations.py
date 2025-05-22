@@ -1010,7 +1010,7 @@ class Monosynaptic(BiologicalSystem):
             
         # Set default connections
         self.connections = {
-            ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9}
+            ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7}
         }
         
         # Override with custom connections if provided
