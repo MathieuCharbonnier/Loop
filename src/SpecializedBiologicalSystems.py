@@ -1,3 +1,5 @@
+from BiologicalSystem import BiologicalSystem
+
 class Monosynaptic(BiologicalSystem):
     """
     Specialized class for monosynaptic reflexes.
@@ -370,7 +372,15 @@ class ReciprocalInhibition(BiologicalSystem):
             'values': b_range,
             'label': 'Afferent Fiber Unbalanced Recruitment'
         }
+
+        # Compute parameter sweep
+        results = self._compute_ees_parameter_sweep(
+            base_ees_params,
+            vary_param,
+            n_iterations,
+            time_step, 
+            seed
+        )
         
-        return EES_stim_analysis(base_ees_params, vary_param, n_iterations, self.reaction_time, 
-                               self.neurons_population, self.connections, self.spindle_model, 
-                               self.biophysical_params, self.muscles_names, time_step, seed)
+        plot_ees_analysis_results(results, save_dir="balance_analysis", seed=seed)
+
