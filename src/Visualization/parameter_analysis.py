@@ -8,25 +8,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
-def plot_clonus_analysis_results(results, output_dir="clonus_analysis"):
-    """
-    Create visualization plots from clonus analysis results.
-    
-    Parameters:
-    -----------
-    results : dict
-        Results dictionary from clonus_analysis method
-    output_dir : str
-        Directory to save plots
-        
-    Returns:
-    --------
-    tuple
-        (fig1, fig2, fig3) - matplotlib figure objects
-    """
-    import matplotlib.pyplot as plt
-    import os
-    from datetime import datetime
+def plot_delays_results(delay_results, delay_values, muscle_names, associated_joint, output_dir="clonus_analysis"):
+
     
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -34,19 +17,11 @@ def plot_clonus_analysis_results(results, output_dir="clonus_analysis"):
         os.makedirs(output_dir)
         print(f"Created directory '{output_dir}' for saving plots")
     
-    # Extract parameters
-    params = results['parameters']
-    delay_values = params['delay_values']
-    threshold_values = params['threshold_values']
-    muscles_names = params['muscles_names']
-    associated_joint = params['associated_joint']
-    
-    # 1. Plot delay variation results
     fig1, axs1 = plt.subplots(len(delay_values), 2, figsize=(15, 4*len(delay_values)), sharex=True)
     if len(delay_values) == 1:
         axs1 = axs1.reshape(1, -1)
     
-    for i, (delay, spikes, time_series) in enumerate(results['delay_results']):
+    for i, (delay, spikes, time_series) in enumerate(delay_results):
         # Plot joint angle
         axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
         axs1[i, 0].set_ylabel(f"Delay = {int(delay/ms)} ms\nJoint angle (deg)")
@@ -65,13 +40,20 @@ def plot_clonus_analysis_results(results, output_dir="clonus_analysis"):
     fig1.suptitle("Joint Angle and Muscle Activation for different reaction times")
     fig1.tight_layout(rect=[0, 0, 1, 0.95])
     fig1.savefig(os.path.join(output_dir, f'delay_variation_{timestamp}.png'))
+
+def plot_twitch_results(fast_twitch_results,  muscle_names, associated_joint, output_dir="clonus_analysis"):
     
-    # 2. Plot fast twitch variation results
-    fig2, axs2 = plt.subplots(len(results['fast_twitch_results']), 2, figsize=(15, 4*len(results['fast_twitch_results'])), sharex=True)
-    if len(results['fast_twitch_results']) == 1:
+    # Create output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created directory '{output_dir}' for saving plots")
+    
+    fig2, axs2 = plt.subplots(len(fast_twitch_results), 2, figsize=(15, 4*len(fast_twitch_results)), sharex=True)
+    if len(fast_twitch_results) == 1:
         axs2 = axs2.reshape(1, -1)
     
-    for i, (fast, spikes, time_series) in enumerate(results['fast_twitch_results']):
+    for i, (fast, spikes, time_series) in enumerate(fast_twitch_results):
         # Plot joint angle
         axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
         label = "Fast type Motor Unit" if fast else "Slow type Motor Unit"
@@ -91,13 +73,20 @@ def plot_clonus_analysis_results(results, output_dir="clonus_analysis"):
     fig2.suptitle("Joint Angle and Muscle Activation of Slow and Fast type motor units")
     fig2.tight_layout(rect=[0, 0, 1, 0.95])
     fig2.savefig(os.path.join(output_dir, f'fast_twitch_variation_{timestamp}.png'))
+
+def plot_excitation_results(threshold_results, threshold_values, muscles_names, associated_joint, output_dir="clonus_analysis"):
+
+    # Create output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created directory '{output_dir}' for saving plots")
     
-    # 3. Plot threshold variation results
     fig3, axs3 = plt.subplots(len(threshold_values), 2, figsize=(15, 4*len(threshold_values)), sharex=True)
     if len(threshold_values) == 1:
         axs3 = axs3.reshape(1, -1)
     
-    for i, (threshold, spikes, time_series) in enumerate(results['threshold_results']):
+    for i, (threshold, spikes, time_series) in enumerate(threshold_results):
         # Plot joint angle
         axs3[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
         axs3[i, 0].set_ylabel(f"Threshold = {int(threshold/mV)} mV\nJoint angle (deg)")
@@ -117,7 +106,6 @@ def plot_clonus_analysis_results(results, output_dir="clonus_analysis"):
     fig3.tight_layout(rect=[0, 0, 1, 0.95])
     fig3.savefig(os.path.join(output_dir, f'threshold_variation_{timestamp}.png'))
     
-    return fig1, fig2, fig3
 
 
 
