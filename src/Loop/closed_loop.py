@@ -11,13 +11,12 @@ from scipy.stats import gaussian_kde
 
 from neural_dynamics import run_monosynaptic_simulation, run_trisynaptic_simulation, run_flexor_extensor_neuron_simulation
 from activation import decode_spikes_to_activation
-from input_generator import transform_torque_params_in_array, transform_intensity_balance_in_recruitment
+
 
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
               spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, 
-              ees_recruitment_profile, ees_stimulation_params=None, 
-              torque=None, fast=True, seed=42,base_output_path=None):
+              ees_params=None, torque_array=None, fast=True, seed=42,base_output_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
     
@@ -50,12 +49,10 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         Number of muscles (length of muscles_names list)
     associated_joint : str
         Name of the associated joint
-    ees_recruitment_profile : dict
-        Parameters to define recruitment curve
-    ees_stimulation_params : dict, optional
+    ees_params : dict, optional
         Parameters for electrical epidural stimulation
-    torque : dict, optional
-        Parameter to create the external torque profile applied at each time step
+    torque_array: numpy.array, optional
+         External torque profile applied at each time step
     fast : bool, optional
         Whether to use the fast spike-to-activation decoding algorithm (default: True)
     seed : int, optional
@@ -112,14 +109,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         }
         for muscle_name in muscles_names
     }
-    torque_array = None
-    if torque is not None:
-        torque_array = transform_torque_params_in_array(time_points, torque)
 
-    ees_params = None
-    if ees_stimulation_params is not None:
-        ees_params = transform_intensity_balance_in_recruitment(
-          ees_recruitment_profile, ees_stimulation_params, neurons_population, num_muscles)
 
     # =============================================================================
     # Main Simulation Loop
