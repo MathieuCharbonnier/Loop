@@ -533,9 +533,4 @@ class BiologicalSystem:
             method=method,
             seed=seed
         )
-
-
-
-
-                               self.biophysical_params, self.muscles_names, time_step, seed)
                     
