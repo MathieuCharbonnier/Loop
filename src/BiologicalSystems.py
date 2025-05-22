@@ -4,11 +4,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
-from closed_loop import closed_loop
-from analysis import delay_excitability_MU_type_analysis, EES_stim_analysis
-from controller import HierarchicalAnkleController
-from plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
-from input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
+
+from Loop.closed_loop import closed_loop
+
+from Visualization.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results
+from Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
+
+from Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
+from Stimulation.controller import HierarchicalAnkleController
 
 class BiologicalSystem:
     """
@@ -147,7 +150,6 @@ class BiologicalSystem:
         
         plot_ees_analysis_results(results, save_dir="frequency_analysis", seed=seed)
         
-        return results
 
     def analyze_intensity_effects(self, intensity_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
@@ -191,7 +193,6 @@ class BiologicalSystem:
 
         plot_ees_analysis_results(results, save_dir="intensity_analysis", seed=seed)
         
-        return results
 
     def _compute_ees_parameter_sweep(self, param_dict, vary_param, n_iterations, time_step=0.1*ms, seed=42):
         """
@@ -311,7 +312,7 @@ class BiologicalSystem:
         
     def clonus_analysis(self, torque_profile, delay_values=[10, 25, 50, 75, 100]*ms, 
                     threshold_values=[-45, -50, -55]*mV, duration=1*second, 
-                    time_step=0.1*ms, fast_type_mu=True, , seed=41):
+                    time_step=0.1*ms, fast_type_mu=True, seed=41):
         """
         Analyze clonus behavior by varying one parameter at a time.
         
@@ -334,29 +335,15 @@ class BiologicalSystem:
             
         Returns:
         --------
-        dict
-            Analysis results containing:
-            - delay_results: list of (delay_value, spikes, time_series) tuples
-            - fast_twitch_results: list of (fast_twitch_bool, spikes, time_series) tuples
-            - threshold_results: list of (threshold_value, spikes, time_series) tuples
+ 
+        delay_results: list of (delay_value, spikes, time_series) tuples
+        fast_twitch_results: list of (fast_twitch_bool, spikes, time_series) tuples
+        threshold_results: list of (threshold_value, spikes, time_series) tuples
         """
-
-        results = {
-            'delay_results': [],
-            'fast_twitch_results': [],
-            'threshold_results': [],
-            'parameters': {
-                'delay_values': delay_values,
-                'threshold_values': threshold_values,
-                'duration': duration,
-                'time_step': time_step,
-                'reaction_time': self.reaction_time,
-                'muscles_names': self.muscles_names,
-                'associated_joint': self.associated_joint,
-                'fast_type_mu': fast_type_mu,
-                'seed': seed
-            }
-        }
+                        
+        delay_results=[]
+        fast_twitch_results=[]
+        threshold_results=[]
         
         # 1. Vary delay (reaction time)
         print("Running delay variation analysis...")
@@ -385,8 +372,10 @@ class BiologicalSystem:
                 None
             )
             
-            results['delay_results'].append((delay, spikes, time_series))
-            
+            delay_results.append((delay, spikes, time_series))
+
+        plot_delay_results(delay_results,delay_values, muscle_names, associated_joint)
+                        
         n_iterations = int(duration/self.reaction_time)
         time_points = np.arange(0, self.reaction_time*n_iterations, time_step)
         torque_array = transform_torque_params_in_array(time_points, torque_profile)
@@ -414,8 +403,10 @@ class BiologicalSystem:
                 None
             )
             
-            results['fast_twitch_results'].append((fast, spikes, time_series))
-        
+            fast_twitch_results.append((fast, spikes, time_series))
+            
+        plot_twitch_result(fast_twitch_results, muscle_names, associated_joint)
+                        
         # 3. Vary threshold voltage
         print("Running threshold variation analysis...")
         for threshold in tqdm(threshold_values, desc="Varying threshold voltage"):
@@ -441,9 +432,11 @@ class BiologicalSystem:
                 None
             )
             
-            results['threshold_results'].append((threshold, spikes, time_series))
+            threshold_results.append((threshold, spikes, time_series))
+
+        plot_excitability_results(threshold_results,threshold_values, muscles_names, associated_joint)
         
-        return results
+
 
     def find_ees_protocol(self, target_amplitude=15, target_period=2*second, 
                         update_interval=200*ms, prediction_horizon=1000*ms, 
@@ -541,207 +534,6 @@ class BiologicalSystem:
             seed=seed
         )
 
-class Monosynaptic(BiologicalSystem):
-    """
-    Specialized class for monosynaptic reflexes.
-    
-    Monosynaptic reflexes involve a direct connection from afferent (Ia) neurons
-    to motor neurons (MN) without intermediate interneurons.
-    """
-    
-    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
-                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_profile=None):
-        """
-        Initialize a monosynaptic reflex system with default or custom parameters.
-        
-        Parameters:
-        -----------
-        reaction_time : brian2.units.fundamentalunits.Quantity, optional
-            Reaction time of the system (default: 25ms)
-        biophysical_params : dict, optional
-            Custom biophysical parameters for neurons (if None, use defaults)
-        muscles_names : list, optional
-            List of muscle names (default: ["soleus_r"])
-        associated_joint : str, optional
-            Name of the associated joint (default: "ankle_angle_r")
-        custom_neurons : dict, optional
-            Custom neuron population counts (if None, use defaults)
-        custom_connections : dict, optional
-            Custom neural connections (if None, use defaults)
-        custom_spindle : dict, optional
-            Custom spindle model equations (if None, use defaults)
-        custom_ees_recruitment_params : dict, optional
-            Custom EES recruitment parameters (if None, use defaults)
-        """
-        # Set default parameters if not provided
-        if muscles_names is None:
-            muscles_names = ["soleus_r"]
-            
-        if biophysical_params is None:
-            biophysical_params = {
-                'T_refr': 5 * ms,  # Refractory period
-                'Eleaky': -70*mV,
-                'gL': 10*nS,
-                'Cm': 0.3*nF,  
-                'E_ex': 0*mV,
-                'tau_e': 0.5*ms,
-                'threshold_v': -50*mV
-            }
-            
-        if custom_ees_recruitment_profile is None:
-            ees_recruitment_profile = {
-                'Ia': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
-                },
-                'MN': {
-                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
-                    'saturation_90pct': 0.9  
-                }
-            }
-        else:
-            ees_recruitment_profile = custom_ees_recruitment_profile
-            
-        # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
-        
-        # Set default neuron populations
-        self.neurons_population = {
-            "Ia": 410,       # Type Ia afferent neurons
-            "MN": 500       # Motor neurons
-        }
-        
-        # Override with custom values if provided
-        if custom_neurons is not None:
-            self.neurons_population.update(custom_neurons)
-            
-        # Set default connections
-        self.connections = {
-            ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7}
-        }
-        
-        # Override with custom connections if provided
-        if custom_connections is not None:
-            self.connections.update(custom_connections)
-            
-        # Set default spindle model
-        self.spindle_model = {
-            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
-        }
-        
-        # Override with custom spindle model if provided
-        if custom_spindle is not None:
-            self.spindle_model.update(custom_spindle)
-            
-        # Validate parameters
-        self.validate_parameters()
-
-
-class Trisynaptic(BiologicalSystem):
-    """
-    Specialized class for trisynaptic reflexes.
-    
-    Trisynaptic reflexes involve connections from afferent neurons (Ia and II)
-    to motor neurons (MN) through excitatory interneurons.
-    """
-    
-    def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
-                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_profile=None):
-        """
-        Initialize a trisynaptic reflex system with default or custom parameters.
-        
-        Parameters:
-        -----------
-        reaction_time : brian2.units.fundamentalunits.Quantity, optional
-            Reaction time of the system (default: 25ms)
-        biophysical_params : dict, optional
-            Custom biophysical parameters for neurons (if None, use defaults)
-        muscles_names : list, optional
-            List of muscle names (default: ["tib_ant_r"])
-        associated_joint : str, optional
-            Name of the associated joint (default: "ankle_angle_r")
-        custom_neurons : dict, optional
-            Custom neuron population counts (if None, use defaults)
-        custom_connections : dict, optional
-            Custom neural connections (if None, use defaults)
-        custom_spindle : dict, optional
-            Custom spindle model equations (if None, use defaults)
-        custom_ees_recruitment_params : dict, optional
-            Custom EES recruitment parameters (if None, use defaults)
-        """
-        # Set default parameters if not provided
-        if muscles_names is None:
-            muscles_names = ["tib_ant_r"]
-            
-        if biophysical_params is None:
-            biophysical_params = {
-                'T_refr': 5 * ms,
-                'Eleaky': -70*mV,
-                'gL': 10*nS,
-                'Cm': 0.3*nF,
-                'E_ex': 0*mV,
-                'tau_e': 0.5*ms,
-                'threshold_v': -50*mV
-            }
-            
-        if custom_ees_recruitment_profile is None:
-            ees_recruitment_profile = {
-                'Ia': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
-                },
-                'II': {
-                    'threshold_10pct': 0.4,  # Type II fibers have higher threshold
-                    'saturation_90pct': 0.8  # and higher saturation point
-                },
-                'MN': {
-                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
-                    'saturation_90pct': 0.9  
-                }
-            }
-        else:
-            ees_recruitment_params = custom_ees_recruitment_profile
-            
-        # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
-        
-        # Set default neuron populations
-        self.neurons_population = {
-            "Ia": 280,       # Type Ia afferent neurons
-            "II": 280,       # Type II afferent neurons
-            "exc": 500,     # Excitatory interneurons
-            "MN": 450       # Motor neurons
-        }
-        
-        # Override with custom values if provided
-        if custom_neurons is not None:
-            self.neurons_population.update(custom_neurons)
-            
-        # Set default connections
-        self.connections = {
-            ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9},
-            ("II", "exc"): {"w": 2*3.64*nS, "p": 0.9},
-            ("exc", "MN"): {"w": 2*2.1*nS, "p": 0.9}
-        }
-        
-        # Override with custom connections if provided
-        if custom_connections is not None:
-            self.connections.update(custom_connections)
-            
-        # Set default spindle model
-        self.spindle_model = {
-            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
-            "II": "20 + 13.5*stretch"
-        }
-        
-        # Override with custom spindle model if provided
-        if custom_spindle is not None:
-            self.spindle_model.update(custom_spindle)
-            
-        # Validate parameters
-        self.validate_parameters()
 
 
 
