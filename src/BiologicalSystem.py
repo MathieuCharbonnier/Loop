@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 
-from Loop.closed_loop import closed_loop
+from .Loop.closed_loop import closed_loop
 
-from Visualization.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results
-from Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
+from .Visualization.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results
+from .Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
 
-from Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
-from Stimulation.controller import HierarchicalAnkleController
+from .Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
+from .Stimulation.controller import HierarchicalAnkleController
 
 class BiologicalSystem:
     """
