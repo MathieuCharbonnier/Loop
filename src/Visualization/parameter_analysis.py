@@ -6,271 +6,162 @@ import os
 from datetime import datetime
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from closed_loop import closed_loop
 
-def delay_excitability_MU_type_analysis(delay_values, threshold_values, duration, time_step, reaction_time,
-                                      neurons_population, connections, 
-                                      spindle_model, biophysical_params, muscles_names, num_muscles,
-                                      associated_joint, torque_profile, ees_stimulation_params, 
-                                      ees_recruitment_profile, fast_type_mu, seed=41):
-        """
-        Analyze clonus behavior by varying one parameter at a time and create visualization plots.
-        
-        Parameters:
-        -----------
-        delay_values:list
-            list of reaction time to test
-        threshold_values
-            list of spikes threshold potential to test
-        duration: brian2.unit
-            Duration of the simulation 
-        time_step: brian2.unit
-            Time step for simulation
-        reaction_time: brian2.unit
-            Feedback time
-        neurons_population: dict
-            Neurons count for each fiber type
-        connections: dict
-            Connections between neurons
-        spindle_model: dict
-            Equations to transform stretch or joint angle into afferent firing rate
-        biophysical_params: dict
-            Parameters for neural dynamics simulations
-        muscles_names: list
-            List of muscle names
-        num_muscles: int
-            Number of muscles
-        associated_joint: str
-            Name of the joint to analyze
-        torque_profile: dict
-            Dictionary with torque profile parameters
-        ees_stimulation_params: dict
-            Parameters for EES stimulation
-        ees_recruitment_profile: dict
-            Parameters for recruitment profiles
-        fast_type_mu: bool
-            Whether to use fast twitch motor units
-        seed: int
-            Random seed for reproducibility
-        """
-        # Create base_output_path for results
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fig_dir = "clonus_analysis"
-        if not os.path.exists(fig_dir):
-            os.makedirs(fig_dir)
-        print(f"Created directory '{fig_dir}' for saving plots")
-    
-    
-        fast_twitch_values = [False, True]  # False for slow, True for fast
-    
-        # 1. Vary delay
-        fig1, axs1 = plt.subplots(len(delay_values), 2, figsize=(15, 4*len(delay_values)), sharex=True)
-        for i, delay in enumerate(tqdm(delay_values, desc="Varying delay")):
-            # Set reaction time to the current delay value
-            current_reaction_time = delay
-            # Run simulation with current parameters
-            n_iterations = int(duration/current_reaction_time) 
-            spikes, time_series = closed_loop(
-                    n_iterations, 
-                    current_reaction_time, 
-                    time_step, 
-                    neurons_population, 
-                    connections,
-                    spindle_model, 
-                    biophysical_params, 
-                    muscles_names,
-                    num_muscles, 
-                    associated_joint,
-                    ees_recruitment_profile,
-                    ees_stimulation_params,
-                    torque_profile, 
-                    fast_type_mu, 
-                    seed,
-                    None
-                )
-            
-            # Plot joint angle
-            axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
-            axs1[i, 0].set_ylabel(f"Delay = {int(delay/ms)} ms\nJoint angle (deg)") 
-            
-            # Plot muscle activations
-            for muscle in muscles_names:  
-                activation_col = f"Activation_{muscle}"
-                axs1[i, 1].plot(time_series['Time'], time_series[activation_col], 
-                              label=muscle)
-            
-            axs1[i, 1].set_ylabel("Muscle activation")
-            axs1[i, 1].legend()
-        
-        axs1[-1, 0].set_xlabel("Time (s)")
-        axs1[-1, 1].set_xlabel("Time (s)")
-        fig1.suptitle("Joint Angle and Muscle Activation for different reaction times")
-        fig1.tight_layout(rect=[0, 0, 1, 0.95])
-        fig1.savefig(os.path.join(fig_dir, f'delay_variation_{timestamp}.png'))
-        
-        n_iterations = int(duration/reaction_time) 
-        # 2. Vary fast twitch parameter
-        fig2, axs2 = plt.subplots(len(fast_twitch_values), 2, figsize=(15, 4*len(fast_twitch_values)), sharex=True)
-        
-        for i, fast in enumerate(tqdm(fast_twitch_values, desc="Varying fast twitch parameter")):
-            
-            # Run simulation with current parameters
-            n_iterations = int(duration/reaction_time) 
-            spikes, time_series = closed_loop(
-                n_iterations, 
-                reaction_time, 
-                time_step, 
-                neurons_population, 
-                connections,
-                spindle_model, 
-                biophysical_params, 
-                muscles_names,
-                num_muscles, 
-                associated_joint,
-                ees_recruitment_profile,
-                ees_stimulation_params,
-                torque_profile, 
-                fast, 
-                seed,
-                None
-            )
-            
-            # Plot joint angle
-            axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
-            if fast:
-                axs2[i, 0].set_ylabel(f"Fast type Motor Unit\nJoint angle (deg)")
-            else:
-                axs2[i, 0].set_ylabel(f"Slow type Motor Unit\nJoint angle (deg)")
 
-            # Plot muscle activations
-            for muscle in muscles_names :  
-                activation_col = f"Activation_{muscle}"
-                axs2[i, 1].plot(time_series['Time'], time_series[activation_col], 
-                              label=muscle)
-            
-            axs2[i, 1].set_ylabel("Muscle activation")
-            axs2[i, 1].legend()
-        
-        axs2[-1, 0].set_xlabel("Time (s)")
-        axs2[-1, 1].set_xlabel("Time (s)")
-        fig2.suptitle("Joint Angle and Muscle Activation of Slow and Fast type motor units")
-        fig2.tight_layout(rect=[0, 0, 1, 0.95])
-        fig2.savefig(os.path.join(fig_dir, f'fast_twitch_variation_{timestamp}.png'))
-        
-        # 3. Vary threshold voltage
-        fig3, axs3 = plt.subplots(len(threshold_values), 2, figsize=(15, 4*len(threshold_values)), sharex=True)
-        
-        for i, threshold in enumerate(tqdm(threshold_values, desc="Varying threshold voltage")):
-            # Create a copy of biophysical params and update the threshold
-            current_biophysical_params = biophysical_params.copy()  
-            current_biophysical_params['threshold_v'] = threshold
-            
-            # Run simulation with current parameters
-            n_iterations = int(duration/reaction_time) 
-            spikes, time_series = closed_loop(
-                n_iterations, 
-                reaction_time, 
-                time_step, 
-                neurons_population, 
-                connections,
-                spindle_model, 
-                current_biophysical_params, 
-                muscles_names,
-                num_muscles, 
-                associated_joint,
-                ees_recruitment_profile,
-                ees_stimulation_params,
-                torque_profile, 
-                fast_type_mu, 
-                seed,
-                None
-            )
-            
-            # Plot joint angle
-            axs3[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
-            axs3[i, 0].set_ylabel(f"Threshold = {int(threshold/mV)} mV\nJoint angle (deg)")  
-            
-            # Plot muscle activations
-            for muscle in muscles_names:  
-                activation_col = f"Activation_{muscle}"
-                axs3[i, 1].plot(time_series['Time'], time_series[activation_col],  
-                              label=muscle)
-            
-            axs3[i, 1].set_ylabel("Muscle activation")
-            axs3[i, 1].legend()
-        
-        axs3[-1, 0].set_xlabel("Time (s)")
-        axs3[-1, 1].set_xlabel("Time (s)")
-        fig3.suptitle("Effect of neuron excitability on Joint Angle and Muscle Activation")
-        fig3.tight_layout(rect=[0, 0, 1, 0.95])
-        fig3.savefig(os.path.join(fig_dir, f'threshold_variation_{timestamp}.png'))
-        
-        plt.show()
-
-def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time, 
-                     neurons_population, connections, spindle_model, biophysical_params, 
-                     muscles_names, num_muscles, associated_joint, ees_recruitment_profile, 
-                     time_step=0.1*ms, seed=42):
+def plot_clonus_analysis_results(results, output_dir="clonus_analysis"):
     """
-    Generalized EES stimulation analysis that can vary any parameter of interest.
+    Create visualization plots from clonus analysis results.
     
     Parameters:
     -----------
-    param_dict : dict
-        Dictionary containing all EES parameters with their default values
-        Expected keys: 'ees_freq', 'afferent_recruited', 'MN_recruited', 'B'
-    vary_param : dict
-        Dictionary specifying which parameter to vary with its range of values
-        Format: {'param_name': [values_to_test], 'label': 'Display Label'}
-        Example: {'param_name': 'ees_freq', 'values': [10, 20, 30], 'label': 'EES Frequency (Hz)'}
-    n_iterations : int
-        Number of iterations for each simulation
-    reaction_time : brian2.unit
-        Feedback time
-    neurons_population : dict
-        Neurons count for each fiber type
-    connections : dict
-        Connections between neurons
-    spindle_model : dict
-        Equations to transform stretch or joint angle into afferent firing rate
-    biophysical_params : dict
-        Parameters for neural dynamics simulations
-    muscles_names : list
-        List of muscle names
-    num_muscles : int
-        Number of muscles
-    associated_joint : str
-        Name of the joint to analyze
-    ees_recruitment_profile: dict
-        threshold and saturations to define the recruitment curves
-    time_step : brian2.unit
-        Time step for simulation
-    seed : int
-        Random seed for reproducibility
+    results : dict
+        Results dictionary from clonus_analysis method
+    output_dir : str
+        Directory to save plots
+        
+    Returns:
+    --------
+    tuple
+        (fig1, fig2, fig3) - matplotlib figure objects
     """
-    # Create a directory for saving plots if it doesn't exist
-    save_dir = "stimulation_analysis"
+    import matplotlib.pyplot as plt
+    import os
+    from datetime import datetime
+    
+    # Create output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created directory '{output_dir}' for saving plots")
+    
+    # Extract parameters
+    params = results['parameters']
+    delay_values = params['delay_values']
+    threshold_values = params['threshold_values']
+    muscles_names = params['muscles_names']
+    associated_joint = params['associated_joint']
+    
+    # 1. Plot delay variation results
+    fig1, axs1 = plt.subplots(len(delay_values), 2, figsize=(15, 4*len(delay_values)), sharex=True)
+    if len(delay_values) == 1:
+        axs1 = axs1.reshape(1, -1)
+    
+    for i, (delay, spikes, time_series) in enumerate(results['delay_results']):
+        # Plot joint angle
+        axs1[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
+        axs1[i, 0].set_ylabel(f"Delay = {int(delay/ms)} ms\nJoint angle (deg)")
+        
+        # Plot muscle activations
+        for muscle in muscles_names:
+            activation_col = f"Activation_{muscle}"
+            if activation_col in time_series:
+                axs1[i, 1].plot(time_series['Time'], time_series[activation_col], label=muscle)
+        
+        axs1[i, 1].set_ylabel("Muscle activation")
+        axs1[i, 1].legend()
+    
+    axs1[-1, 0].set_xlabel("Time (s)")
+    axs1[-1, 1].set_xlabel("Time (s)")
+    fig1.suptitle("Joint Angle and Muscle Activation for different reaction times")
+    fig1.tight_layout(rect=[0, 0, 1, 0.95])
+    fig1.savefig(os.path.join(output_dir, f'delay_variation_{timestamp}.png'))
+    
+    # 2. Plot fast twitch variation results
+    fig2, axs2 = plt.subplots(len(results['fast_twitch_results']), 2, figsize=(15, 4*len(results['fast_twitch_results'])), sharex=True)
+    if len(results['fast_twitch_results']) == 1:
+        axs2 = axs2.reshape(1, -1)
+    
+    for i, (fast, spikes, time_series) in enumerate(results['fast_twitch_results']):
+        # Plot joint angle
+        axs2[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
+        label = "Fast type Motor Unit" if fast else "Slow type Motor Unit"
+        axs2[i, 0].set_ylabel(f"{label}\nJoint angle (deg)")
+        
+        # Plot muscle activations
+        for muscle in muscles_names:
+            activation_col = f"Activation_{muscle}"
+            if activation_col in time_series:
+                axs2[i, 1].plot(time_series['Time'], time_series[activation_col], label=muscle)
+        
+        axs2[i, 1].set_ylabel("Muscle activation")
+        axs2[i, 1].legend()
+    
+    axs2[-1, 0].set_xlabel("Time (s)")
+    axs2[-1, 1].set_xlabel("Time (s)")
+    fig2.suptitle("Joint Angle and Muscle Activation of Slow and Fast type motor units")
+    fig2.tight_layout(rect=[0, 0, 1, 0.95])
+    fig2.savefig(os.path.join(output_dir, f'fast_twitch_variation_{timestamp}.png'))
+    
+    # 3. Plot threshold variation results
+    fig3, axs3 = plt.subplots(len(threshold_values), 2, figsize=(15, 4*len(threshold_values)), sharex=True)
+    if len(threshold_values) == 1:
+        axs3 = axs3.reshape(1, -1)
+    
+    for i, (threshold, spikes, time_series) in enumerate(results['threshold_results']):
+        # Plot joint angle
+        axs3[i, 0].plot(time_series['Time'], time_series[f'Joint_{associated_joint}'], 'b-')
+        axs3[i, 0].set_ylabel(f"Threshold = {int(threshold/mV)} mV\nJoint angle (deg)")
+        
+        # Plot muscle activations
+        for muscle in muscles_names:
+            activation_col = f"Activation_{muscle}"
+            if activation_col in time_series:
+                axs3[i, 1].plot(time_series['Time'], time_series[activation_col], label=muscle)
+        
+        axs3[i, 1].set_ylabel("Muscle activation")
+        axs3[i, 1].legend()
+    
+    axs3[-1, 0].set_xlabel("Time (s)")
+    axs3[-1, 1].set_xlabel("Time (s)")
+    fig3.suptitle("Effect of neuron excitability on Joint Angle and Muscle Activation")
+    fig3.tight_layout(rect=[0, 0, 1, 0.95])
+    fig3.savefig(os.path.join(output_dir, f'threshold_variation_{timestamp}.png'))
+    
+    return fig1, fig2, fig3
+
+
+
+def plot_ees_analysis_results(results, save_dir="stimulation_analysis", seed=42):
+    """
+    Plot the results from EES parameter sweep analysis.
+    
+    Parameters:
+    -----------
+    results : dict
+        Results dictionary from compute_ees_parameter_sweep
+    save_dir : str
+        Directory to save plots
+    seed : int
+        Random seed (for filename generation)
+    """
+    
+    # Create save directory
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         print(f"Created directory '{save_dir}' for saving plots")
-  
+    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # Define a custom color palette for muscles
-    # Using a colorblind-friendly palette
+    
+    # Extract data from results
+    param_values = results['param_values']
+    param_name = results['param_name']
+    param_label = results['param_label']
+    time_data = results['time_data']
+    simulation_data = results['simulation_data']
+    spikes_data = results['spikes_data']
+    muscles_names = results['muscle_names']
+    associated_joint = results['associated_joint']
+    num_muscles = results['num_muscles']
+    activities = results.get('activities', None)
+    
+    n_rows = len(param_values)
+    
+    # Define muscle colors
     muscle_colors = {
         muscles_names[i]: plt.cm.tab10(i % 10) for i in range(num_muscles) 
     }
     
-    
     time_series_to_plot = ['Ia_rate_baseline', 'II_rate_baseline', 'MN_rate', 'Raster_MN', 'Activation', 'Stretch', 'Joint']
-    
-    # Get parameter info
-    param_name = vary_param['param_name']
-    param_values = vary_param['values']
-    param_label = vary_param['label']
-    
-    n_rows = len(param_values)
     
     # Initialize figures and axes
     figs = {}
@@ -281,306 +172,245 @@ def EES_stim_analysis(param_dict, vary_param, n_iterations, reaction_time,
             axs = [axs]  
         figs[var] = fig
         axs_dict[var] = axs
-      
-    if (num_muscles == 2):  # coactivation analysis
-        # Preallocate activities array
-        activities = None  # Will initialize inside loop
     
-    
-    # Run simulations for each parameter value
-    for i, value in enumerate(param_values):
-        # Create a copy of the base parameters
-        current_params = param_dict.copy()
+    # Plot data for each parameter value
+    for i, (value, main_data, spikes) in enumerate(zip(param_values, simulation_data, spikes_data)):
         
-        # Update the parameter we're varying
-        current_params[param_name] = value
-        
-        # Create a descriptive name for the output file
-        param_str_parts = []
-        for key in current_params.keys():
-            param_str_parts.append(f"{key}_{current_params[key]}")
-        
-    
-        # --- Run simulation ---
-           
-        spikes, main_data = closed_loop(
-            n_iterations, 
-            reaction_time, 
-            time_step, 
-            neurons_population, 
-            connections,
-            spindle_model, 
-            biophysical_params, 
-            muscles_names,
-            num_muscles, 
-            associated_joint,
-            ees_recruitment_profile,
-            current_params, # EES_STIMULATION_PARAMS
-            None,  # TORQUE 
-            True, 
-            seed,
-            None
-        )
- 
-        
-        # Extract time from the dataframe
-        time_data = main_data['Time']
-        
-        # Get time length for preallocation on first iteration
-        if num_muscles == 2 and activities is None:
-            T = len(time_data)
-            activities = np.zeros((num_muscles, n_rows, T))  
-    
-        # --- Plot each variable ---
+        # Plot each variable
         for var in time_series_to_plot:
-            # Get the axis for this variable and parameter value
             ax = axs_dict[var][i]
             
             # Set title with parameter information
-            ax.set_title(f"{param_label}: {value} ")
-            
+            ax.set_title(f"{param_label}: {value}")
             ax.set_xlabel("Time (s)")
+            
             if "rate" in var:
                 ax.set_ylabel(var.replace('_', ' ').title() + " (hertz)")
             else:
                 ax.set_ylabel(var.replace('_', ' ').title() + " (dimless)")
             
-            # Add a light background grid for better readability
             ax.grid(True, linestyle='--', alpha=0.3)
-    
+            
             if var == f'Joints_{associated_joint}':
                 ax.plot(time_data, main_data[f'Joints_{associated_joint}'], color='darkred', 
-                           label='Ankle Angle', linewidth=2.5)
+                       label='Ankle Angle', linewidth=2.5)
                 ax.set_ylabel(var.replace('_', ' ').title() + " (degree)")
-    
+            
             elif var == 'Raster_MN':
-                # Add different colors for each muscle in the raster plot
-                for idx, muscle_name in enumerate(muscles_names):  # Fixed: muscles_names -> MUSCLES_NAMES
+                # Raster plot with different colors for each muscle
+                for idx, muscle_name in enumerate(muscles_names):
                     if muscle_name in spikes:
                         color = muscle_colors[muscle_name]
                         
-                        # Plot spikes for this muscle with a distinct color
                         for neuron_id, neuron_spikes in spikes[muscle_name]['MN'].items():
                             if neuron_spikes:
                                 ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), 
                                        '.', markersize=4, color=color)
                         
-                        # Add a label for this muscle at its position
                         ax.text(0.01 + idx*0.09, 1.05, muscle_name, 
                                transform=ax.get_xaxis_transform(), color=color,
                                fontweight='bold', verticalalignment='center')
                 
-                # Add a more descriptive y-axis label for raster plot
-                ax.set_ylabel("Neuron ID ")
-                    
+                ax.set_ylabel("Neuron ID")
+            
             else:
-                # Plot data for each muscle with consistent colors
-                for idx, muscle_name in enumerate(muscles_names):  
-                    # Construct column name with muscle suffix
+                # Plot data for each muscle
+                for idx, muscle_name in enumerate(muscles_names):
                     col_name = f"{var}_{muscle_name}"
                     
                     if col_name in main_data.columns:
                         ax.plot(time_data, main_data[col_name], label=muscle_name, 
                                color=muscle_colors[muscle_name], linewidth=2.0, alpha=0.8)
-                        
-                        # Store mean activation for coactivation analysis
-                        if var == 'Activation' and num_muscles == 2:
-                            activities[idx, i, :] = main_data[col_name].values
-                
-            # Add legend with improved styling
-            if var != 'Raster_MN':  # Raster plot has text labels instead
+            
+            # Add legend
+            if var != 'Raster_MN':
                 legend = ax.legend(frameon=True, fancybox=True, framealpha=0.9, 
                                   loc='upper right', ncol=1, fontsize='x-large')
                 legend.get_frame().set_edgecolor('lightgray')
     
-    # --- Final layout adjustments, saving, and display ---
-    
-    # Process all figures
+    # Finalize and save figures
     for var in time_series_to_plot:
-        # Add a main title to each figure with improved styling
         figs[var].suptitle(f"{var.replace('_', ' ').title()} Response Across {param_label} Values", y=0.98)
         
-        # Make sure all plots have data and proper formatting
+        # Handle empty plots
         for ax in axs_dict[var]:
-            # If the axis is empty (no lines plotted), add a dummy invisible line
             if not ax.lines:
                 ax.plot([0], [0], alpha=0)
                 ax.text(0.5, 0.5, 'No data available', 
-                       horizontalalignment='center',
-                       verticalalignment='center',
-                       transform=ax.transAxes,
-                       fontsize=12, fontweight='bold')
+                       horizontalalignment='center', verticalalignment='center',
+                       transform=ax.transAxes, fontsize=12, fontweight='bold')
         
-        # Add a global x-label at the bottom of the figure
-        figs[var].text(0.5, 0.04, 'Time (seconds)', ha='center', 
-                      fontsize=14, fontweight='bold')
+        # Global labels
+        figs[var].text(0.5, 0.04, 'Time (seconds)', ha='center', fontsize=14, fontweight='bold')
         
-        # Add a global y-label for the entire figure
         if var != 'Raster_MN':
             figs[var].text(0.04, 0.5, f"{var.replace('_', ' ').title()}", 
-                          va='center', rotation='vertical', 
-                          fontsize=14, fontweight='bold')
+                          va='center', rotation='vertical', fontsize=14, fontweight='bold')
         else:
             figs[var].text(0.04, 0.5, "Motor Neuron Activity", 
-                          va='center', rotation='vertical', 
-                          fontsize=14, fontweight='bold')
+                          va='center', rotation='vertical', fontsize=14, fontweight='bold')
         
-        # Adjust layout
+        # Layout and save
         figs[var].tight_layout(rect=[0.08, 0.08, 0.98, 0.95])
         
-        # Create a meaningful filename
         var_name = var.replace('_', '-')
         param_range = f"{param_name}_{min(param_values)}to{max(param_values)}"
         filename = f"{var_name}_{param_range}_{timestamp}_{seed}.png"
         filepath = os.path.join(save_dir, filename)
         
-        # Save the figure with high resolution
         figs[var].savefig(filepath, bbox_inches='tight')
         print(f"Saved plot: {filename}")
     
-    # Return activities if this was a coactivation analysis
-    if num_muscles == 2:
-        return activities
+    # Coactivation analysis for 2-muscle systems
+    if num_muscles == 2 and activities is not None:
+        plot_coactivation_analysis(results, save_dir, timestamp, seed)
     
-    # Display all figures
     plt.show()
+    print(f"All plots saved to '{save_dir}' directory.")
 
-    print(f"Simulation and plotting complete! All plots saved to '{save_dir}' directory.")
+
+def plot_coactivation_analysis(results, save_dir, timestamp, seed):
+    """
+    Perform and plot coactivation analysis for 2-muscle systems.
     
-    # Co-activation analysis if we have 2 muscles 
-    if num_muscles == 2:
-        # ===== Flexor-Extensor Activation Analysis =====
-        print("\nPerforming flexor-extensor activation analysis...")
+    Parameters:
+    -----------
+    results : dict
+        Results dictionary from compute_ees_parameter_sweep
+    save_dir : str
+        Directory to save plots
+    timestamp : str
+        Timestamp for filename
+    seed : int
+        Random seed for filename
+    """
+    
+    print("\nPerforming flexor-extensor activation analysis...")
+    
+    param_values = results['param_values']
+    param_name = results['param_name']
+    param_label = results['param_label']
+    activities = results['activities']
+    time_data = results['time_data']
+    
+    # Define activation threshold
+    activation_threshold = 0.1
+    
+    flexor_idx = 0  # tib_ant_r (tibialis anterior - flexor)
+    extensor_idx = 1  # med_gas_r (medial gastrocnemius - extensor)
+    
+    # Calculate grid layout
+    n_cols = 2
+    n_rows = math.ceil(len(param_values) / n_cols)
+    
+    # Create figures
+    fig_scatter, axs_scatter = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 5 * n_rows))
+    fig_scatter.suptitle("Flexor vs Extensor Activity")
+    
+    fig_coact, axs_coact = plt.subplots(1, 2, figsize=(15, 6))
+    fig_coact.suptitle("Coactivation Analysis")
+    
+    fig_time, axs_time = plt.subplots(1, 2, figsize=(15, 6))
+    fig_time.suptitle("Muscle Activation Time Analysis")
+    
+    # Ensure axs_scatter is 2D array
+    axs_scatter = np.atleast_2d(axs_scatter)
+    
+    # Initialize metric arrays
+    min_coactivation = np.zeros(len(param_values))
+    product_coactivation = np.zeros(len(param_values))
+    flexor_active_time = np.zeros(len(param_values))
+    extensor_active_time = np.zeros(len(param_values))
+    
+    # Get simulation parameters
+    total_time = time_data.iloc[-1] if hasattr(time_data, 'iloc') else time_data[-1]
+    dt = time_data[1] - time_data[0] if len(time_data) > 1 else 0.001
+    
+    # Analyze each parameter value
+    for i, value in enumerate(param_values):
+        flexor_activation = activities[flexor_idx, i, :]
+        extensor_activation = activities[extensor_idx, i, :]
         
-        # Define activation threshold
-        activation_threshold = 0.1  # Threshold to consider a muscle as "active"
+        # Scatter plot
+        row = i // n_cols
+        col = i % n_cols
+        ax = axs_scatter[row, col]
         
-        flexor_idx = 0  # tib_ant_r (tibialis anterior - flexor)
-        extensor_idx = 1  # med_gas_r (medial gastrocnemius - extensor)
+        ax.scatter(flexor_activation, extensor_activation, alpha=0.6, s=10)
+        ax.set_xlabel("Flexor Activation")
+        ax.set_ylabel("Extensor Activation")
+        ax.set_title(f"{param_label}: {value}")
+        ax.grid(True, linestyle='--', alpha=0.7)
         
-        # Calculate grid layout (e.g., 2 rows if there are more than 3 parameter values)
-        n_cols = 2  # or choose based on space
-        n_rows = math.ceil(len(param_values) / n_cols)
+        # Diagonal reference line
+        max_val = max(np.max(flexor_activation), np.max(extensor_activation))
+        ax.plot([0, max_val], [0, max_val], 'r--', alpha=0.5)
         
-        # Create scatter plot grid with multiple rows
-        fig_scatter, axs_scatter = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 5 * n_rows))
-        fig_scatter.suptitle("Flexor vs Extensor Activity")
+        # Calculate coactivation metrics
+        min_coact = np.sum(np.minimum(flexor_activation, extensor_activation)) * dt / total_time
+        min_coactivation[i] = min_coact
         
-        # Ensure axs_scatter is 2D array
-        axs_scatter = np.atleast_2d(axs_scatter)
+        prod_coact = np.sum(flexor_activation * extensor_activation) * dt / total_time
+        product_coactivation[i] = prod_coact
         
-        # Create a figure for coactivation metrics
-        fig_coact, axs_coact = plt.subplots(1, 2, figsize=(15, 6))
-        fig_coact.suptitle("Coactivation Analysis")
+        # Calculate activation time
+        flexor_active = np.sum(flexor_activation > activation_threshold) * dt / total_time
+        extensor_active = np.sum(extensor_activation > activation_threshold) * dt / total_time
         
-        # Create a figure for activation time analysis
-        fig_time, axs_time = plt.subplots(1, 2, figsize=(15, 6))
-        fig_time.suptitle("Muscle Activation Time Analysis")
-        
-        # Arrays to store metrics across parameter values
-        min_coactivation = np.zeros(len(param_values))
-        product_coactivation = np.zeros(len(param_values))
-        flexor_active_time = np.zeros(len(param_values))
-        extensor_active_time = np.zeros(len(param_values))
-        
-        # Get total simulation time
-        time_array = main_data['Time']
-        total_time = time_array.iloc[-1] if hasattr(time_array, 'iloc') else time_array[-1]
-        
-        # Analyze each parameter value
-        for i, value in enumerate(param_values):
-            # Get flexor and extensor activation data
-            flexor_activation = activities[flexor_idx, i, :]
-            extensor_activation = activities[extensor_idx, i, :]
-            
-            # Calculate time step for integration
-            dt = time_array[1] - time_array[0] if len(time_array) > 1 else 0.001
-            
-            # 1. Flexor vs Extensor Scatter Plot
-            row = i // n_cols
-            col = i % n_cols
-            ax = axs_scatter[row, col]
-        
-            # Plot scatter
-            ax.scatter(flexor_activation, extensor_activation, alpha=0.6, s=10)
-            ax.set_xlabel("Flexor Activation")
-            ax.set_ylabel("Extensor Activation")
-            ax.set_title(f"{param_label}: {value}")
-            ax.grid(True, linestyle='--', alpha=0.7)
-        
-            # Diagonal reference line
-            max_val = max(np.max(flexor_activation), np.max(extensor_activation))
-            ax.plot([0, max_val], [0, max_val], 'r--', alpha=0.5)
-            
-            # 2. Calculate coactivation metrics
-            # Minimum-based coactivation: integral(min(flexor, extensor)dt)/total_time
-            min_coact = np.sum(np.minimum(flexor_activation, extensor_activation)) * dt / total_time
-            min_coactivation[i] = min_coact
-            
-            # Product-based coactivation: integral(flexor*extensor dt)/total_time
-            prod_coact = np.sum(flexor_activation * extensor_activation) * dt / total_time
-            product_coactivation[i] = prod_coact
-            
-            # 3. Calculate activation time (time above threshold)
-            flexor_active = np.sum(flexor_activation > activation_threshold) * dt / total_time
-            extensor_active = np.sum(extensor_activation > activation_threshold) * dt / total_time
-            
-            flexor_active_time[i] = flexor_active
-            extensor_active_time[i] = extensor_active
-        
-        # Plot coactivation metrics vs parameter value
-        axs_coact[0].plot(param_values, min_coactivation, 'o-', linewidth=2)
-        axs_coact[0].set_xlabel(param_label)
-        axs_coact[0].set_ylabel("Min-based Coactivation")
-        axs_coact[0].set_title("Coactivation: min(flexor, extensor)")
-        axs_coact[0].grid(True)
-        
-        axs_coact[1].plot(param_values, product_coactivation, 'o-', linewidth=2, color='orange')
-        axs_coact[1].set_xlabel(param_label)
-        axs_coact[1].set_ylabel("Product-based Coactivation")
-        axs_coact[1].set_title("Coactivation: flexor * extensor")
-        axs_coact[1].grid(True)
-        
-        # Plot activation time metrics vs parameter value
-        axs_time[0].plot(param_values, flexor_active_time, 'o-', linewidth=2, color='blue', label='Flexor')
-        axs_time[0].plot(param_values, extensor_active_time, 'o-', linewidth=2, color='green', label='Extensor')
-        axs_time[0].set_xlabel(param_label)
-        axs_time[0].set_ylabel("Fraction of Time Active")
-        axs_time[0].set_title(f"Time Active (threshold = {activation_threshold})")
-        axs_time[0].legend()
-        axs_time[0].grid(True)
-        
-        # Plot activation time ratio (flexor/extensor)
-        ratio = np.divide(flexor_active_time, extensor_active_time, 
-                         out=np.ones_like(flexor_active_time), 
-                         where=extensor_active_time!=0)
-        axs_time[1].plot(param_values, ratio, 'o-', linewidth=2, color='purple')
-        axs_time[1].axhline(y=1.0, color='r', linestyle='--', alpha=0.5)  
-        axs_time[1].set_xlabel(param_label)
-        axs_time[1].set_ylabel("Flexor/Extensor Ratio")
-        axs_time[1].set_title("Balance of Activation")
-        axs_time[1].grid(True)
-        
-        # Hide any unused subplots
-        for j in range(len(param_values), n_rows * n_cols):
-            row = j // n_cols
-            col = j % n_cols
-            axs_scatter[row, col].axis('off')
-        
-        # Adjust layout for all figures
-        for fig in [fig_scatter, fig_coact, fig_time]:
-            fig.tight_layout()
-            fig.subplots_adjust(top=0.9)
-        
-        # Save these new figures
-        for fig, name in zip([fig_scatter, fig_coact, fig_time], 
-                            ["flexor_vs_extensor", "coactivation_metrics", "activation_time"]):
-            filename = f"{name}_{param_name}_{min(param_values)}to{max(param_values)}_{timestamp}_{seed}.png"
-            filepath = os.path.join(save_dir, filename)
-            fig.savefig(filepath, bbox_inches='tight')
-            print(f"Saved analysis plot: {filename}")
-        
-        # Display all figures
-        plt.show()
-
-        print("Flexor-extensor activation analysis complete!")
+        flexor_active_time[i] = flexor_active
+        extensor_active_time[i] = extensor_active
+    
+    # Plot coactivation metrics
+    axs_coact[0].plot(param_values, min_coactivation, 'o-', linewidth=2)
+    axs_coact[0].set_xlabel(param_label)
+    axs_coact[0].set_ylabel("Min-based Coactivation")
+    axs_coact[0].set_title("Coactivation: min(flexor, extensor)")
+    axs_coact[0].grid(True)
+    
+    axs_coact[1].plot(param_values, product_coactivation, 'o-', linewidth=2, color='orange')
+    axs_coact[1].set_xlabel(param_label)
+    axs_coact[1].set_ylabel("Product-based Coactivation")
+    axs_coact[1].set_title("Coactivation: flexor * extensor")
+    axs_coact[1].grid(True)
+    
+    # Plot activation time metrics
+    axs_time[0].plot(param_values, flexor_active_time, 'o-', linewidth=2, color='blue', label='Flexor')
+    axs_time[0].plot(param_values, extensor_active_time, 'o-', linewidth=2, color='green', label='Extensor')
+    axs_time[0].set_xlabel(param_label)
+    axs_time[0].set_ylabel("Fraction of Time Active")
+    axs_time[0].set_title(f"Time Active (threshold = {activation_threshold})")
+    axs_time[0].legend()
+    axs_time[0].grid(True)
+    
+    # Plot activation time ratio
+    ratio = np.divide(flexor_active_time, extensor_active_time, 
+                     out=np.ones_like(flexor_active_time), 
+                     where=extensor_active_time!=0)
+    axs_time[1].plot(param_values, ratio, 'o-', linewidth=2, color='purple')
+    axs_time[1].axhline(y=1.0, color='r', linestyle='--', alpha=0.5)  
+    axs_time[1].set_xlabel(param_label)
+    axs_time[1].set_ylabel("Flexor/Extensor Ratio")
+    axs_time[1].set_title("Balance of Activation")
+    axs_time[1].grid(True)
+    
+    # Hide unused subplots
+    for j in range(len(param_values), n_rows * n_cols):
+        row = j // n_cols
+        col = j % n_cols
+        axs_scatter[row, col].axis('off')
+    
+    # Adjust layout and save
+    for fig in [fig_scatter, fig_coact, fig_time]:
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.9)
+    
+    # Save figures
+    for fig, name in zip([fig_scatter, fig_coact, fig_time], 
+                        ["flexor_vs_extensor", "coactivation_metrics", "activation_time"]):
+        filename = f"{name}_{param_name}_{min(param_values)}to{max(param_values)}_{timestamp}_{seed}.png"
+        filepath = os.path.join(save_dir, filename)
+        fig.savefig(filepath, bbox_inches='tight')
+        print(f"Saved analysis plot: {filename}")
+    
+    plt.show()
+    print("Flexor-extensor activation analysis complete!")
