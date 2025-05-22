@@ -1,3 +1,210 @@
+class Monosynaptic(BiologicalSystem):
+    """
+    Specialized class for monosynaptic reflexes.
+    
+    Monosynaptic reflexes involve a direct connection from afferent (Ia) neurons
+    to motor neurons (MN) without intermediate interneurons.
+    """
+    
+    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
+                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
+                custom_spindle=None, custom_ees_recruitment_profile=None):
+        """
+        Initialize a monosynaptic reflex system with default or custom parameters.
+        
+        Parameters:
+        -----------
+        reaction_time : brian2.units.fundamentalunits.Quantity, optional
+            Reaction time of the system (default: 25ms)
+        biophysical_params : dict, optional
+            Custom biophysical parameters for neurons (if None, use defaults)
+        muscles_names : list, optional
+            List of muscle names (default: ["soleus_r"])
+        associated_joint : str, optional
+            Name of the associated joint (default: "ankle_angle_r")
+        custom_neurons : dict, optional
+            Custom neuron population counts (if None, use defaults)
+        custom_connections : dict, optional
+            Custom neural connections (if None, use defaults)
+        custom_spindle : dict, optional
+            Custom spindle model equations (if None, use defaults)
+        custom_ees_recruitment_params : dict, optional
+            Custom EES recruitment parameters (if None, use defaults)
+        """
+        # Set default parameters if not provided
+        if muscles_names is None:
+            muscles_names = ["soleus_r"]
+            
+        if biophysical_params is None:
+            biophysical_params = {
+                'T_refr': 5 * ms,  # Refractory period
+                'Eleaky': -70*mV,
+                'gL': 10*nS,
+                'Cm': 0.3*nF,  
+                'E_ex': 0*mV,
+                'tau_e': 0.5*ms,
+                'threshold_v': -50*mV
+            }
+            
+        if custom_ees_recruitment_profile is None:
+            ees_recruitment_profile = {
+                'Ia': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                },
+                'MN': {
+                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
+                    'saturation_90pct': 0.9  
+                }
+            }
+        else:
+            ees_recruitment_profile = custom_ees_recruitment_profile
+            
+        # Initialize the base class
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
+        
+        # Set default neuron populations
+        self.neurons_population = {
+            "Ia": 410,       # Type Ia afferent neurons
+            "MN": 500       # Motor neurons
+        }
+        
+        # Override with custom values if provided
+        if custom_neurons is not None:
+            self.neurons_population.update(custom_neurons)
+            
+        # Set default connections
+        self.connections = {
+            ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7}
+        }
+        
+        # Override with custom connections if provided
+        if custom_connections is not None:
+            self.connections.update(custom_connections)
+            
+        # Set default spindle model
+        self.spindle_model = {
+            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+        }
+        
+        # Override with custom spindle model if provided
+        if custom_spindle is not None:
+            self.spindle_model.update(custom_spindle)
+            
+        # Validate parameters
+        self.validate_parameters()
+
+
+class Trisynaptic(BiologicalSystem):
+    """
+    Specialized class for trisynaptic reflexes.
+    
+    Trisynaptic reflexes involve connections from afferent neurons (Ia and II)
+    to motor neurons (MN) through excitatory interneurons.
+    """
+    
+    def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
+                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
+                custom_spindle=None, custom_ees_recruitment_profile=None):
+        """
+        Initialize a trisynaptic reflex system with default or custom parameters.
+        
+        Parameters:
+        -----------
+        reaction_time : brian2.units.fundamentalunits.Quantity, optional
+            Reaction time of the system (default: 25ms)
+        biophysical_params : dict, optional
+            Custom biophysical parameters for neurons (if None, use defaults)
+        muscles_names : list, optional
+            List of muscle names (default: ["tib_ant_r"])
+        associated_joint : str, optional
+            Name of the associated joint (default: "ankle_angle_r")
+        custom_neurons : dict, optional
+            Custom neuron population counts (if None, use defaults)
+        custom_connections : dict, optional
+            Custom neural connections (if None, use defaults)
+        custom_spindle : dict, optional
+            Custom spindle model equations (if None, use defaults)
+        custom_ees_recruitment_params : dict, optional
+            Custom EES recruitment parameters (if None, use defaults)
+        """
+        # Set default parameters if not provided
+        if muscles_names is None:
+            muscles_names = ["tib_ant_r"]
+            
+        if biophysical_params is None:
+            biophysical_params = {
+                'T_refr': 5 * ms,
+                'Eleaky': -70*mV,
+                'gL': 10*nS,
+                'Cm': 0.3*nF,
+                'E_ex': 0*mV,
+                'tau_e': 0.5*ms,
+                'threshold_v': -50*mV
+            }
+            
+        if custom_ees_recruitment_profile is None:
+            ees_recruitment_profile = {
+                'Ia': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                },
+                'II': {
+                    'threshold_10pct': 0.4,  # Type II fibers have higher threshold
+                    'saturation_90pct': 0.8  # and higher saturation point
+                },
+                'MN': {
+                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
+                    'saturation_90pct': 0.9  
+                }
+            }
+        else:
+            ees_recruitment_params = custom_ees_recruitment_profile
+            
+        # Initialize the base class
+        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        
+        # Set default neuron populations
+        self.neurons_population = {
+            "Ia": 280,       # Type Ia afferent neurons
+            "II": 280,       # Type II afferent neurons
+            "exc": 500,     # Excitatory interneurons
+            "MN": 450       # Motor neurons
+        }
+        
+        # Override with custom values if provided
+        if custom_neurons is not None:
+            self.neurons_population.update(custom_neurons)
+            
+        # Set default connections
+        self.connections = {
+            ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9},
+            ("II", "exc"): {"w": 2*3.64*nS, "p": 0.9},
+            ("exc", "MN"): {"w": 2*2.1*nS, "p": 0.9}
+        }
+        
+        # Override with custom connections if provided
+        if custom_connections is not None:
+            self.connections.update(custom_connections)
+            
+        # Set default spindle model
+        self.spindle_model = {
+            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
+            "II": "20 + 13.5*stretch"
+        }
+        
+        # Override with custom spindle model if provided
+        if custom_spindle is not None:
+            self.spindle_model.update(custom_spindle)
+            
+        # Validate parameters
+        self.validate_parameters()
+
+
+
+
+
+
 class ReciprocalInhibition(BiologicalSystem):
     """
     Specialized class for reciprocal inhibition reflexes.
