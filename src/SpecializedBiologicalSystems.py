@@ -1,6 +1,7 @@
 from brian2 import *
-
+from .helpers.checker import validate_parameters
 from .BiologicalSystem import BiologicalSystem
+from .Visualization.plot_parameters_variations import plot_ees_analysis_results
 
 class Monosynaptic(BiologicalSystem):
     """
@@ -96,7 +97,8 @@ class Monosynaptic(BiologicalSystem):
             self.spindle_model.update(custom_spindle)
             
         # Validate parameters
-        self.validate_parameters()
+        validate_parameters(self.neurons_population, self.connections, self.spindle_model, 
+        self.biophysical_params, self.muscles_names, self.number_muscles,self.ees_recruitment_profile )
 
 
 class Trisynaptic(BiologicalSystem):
@@ -202,7 +204,8 @@ class Trisynaptic(BiologicalSystem):
             self.spindle_model.update(custom_spindle)
             
         # Validate parameters
-        self.validate_parameters()
+        validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
+        self.biophysical_parameters, self.muscles_names, self.number_muscles,self.ees_recruitment_profile)
 
 
 
@@ -346,6 +349,9 @@ class ReciprocalInhibition(BiologicalSystem):
         # Override with custom spindle model if provided
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
+
+        validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
+        self.biophysical_parameters, self.muscles_names, self.number_muscles,self.ees_recruitment_profile)
     
     def analyse_unbalanced_recruitment_effects(self, b_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
