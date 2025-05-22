@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from brian2.units import second, hertz
 import os
 from datetime import datetime
-from input_generator import calculate_full_recruitment
+from ..Stimulation.input_generator import calculate_full_recruitment
 
 
 # Colorblind-friendly palette
