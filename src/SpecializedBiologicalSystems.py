@@ -1,4 +1,4 @@
-from BiologicalSystem import BiologicalSystem
+from .BiologicalSystem import BiologicalSystem
 
 class Monosynaptic(BiologicalSystem):
     """
