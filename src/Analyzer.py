@@ -5,7 +5,7 @@ from .Visualization.plot_parameters_variations import plot_delay_results, plot_e
 from .Stimulation.controller import HierarchicalAnkleController
 from .helpers.sensitivity_analysis import sensitivity_analysis_func
 
-class BiologicalSystemAnalyzer:
+class Analyzer:
   
     def __init__(self, system):
         self.original_system = system
