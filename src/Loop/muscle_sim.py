@@ -85,13 +85,14 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
         
         print(f"Applying direct torque to coordinate '{joint_name}'")
   
-    # Add muscle reporter to record fiber lengths and joint
+    # Add muscle reporter to record fiber lengths, normalized forces and joint
     reporter = osim.TableReporter()
     reporter.setName("MuscleReporter")
     reporter.set_report_time_interval(dt)
     for muscle_name in muscles:
         muscle = model.getMuscles().get(muscle_name)
         reporter.addToReport(muscle.getOutput("fiber_length"), f'{muscle_name}_fiber_length')
+        reporter.addToReport(muscle.getOutput("normalized_fiber_force"), f'{muscle_name}_normalized_force')
     coordinate = model.getCoordinateSet().get(joint_name)
     if coordinate is not None:
         reporter.addToReport(coordinate.getOutput("value"), f'{joint_name}_angle')
@@ -131,11 +132,13 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
         osim.STOFileAdapter.write(statesTable, output_all)
         print(f'{output_all} file is saved')
 
-    # Get muscle stretch and joint data 
+    # Get muscle stretch, force and joint data 
     results_table = reporter.getTable()
     fiber_length = np.zeros((len(muscles), results_table.getNumRows()))
+    normalized_force = np.zeros((len(muscles), results_table.getNumRows()))
     for i, muscle_name in enumerate(muscles):
         fiber_length[i] = results_table.getDependentColumn(f'{muscle_name}_fiber_length').to_numpy()
+        normalized_force[i] = results_table.getDependentColumn(f'{muscle_name}_normalized_force').to_numpy()
     
     joint_angles = None
     if coordinate is not None:
@@ -152,7 +155,7 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
         value = lastRow[i]
         json_[label] = value
 
-    return fiber_length, joint_angles,json_
+    return fiber_length, normalized_force, joint_angles, json_
 
 
 if __name__ == "__main__":
@@ -166,6 +169,7 @@ if __name__ == "__main__":
     parser.add_argument('--torque', type=str, help='Path to numpy array file with torque values')
     parser.add_argument('--output_all', type=str, help='Path to the saved states file (.sto)')
     parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array of fiber lengths')
+    parser.add_argument('--output_force', type=str, help='Path to save output numpy array of normalized muscle forces')
     parser.add_argument('--output_joint', type=str, help='Path to save output numpy array of joint angles')
 
 
@@ -199,7 +203,7 @@ if __name__ == "__main__":
             print(f"Error loading initial state file: {e}")
 
     # Run the simulation
-    fiber_lengths, joint_angles, json_ = run_simulation(
+    fiber_lengths, normalized_forces, joint_angles, json_ = run_simulation(
         args.dt,
         args.T,
         muscles,
@@ -214,11 +218,12 @@ if __name__ == "__main__":
     if args.output_stretch:
         np.save(args.output_stretch, fiber_lengths)
     
+    if args.output_force:
+        np.save(args.output_force, normalized_forces)
+    
     if args.output_joint and joint_angles is not None:
         np.save(args.output_joint, joint_angles)
     
     
     with open(args.state, "w") as f:
         json.dump(json_, f, indent=4)
-
-
