@@ -12,7 +12,7 @@ from copy import deepcopy
 import pickle
 from tqdm import tqdm
 
-def sensitivity_analysis(biological_system, base_output_path, n_iterations=20, n_samples=50, 
+def sensitivity_analysis_func(biological_system, base_output_path, n_iterations=20, n_samples=50, 
                         time_step=0.1, base_ees_params=None, torque_profile=None, 
                         method='morris', seed=42):
     """
