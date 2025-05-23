@@ -209,9 +209,6 @@ class Trisynaptic(BiologicalSystem):
 
 
 
-
-
-
 class ReciprocalInhibition(BiologicalSystem):
     """
     Specialized class for reciprocal inhibition reflexes.
@@ -391,4 +388,234 @@ class ReciprocalInhibition(BiologicalSystem):
         )
         
         plot_ees_analysis_results(results, save_dir="balance_analysis", seed=seed)
+
+
+
+
+class ComplexSpinalCircuit(BiologicalSystem):
+    """
+    Specialized class that integrate more complex realistic biological neural network reflexes and Ib .
+    
+    Reciprocal inhibition reflexes involve complex connections between two antagonistic
+    muscle systems, with both excitatory and inhibitory connections.
+    """
+    
+    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
+                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
+                custom_spindle=None, custom_ees_recruitment_profile=None):
+        """
+        Initialize a reciprocal inhibition system with default or custom parameters.
+        
+        Parameters:
+        -----------
+        reaction_time : brian2.units.fundamentalunits.Quantity, optional
+            Reaction time of the system (default: 25ms)
+        biophysical_params : dict, optional
+            Custom biophysical parameters for neurons (if None, use defaults)
+        muscles_names : list, optional
+            List of muscle names (default: ["tib_ant_r", "med_gas_r"])
+        associated_joint : str, optional
+            Name of the associated joint (default: "ankle_angle_r")
+        custom_neurons : dict, optional
+            Custom neuron population counts (if None, use defaults)
+        custom_connections : dict, optional
+            Custom neural connections (if None, use defaults)
+        custom_spindle : dict, optional
+            Custom spindle model equations (if None, use defaults)
+        custom_ees_recruitment_params : dict, optional
+            Custom EES recruitment parameters (if None, use defaults)
+        """
+        # Set default parameters if not provided
+        if muscles_names is None:
+            muscles_names = ["tib_ant_r", "med_gas_r"]
+        elif len(muscles_names) != 2:
+            raise ValueError("Reciprocal inhibition requires exactly 2 muscles")
+            
+        if biophysical_params is None:
+            biophysical_params = {
+                'T_refr': 5 * ms,
+                'Eleaky': -70*mV,
+                'gL': 10*nS,
+                'Cm': 0.3*nF,
+                'E_ex': 0*mV,
+                'tau_e': 0.5*ms,
+                'E_inh': -75*mV,
+                'tau_i': 5*ms,
+                'threshold_v': -50*mV
+            }
+            
+        if custom_ees_recruitment_profile is None:
+            ees_recruitment_profile = {
+                'Ia': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                  },
+                'Ib': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                  },
+                  'II': {
+                      'threshold_10pct': 0.4,  # Type II fibers have higher threshold
+                      'saturation_90pct': 0.8  # and higher saturation point
+                  },
+                  'MN':{
+                      'threshold_10pct': 0.7,  # Motoneuron are recruited at high intensity
+                      'saturation_90pct': 0.9  
+              }  
+            }
+        # Initialize the base class
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
+        
+        
+        # Setup specialized neuron populations for reciprocal inhibition
+        self.neurons_population = {
+            # Afferents for each muscle
+            "Ia_flexor": 280,
+            "II_flexor": 280,
+            "Ib_flexor": 280,
+            "Ia_extensor": 160,
+            "II_extensor": 160,
+            "Ib_extensor": 160,
+       
+            # Interneurons
+            f"exc_flexor": 500,
+            f"exc_extensor": 500,
+            f"inh_flexor": 500,
+            f"inh_extensor": 500,
+            
+            # Motor neurons
+            f"MN_flexor": 450,
+            f"MN_extensor": 580
+        }
+        
+        # Override with custom values if provided
+        if custom_neurons is not None:
+            self.neurons_population.update(custom_neurons)
+            
+        # Set default connections with reciprocal inhibition pattern
+        self.connections =  {
+            # MONOSYNAPTIC PATHWAYS
+            # Ia e5 → MN (positive, within population)
+            ("Ia_flexor", "MN_flexor"): {"w": 5.0*nS, "p": 0.8},  # 5 nS, 80% connection probability
+            ("Ia_extensor", "MN_extensor"): {"w": 5.0*nS, "p": 0.8},
+            
+            # DISYNAPTIC PATHWAYS
+            # Ia e14 → IA i2 ⇒ MN (positive, cross-population)
+            ("Ia_flexor", "IA_flexor"): {"w": 3.0*nS, "p": 0.6},  # e14
+            ("IA_flexor", "MN_extensor"): {"w": 2.0*nS, "p": 0.5},  # i2 (inhibitory, cross)
+            ("Ia_extensor", "IA_extensor"): {"w": 3.0*nS, "p": 0.6},  # e14
+            ("IA_extensor", "MN_flexor"): {"w": 2.0*nS, "p": 0.5},  # i2 (inhibitory, cross)
+            
+            # Ia e20 → IN i3 → MN (negative, within population)
+            ("Ia_flexor", "IN_flexor"): {"w": 4.0*nS, "p": 0.7},  # e20
+            ("IN_flexor", "MN_flexor"): {"w": 3.0*nS, "p": 0.6},  # i3 (inhibitory)
+            ("Ia_extensor", "IN_extensor"): {"w": 4.0*nS, "p": 0.7},  # e20
+            ("IN_extensor", "MN_extensor"): {"w": 3.0*nS, "p": 0.6},  # i3 (inhibitory)
+            
+            # Ib e21 → IN i3 → MN (negative, within population)
+            ("Ib_flexor", "IN_flexor"): {"w": 3.5*nS, "p": 0.6},  # e21
+            ("Ib_extensor", "IN_extensor"): {"w": 3.5*nS, "p": 0.6},  # e21
+            # Note: IN → MN connections already defined above (i3)
+            
+            # II e15 → IA i2 ⇒ MN (positive, cross-population)
+            ("II_flexor", "IA_flexor"): {"w": 2.5*nS, "p": 0.5},  # e15
+            ("II_extensor", "IA_extensor"): {"w": 2.5*nS, "p": 0.5},  # e15
+            # Note: IA → MN connections already defined above (i2)
+            
+            # II e23 → EX e4 → MN (positive, cross-population)
+            ("II_flexor", "EX_flexor"): {"w": 3.0*nS, "p": 0.6},  # e23
+            ("EX_flexor", "MN_extensor"): {"w": 2.5*nS, "p": 0.5},  # e4 (excitatory, cross)
+            ("II_extensor", "EX_extensor"): {"w": 3.0*nS, "p": 0.6},  # e23
+            ("EX_extensor", "MN_flexor"): {"w": 2.5*nS, "p": 0.5},  # e4 (excitatory, cross)
+            
+            # TRISYNAPTIC PATHWAYS
+            # Ia e14 → IA i10 ⇒ RC i1 → MN (negative, cross then within)
+            # Note: Ia → IA connection already defined above (e14)
+            ("IA_flexor", "RC_extensor"): {"w": 2.5*nS, "p": 0.4},  # i10 (inhibitory, cross)
+            ("RC_extensor", "MN_flexor"): {"w": 2.0*nS, "p": 0.5},  # i1 (inhibitory, back to flexor)
+            ("IA_extensor", "RC_flexor"): {"w": 2.5*nS, "p": 0.4},  # i10 (inhibitory, cross)
+            ("RC_flexor", "MN_extensor"): {"w": 2.0*nS, "p": 0.5},  # i1 (inhibitory, back to extensor)
+            
+            # Ia e14 → IA i13 ⇒ IA i2 ⇒ MN (positive, cross then cross)
+            # Note: First Ia → IA connection already defined above (e14)
+            ("IA_flexor", "IA_extensor"): {"w": 1.5*nS, "p": 0.3},  # i13 (inhibitory, cross)
+            ("IA_extensor", "IA_flexor"): {"w": 1.5*nS, "p": 0.3},  # i13 (inhibitory, cross)
+            # Note: Final IA → MN connections already defined above (i2)
+            
+            # Ia e17 → IB e19 → IN i3 → MN (negative, within then within)
+            ("Ia_flexor", "IB_flexor"): {"w": 2.0*nS, "p": 0.4},  # e17
+            ("IB_flexor", "IN_flexor"): {"w": 2.5*nS, "p": 0.5},  # e19
+            ("Ia_extensor", "IB_extensor"): {"w": 2.0*nS, "p": 0.4},  # e17
+            ("IB_extensor", "IN_extensor"): {"w": 2.5*nS, "p": 0.5},  # e19
+            # Note: IN → MN connections already defined above (i3)
+            
+            # Ia e17 → IB e22 ⇒ EX e4 → MN (negative, within then cross)
+            # Note: Ia → IB connection already defined above (e17)
+            ("IB_flexor", "EX_extensor"): {"w": 2.0*nS, "p": 0.4},  # e22 (excitatory, cross)
+            ("IB_extensor", "EX_flexor"): {"w": 2.0*nS, "p": 0.4},  # e22 (excitatory, cross)
+            # Note: EX → MN connections already defined above (e4)
+            
+            # Ib e18 → IB e19 → IN i3 → MN (negative, within then within)
+            ("Ib_flexor", "IB_flexor"): {"w": 2.5*nS, "p": 0.5},  # e18
+            ("Ib_extensor", "IB_extensor"): {"w": 2.5*nS, "p": 0.5},  # e18
+            # Note: IB → IN and IN → MN connections already defined above
+            
+        }
+                
+        # Override with custom connections if provided
+        if custom_connections is not None:
+            self.connections.update(custom_connections)
+            
+        # Set default spindle model - need to handle specific muscle names
+        self.spindle_model = {}
+        self.spindle_model[f"Ia"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+        self.spindle_model[f"II"] = "20 + 13.5*stretch"
+        self.spindle_model[f"Ib"] = "10 + 1*force_normalized**0.2"
+                    
+        # Override with custom spindle model if provided
+        if custom_spindle is not None:
+            self.spindle_model.update(custom_spindle)
+
+        validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
+        self.biophysical_parameters, self.muscles_names, self.number_muscles,self.ees_recruitment_profile)
+    
+    def analyse_unbalanced_recruitment_effects(self, b_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
+        """
+        Analyze the effects of unbalanced afferent recruitment between antagonistic muscles.
+        
+        Parameters:
+        -----------
+        b_range : array-like
+            Range of balance values to analyze (0-1 where 0.5 is balanced)
+        base_ees_params : dict
+            Base parameters for EES
+        n_iterations : int
+            Number of iterations for each simulation
+        time_step : brian2.units.fundamentalunits.Quantity
+            Time step for simulations
+        seed : int
+            Random seed for reproducibility
+        
+        Returns:
+        --------
+        dict
+            Analysis results
+        """
+        vary_param = {
+            'param_name': 'balance',
+            'values': b_range,
+            'label': 'Afferent Fiber Unbalanced Recruitment'
+        }
+
+        # Compute parameter sweep
+        results = self._compute_ees_parameter_sweep(
+            base_ees_params,
+            vary_param,
+            n_iterations,
+            time_step, 
+            seed
+        )
+        
+        plot_ees_analysis_results(results, save_dir="balance_analysis", seed=seed)
+
 
