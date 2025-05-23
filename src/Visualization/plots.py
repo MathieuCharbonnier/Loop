@@ -193,13 +193,13 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
         axs[current_axis].legend()
         current_axis += 1
 
-    # Plot joint angle
-    joint_column = f"Joint_{joint_name}"
-    axs[current_axis].plot(time, df[joint_column], label=joint_name)
-    axs[current_axis].set_ylabel("Joint Angle (°)")
-    axs[current_axis].set_xlabel('Time (s)')
-    axs[current_axis].legend()
-    current_axis += 1
+        # Plot joint angle
+        joint_column = f"Joint_{joint_name}"
+        axs[current_axis].plot(time, df[joint_column], label=joint_name)
+        axs[current_axis].set_ylabel("Joint Angle (°)")
+        axs[current_axis].set_xlabel('Time (s)')
+        axs[current_axis].legend()
+        current_axis += 1
 
     # Plot joint Velocity
     joint_column = f"Joint_Velocity_{joint_name}"
@@ -211,8 +211,8 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
 
 
     # Plot fiber properties: Fiber_length, Stretch, Velocity
-    props = ['Fiber_length', 'Stretch', 'Stretch_Velocity']
-    ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)']
+    props = ['Fiber_length', 'Stretch', 'Stretch_Velocity', 'Normalized_Force']
+    ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)', 'Normalized Force (N)']
 
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
         for j, muscle_name in enumerate(muscle_names):
@@ -224,6 +224,18 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
         axs[current_axis].set_ylabel(ylabel)
         axs[current_axis].legend()
         current_axis+=1
+        
+    if not has torque:
+        # if there is no torque, plot joint at the end
+        # Plot joint angle
+        joint_column = f"Joint_{joint_name}"
+        axs[current_axis].plot(time, df[joint_column], label=joint_name)
+        axs[current_axis].set_ylabel("Joint Angle (°)")
+        axs[current_axis].set_xlabel('Time (s)')
+        axs[current_axis].legend()
+        current_axis += 1
+
+    
     fig.suptitle("Movement")
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
