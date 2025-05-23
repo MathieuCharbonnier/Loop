@@ -189,13 +189,13 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             
                 if has_II_pathway:
                     all_spikes, final_potentials, state_monitors = run_disynaptic_simulation(
-                        stretch, stretch_velocity, normalized_force, neurons_population, connections, 
+                        stretch, stretch_velocity, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
                         initial_potentials, **biophysical_params, ees_params=ees_params
                     )
                 else:
                     all_spikes, final_potentials, state_monitors = run_monosynaptic_simulation(
-                        stretch, stretch_velocity, normalized_force, neurons_population, connections, 
+                        stretch, stretch_velocity, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
                         initial_potentials, **biophysical_params, ees_params=ees_params
                     )
@@ -219,7 +219,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     )
                 else:
                     all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
-                        stretch, stretch_velocity, normalized_force, neurons_population, connections, time_step, reaction_time, 
+                        stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
                         spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
                     )
                 
@@ -316,7 +316,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         # Compute Ia firing rate using spindle model
         Ia_rate = eval(spindle_model['Ia'], 
                        {"__builtins__": {'sign': np.sign, 'abs': np.abs, 'clip': np.clip}}, 
-                       {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values, "normalized_force": normalize_force}
+                       {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values}
                        )
         
         df[f'Ia_rate_baseline_{muscle_name}'] = Ia_rate
@@ -325,7 +325,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         if "II" in neurons_population and "II" in spindle_model:
             II_rate = eval(spindle_model['II'], 
                           {"__builtins__": {}}, 
-                          {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values, "normalized_force": normalize_force}
+                          {"stretch": stretch_values}
                            )
 
             df[f'II_rate_baseline_{muscle_name}'] = II_rate
@@ -334,7 +334,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         if "Ib" in neurons_population and "Ib" in spindle_model:
             Ib_rate = eval(spindle_model['Ib'], 
                           {"__builtins__": {}}, 
-                          {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values, "normalized_force": normalize_force}
+                          {"normalized_force": normalize_force}
                            )
 
             df[f'Ib_rate_baseline_{muscle_name}'] = Ib_rate
