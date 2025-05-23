@@ -106,13 +106,15 @@ def plot_excitability_results(threshold_results, threshold_values, muscles_names
     fig3.tight_layout(rect=[0, 0, 1, 0.95])
     fig3.savefig(os.path.join(output_dir, f'threshold_variation_{timestamp}.png'))
     
-
-
+import os
+import matplotlib.pyplot as plt
+from datetime import datetime
+import numpy as np
 
 def plot_ees_analysis_results(results, save_dir="stimulation_analysis", seed=42):
     """
     Plot the results from EES parameter sweep analysis.
-    
+
     Parameters:
     -----------
     results : dict
@@ -122,133 +124,120 @@ def plot_ees_analysis_results(results, save_dir="stimulation_analysis", seed=42)
     seed : int
         Random seed (for filename generation)
     """
-    
+
     # Create save directory
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         print(f"Created directory '{save_dir}' for saving plots")
-    
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
     # Extract data from results
     param_values = results['param_values']
     param_name = results['param_name']
     param_label = results['param_label']
-    time_data = results['time_data']
     simulation_data = results['simulation_data']
     spikes_data = results['spikes_data']
     muscles_names = results['muscle_names']
     associated_joint = results['associated_joint']
     num_muscles = results['num_muscles']
-    activities = results.get('activities', None)
-    
-    n_rows = len(param_values)
-    
+
+    time_series_to_plot = ['Ia_rate_baseline', 'II_rate_baseline', 'MN_rate', 'Activation', 'Stretch']
+
     # Define muscle colors
     muscle_colors = {
-        muscles_names[i]: plt.cm.tab10(i % 10) for i in range(num_muscles) 
+        muscles_names[i]: plt.cm.tab10(i % 10) for i in range(num_muscles)
     }
-    
-    time_series_to_plot = ['Ia_rate_baseline', 'II_rate_baseline', 'MN_rate', 'Raster_MN', 'Activation', 'Stretch', 'Joint']
-    
-    # Initialize figures and axes
+
+    n_rows = len(param_values)
+
+    # --- Plot time series data ---
     figs = {}
     axs_dict = {}
     for var in time_series_to_plot:
-        fig, axs = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True, sharey=True)
+        fig, axs = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True)
         if n_rows == 1:
-            axs = [axs]  
+            axs = [axs]
         figs[var] = fig
         axs_dict[var] = axs
-    
-    # Plot data for each parameter value
-    for i, (value, main_data, spikes) in enumerate(zip(param_values, simulation_data, spikes_data)):
-        
-        # Plot each variable
-        for var in time_series_to_plot:
-            ax = axs_dict[var][i]
-            
-            # Set title with parameter information
+
+        for i, (value, main_data) in enumerate(zip(param_values, simulation_data)):
+            ax = axs[i]
             ax.set_title(f"{param_label}: {value}")
             ax.set_xlabel("Time (s)")
-            
-            if "rate" in var:
-                ax.set_ylabel(var.replace('_', ' ').title() + " (hertz)")
-            else:
-                ax.set_ylabel(var.replace('_', ' ').title() + " (dimless)")
-            
+            ylabel = var.replace('_', ' ').title()
+            ax.set_ylabel(f"{ylabel} (Hz)" if "rate" in var else f"{ylabel} (dimless)")
             ax.grid(True, linestyle='--', alpha=0.3)
-            
-            if var == f'Joints_{associated_joint}':
-                ax.plot(time_data, main_data[f'Joints_{associated_joint}'], color='darkred', 
-                       label='Ankle Angle', linewidth=2.5)
-                ax.set_ylabel(var.replace('_', ' ').title() + " (degree)")
-            
-            elif var == 'Raster_MN':
-                # Raster plot with different colors for each muscle
-                for idx, muscle_name in enumerate(muscles_names):
-                    if muscle_name in spikes:
-                        color = muscle_colors[muscle_name]
-                        
-                        for neuron_id, neuron_spikes in spikes[muscle_name]['MN'].items():
-                            if neuron_spikes:
-                                ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id), 
-                                       '.', markersize=4, color=color)
-                        
-                        ax.text(0.01 + idx*0.09, 1.05, muscle_name, 
-                               transform=ax.get_xaxis_transform(), color=color,
-                               fontweight='bold', verticalalignment='center')
-                
-                ax.set_ylabel("Neuron ID")
-            
-            else:
-                # Plot data for each muscle
-                for idx, muscle_name in enumerate(muscles_names):
-                    col_name = f"{var}_{muscle_name}"
-                    
-                    if col_name in main_data.columns:
-                        ax.plot(time_data, main_data[col_name], label=muscle_name, 
-                               color=muscle_colors[muscle_name], linewidth=2.0, alpha=0.8)
-            
-            # Add legend
-            if var != 'Raster_MN':
-                legend = ax.legend(frameon=True, fancybox=True, framealpha=0.9, 
-                                  loc='upper right', ncol=1, fontsize='x-large')
-                legend.get_frame().set_edgecolor('lightgray')
-    
-    # Finalize and save figures
-    for var in time_series_to_plot:
-        figs[var].suptitle(f"{var.replace('_', ' ').title()} Response Across {param_label} Values", y=0.98)
-        
-        # Handle empty plots
-        for ax in axs_dict[var]:
-            if not ax.lines:
-                ax.plot([0], [0], alpha=0)
-                ax.text(0.5, 0.5, 'No data available', 
-                       horizontalalignment='center', verticalalignment='center',
-                       transform=ax.transAxes, fontsize=12, fontweight='bold')
-        
-        # Global labels
-        figs[var].text(0.5, 0.04, 'Time (seconds)', ha='center', fontsize=14, fontweight='bold')
-        
-        if var != 'Raster_MN':
-            figs[var].text(0.04, 0.5, f"{var.replace('_', ' ').title()}", 
-                          va='center', rotation='vertical', fontsize=14, fontweight='bold')
-        else:
-            figs[var].text(0.04, 0.5, "Motor Neuron Activity", 
-                          va='center', rotation='vertical', fontsize=14, fontweight='bold')
-        
-        # Layout and save
-        figs[var].tight_layout(rect=[0.08, 0.08, 0.98, 0.95])
-        
-        var_name = var.replace('_', '-')
-        param_range = f"{param_name}_{min(param_values)}to{max(param_values)}"
-        filename = f"{var_name}_{param_range}_{timestamp}_{seed}.png"
-        filepath = os.path.join(save_dir, filename)
-        
-        figs[var].savefig(filepath, bbox_inches='tight')
-        print(f"Saved plot: {filename}")
-    
+
+            time_data = main_data['Time']
+            for idx, muscle_name in enumerate(muscles_names):
+                col_name = f"{var}_{muscle_name}"
+                if col_name in main_data:
+                    ax.plot(time_data, main_data[col_name], label=muscle_name,
+                            color=muscle_colors[muscle_name], linewidth=2.0, alpha=0.8)
+        fig.legend(muscles_names, loc='upper right')
+        fig.tight_layout()
+        fig.savefig(os.path.join(save_dir, f"{var}_{timestamp}.png"))
+
+    # --- Plot joint angle ---
+    fig_joint, axs_joint = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True)
+    if n_rows == 1:
+        axs_joint = [axs_joint]
+    for i, (value, main_data) in enumerate(zip(param_values, simulation_data)):
+        ax = axs_joint[i]
+        ax.set_title(f"{param_label}: {value}")
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel(f"{associated_joint} Angle (deg)")
+        ax.grid(True, linestyle='--', alpha=0.3)
+        ax.plot(main_data['Time'], main_data[f'Joints_{associated_joint}'],
+                color='darkred', label='Joint Angle', linewidth=2.5)
+        ax.legend()
+    fig_joint.tight_layout()
+    fig_joint.savefig(os.path.join(save_dir, f"joint_angle_{timestamp}.png"))
+
+    # --- Raster plot for MN spikes ---
+    fig_raster, axs_raster = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True)
+    if n_rows == 1:
+        axs_raster = [axs_raster]
+    for i, (value, spikes) in enumerate(zip(param_values, spikes_data)):
+        ax = axs_raster[i]
+        ax.set_title(f"MN Raster Plot — {param_label}: {value}")
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Neuron ID")
+        ax.grid(True, linestyle='--', alpha=0.3)
+
+        for idx, muscle_name in enumerate(muscles_names):
+            if muscle_name in spikes:
+                for neuron_id, neuron_spikes in spikes[muscle_name]['MN'].items():
+                    if neuron_spikes:
+                        ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id),
+                                '.', markersize=4, color=muscle_colors[muscle_name])
+    fig_raster.tight_layout()
+    fig_raster.savefig(os.path.join(save_dir, f"mn_raster_{timestamp}.png"))
+
+    # --- Plot MN Recruitment Fraction ---
+    recruitment_fractions = []
+    for spikes in spikes_data:
+        total_recruited = 0
+        total_neurons = 0
+        for muscle_name in muscles_names:
+            if muscle_name in spikes and 'MN' in spikes[muscle_name]:
+                MN_dict = spikes[muscle_name]['MN']
+                total_neurons += len(MN_dict)
+                total_recruited += sum(1 for s in MN_dict.values() if len(s) > 0)
+        recruitment_fractions.append(total_recruited / total_neurons if total_neurons else 0)
+
+    fig_recruit, ax_recruit = plt.subplots(figsize=(10, 6))
+    ax_recruit.plot(param_values, recruitment_fractions, marker='o', linestyle='-', color='blue')
+    ax_recruit.set_title("Fraction of Recruited MNs vs " + param_label)
+    ax_recruit.set_xlabel(param_label)
+    ax_recruit.set_ylabel("Fraction of Recruited Motoneurons")
+    ax_recruit.grid(True, linestyle='--', alpha=0.3)
+    fig_recruit.tight_layout()
+    fig_recruit.savefig(os.path.join(save_dir, f"mn_recruitment_fraction_{timestamp}.png"))
+
+    print("All plots saved to", save_dir)
+
     # Coactivation analysis for 2-muscle systems
     if num_muscles == 2 and activities is not None:
         plot_coactivation_analysis(results, save_dir, timestamp, seed)
