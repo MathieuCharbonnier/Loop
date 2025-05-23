@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-
+from brian2  import *
 
 class Controller:
     def __init__(self, biologicalsystem, target_amplitude, target_period, 
@@ -22,7 +22,7 @@ class Controller:
         self.prediction_horizon = prediction_horizon
         
         # Internal model step (given as 50ms)
-        self.model_step = 50
+        self.model_step = 50*ms
         
         # Check that update interval is multiple of model step
         assert update_interval % self.model_step == 0, "Update interval must be multiple of model step"
