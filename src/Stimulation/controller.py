@@ -2,20 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
+from ..Loop import closed_loop
+
 class HierarchicalAnkleController:
-    def __init__(self, reflex_model, target_amplitude, target_period, 
+    def __init__(self, target_amplitude, target_period, 
                  update_interval=200, prediction_horizon=1000):
         """
         Hierarchical controller for ankle movement using EES parameters.
         
         Args:
-            reflex_model: Function that simulates reflex loop for specified time steps
             target_amplitude: Desired amplitude of sinusoidal movement (degrees)
             target_period: Desired period of sinusoidal movement (milliseconds)
             update_interval: Controller update interval in ms (should be multiple of model step)
             prediction_horizon: How far ahead to predict for MPC (milliseconds)
         """
-        self.reflex_model = reflex_model
+  
         self.target_amplitude = target_amplitude
         self.target_period = target_period
         self.update_interval = update_interval
@@ -31,7 +32,7 @@ class HierarchicalAnkleController:
         # Current parameters
         self.current_state = None  # Will be set when sim starts
         self.ees_frequency = 30.0  # Initial EES frequency
-        self.flexor_ratio = 0.5    # Initial flexor ratio (0-1)
+        self.balance = 0.0    # Initial balance ratio (-1, 1)
         
         # Controller memory
         self.history = {
@@ -72,13 +73,13 @@ class HierarchicalAnkleController:
         Returns:
             Cost value (lower is better)
         """
-        ees_freq, flex_ratio = params
+        ees_freq, balance = params
         
         # Constraint penalties
         if ees_freq < 10 or ees_freq > 100:
             return 1000 + abs(ees_freq - 50)
-        if flex_ratio < 0.1 or flex_ratio > 0.9:
-            return 1000 + abs(flex_ratio - 0.5)
+        if balance < -0.6 or balance > 0.6:
+            return 1000 + abs(balance )
         
         # Predict future states
         num_steps = self.prediction_horizon // self.model_step
@@ -89,15 +90,15 @@ class HierarchicalAnkleController:
         state = self.current_state.copy()
         
         # Calculate number of model steps to simulate
-        steps_to_simulate = min(num_steps, 20)  # Limit to 20 steps for computational efficiency
+        steps_to_simulate = min(num_steps, 10)  # Limit to 10 steps for computational efficiency
         
         # Simulate forward with these parameters
         for i in range(steps_to_simulate):
             # Run one step of reflex model
-            next_state, angle = self.reflex_model(
+            next_state, angle = closed_loop(
                 state, 
                 ees_frequency=ees_freq, 
-                flexor_ratio=flex_ratio
+                flexor_ratio=balance
             )
             
             states.append(next_state)
@@ -127,7 +128,7 @@ class HierarchicalAnkleController:
         Returns optimal parameters for next control interval.
         """
         # Initial guess = current parameters
-        initial_guess = [self.ees_frequency, self.flexor_ratio]
+        initial_guess = [self.ees_frequency, self.balance]
         
         # Parameter bounds
         bounds = [(10, 100), (0.1, 0.9)]  # EES frequency, flexor ratio
@@ -230,64 +231,6 @@ class HierarchicalAnkleController:
         print(f"Max error: {np.max(np.abs(errors)):.2f} degrees")
 
 
-# Example usage with a simplified reflex model
-def example_reflex_model(state, ees_frequency, flexor_ratio):
-    """
-    Simplified reflex model for demonstration.
-    In your real implementation, you would replace this with your actual model.
-    
-    Args:
-        state: Current state dictionary
-        ees_frequency: EES frequency (Hz)
-        flexor_ratio: Ratio of flexor recruitment (0-1)
-        
-    Returns:
-        next_state: Updated state dictionary
-        joint_angle: Current joint angle
-    """
-    # Unpack current state
-    current_angle = state['joint_angle']
-    current_velocity = state['joint_velocity']
-    flexor_activation = state['flexor_activation']
-    extensor_activation = state['extensor_activation']
-    
-    # Simplified muscle dynamics (replace with your model)
-    # EES influences motoneuron firing
-    flexor_target = ees_frequency * flexor_ratio
-    extensor_target = ees_frequency * (1 - flexor_ratio)
-    
-    # Simple first-order dynamics for muscle activation
-    tau = 0.1  # Time constant (s)
-    flexor_activation += (flexor_target - flexor_activation) * (0.05 / tau)
-    extensor_activation += (extensor_target - extensor_activation) * (0.05 / tau)
-    
-    # Net torque from muscle activation
-    net_torque = 0.2 * (flexor_activation - extensor_activation)
-    
-    # Simple joint dynamics (replace with your model)
-    # Add angle-dependent passive forces
-    passive_torque = -0.05 * current_angle - 0.01 * current_velocity
-    
-    # Total torque
-    total_torque = net_torque + passive_torque
-    
-    # Update velocity and position
-    # Simple Euler integration
-    dt = 0.05  # 50ms
-    inertia = 0.1  # Joint inertia
-    new_velocity = current_velocity + total_torque * dt / inertia
-    new_angle = current_angle + new_velocity * dt
-    
-    # Create new state
-    next_state = {
-        'joint_angle': new_angle,
-        'joint_velocity': new_velocity,
-        'flexor_activation': flexor_activation,
-        'extensor_activation': extensor_activation
-    }
-    
-    return next_state, new_angle
-
 # Run a test simulation
 def run_test():
     # Initial state
@@ -300,7 +243,6 @@ def run_test():
     
     # Create controller
     controller = HierarchicalAnkleController(
-        reflex_model=example_reflex_model,
         target_amplitude=15.0,  # 15 degrees
         target_period=2000.0,   # 2 seconds (2000ms)
         update_interval=200,    # 200ms controller update
