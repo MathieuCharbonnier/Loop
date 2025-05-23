@@ -849,7 +849,7 @@ def process_motoneuron_spikes(neuron_pop: Dict[str, int], MN_spikes: Dict,
     return MN_spike_dict
 
 
-def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, neuron_pop, connections, dt_run, T,
+def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input, neuron_pop, connections, dt_run, T,
                                          spindle_model, seed_run, initial_potentials, 
                                          Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
                                          ees_params):
@@ -918,21 +918,17 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
     n_Ib_flexor = neuron_pop['Ib_flexor']
     n_II_flexor = neuron_pop['II_flexor']
     n_MN_flexor = neuron_pop['MN_flexor']
-    n_RC_flexor = neuron_pop['RC_flexor']
-    n_IA_flexor = neuron_pop['IA_flexor']
-    n_IB_flexor = neuron_pop['IB_flexor']
-    n_IN_flexor = neuron_pop['IN_flexor']
-    n_EX_flexor = neuron_pop['EX_flexor']
+    n_inh_flexor = neuron_pop['inh_flexor']
+    n_inhb_flexor = neuron_pop['inhb_flexor']
+    n_exc_flexor = neuron_pop['exc_flexor']
     
     n_Ia_extensor = neuron_pop['Ia_extensor']
     n_Ib_extensor = neuron_pop['Ib_extensor']
     n_II_extensor = neuron_pop['II_extensor']
     n_MN_extensor = neuron_pop['MN_extensor']
-    n_RC_extensor = neuron_pop['RC_extensor']
-    n_IA_extensor = neuron_pop['IA_extensor']
-    n_IB_extensor = neuron_pop['IB_extensor']
-    n_IN_extensor = neuron_pop['IN_extensor']
-    n_EX_extensor = neuron_pop['EX_extensor']
+    n_inh_extensor = neuron_pop['inh_extensor']
+    n_inhb_extensor = neuron_pop['inhb_extensor']
+    n_exc_extensor = neuron_pop['exc_extensor']
 
     # Extract EES parameters
     if ees_params is not None:
@@ -984,80 +980,61 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
 
     # LIF neuron equations for different neuron types
     
-    # Motoneuron (MN) - receives multiple inputs
+    # Motoneuron (MN) 
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gIA*(E_ex - v) + gEX*(E_ex - v) + gRC*(E_inh - v) + gIN*(E_inh - v) : amp
+    Isyn = gIa*(E_ex - v) + gi_*(E_inh - v) + gexc*(E_ex - v)  + gi__*(E_inh - v) : amp
     dgIa/dt = -gIa / tau_e : siemens 
-    dgIA/dt = -gIA / tau_e : siemens
-    dgEX/dt = -gEX / tau_e : siemens
-    dgRC/dt = -gRC / tau_i : siemens
-    dgIN/dt = -gIN / tau_i : siemens
+    dgi_/dt = (ginh-gi_)/tau_i : siemens
+    dginh/dt = -ginh / tau_i : siemens
+    dgexc/dt = -gexc / tau_e : siemens
+    dgi__/dt = (ginhb-gi__)/tau_i : siemens
+    dginhb/dt = -ginhb / tau_i : siemens
     '''
-    
-    # Renshaw Cell (RC) - inhibitory interneuron
-    rc_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIA*(E_inh - v) : amp
-    dgIA/dt = -gIA / tau_i : siemens
-    '''
-    
-    # IA interneuron - excitatory/inhibitory
-    ia_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gII*(E_ex - v) + gIA*(E_ex - v) : amp
-    dgIa/dt = -gIa / tau_e : siemens
+                                           
+    inh_eq = '''
+    dv/dt = (gL*(Eleaky - v)+Isyn ) / Cm : volt
+    Isyn = gi*(E_inh - v) + gIa*(E_ex-v) + gII*(E_ex - v) :amp
+    dgIa/dt = -gIa / tau_e : siemens 
     dgII/dt = -gII / tau_e : siemens
-    dgIA/dt = -gIA / tau_e : siemens
+    dgi/dt = (ginh-gi)/tau_i : siemens
+    dginh/dt = -ginh/tau_i :siemens                                           
     '''
+
     
-    # IB interneuron - excitatory
-    ib_eq = '''
+    # inhb interneuron - inhibitory
+    inhb_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gIb*(E_ex - v) : amp
+    Isyn = gIa*(E_ex - v) + gIb*(E_ex - v) + gIa*(E_ex - v) : amp
     dgIa/dt = -gIa / tau_e : siemens
     dgIb/dt = -gIb / tau_e : siemens
     '''
     
-    # IN interneuron - inhibitory
-    in_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gIb*(E_ex - v) + gIB*(E_ex - v) : amp
-    dgIa/dt = -gIa / tau_e : siemens
-    dgIb/dt = -gIb / tau_e : siemens
-    dgIB/dt = -gIB / tau_e : siemens
-    '''
-    
-    # EX interneuron - excitatory
+    # exc interneuron - excitatory
     ex_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gII*(E_ex - v) + gIB*(E_ex - v) : amp
+    Isyn = gII*(E_ex - v) : amp
     dgII/dt = -gII / tau_e : siemens
-    dgIB/dt = -gIB / tau_e : siemens
     '''
 
     # Create neuron groups
     MN = NeuronGroup(n_MN_flexor + n_MN_extensor, mn_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', refractory=T_refr, method='euler')
-    RC = NeuronGroup(n_RC_flexor + n_RC_extensor, rc_eq, threshold='v > threshold_v', 
+    inh = NeuronGroup(n_IA_flexor + n_IA_extensor, inh_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', refractory=T_refr, method='euler')
-    IA = NeuronGroup(n_IA_flexor + n_IA_extensor, ia_eq, threshold='v > threshold_v', 
+    inhb = NeuronGroup(n_IN_flexor + n_IN_extensor, inhb_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', refractory=T_refr, method='euler')
-    IB = NeuronGroup(n_IB_flexor + n_IB_extensor, ib_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', refractory=T_refr, method='euler')
-    IN = NeuronGroup(n_IN_flexor + n_IN_extensor, in_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', refractory=T_refr, method='euler')
-    EX = NeuronGroup(n_EX_flexor + n_EX_extensor, ex_eq, threshold='v > threshold_v', 
+    exc = NeuronGroup(n_EX_flexor + n_EX_extensor, ex_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', refractory=T_refr, method='euler')
 
     # Initialize membrane potentials
     MN.v = initial_potentials['MN']
-    IA.v = initial_potentials['IA']
-    IN.v = initial_potentials['IN']
-    EX.v = initial_potentials['EX']
+    inh.v = initial_potentials['inh']
+    inhb.v = initial_potentials['inhb']
+    exc.v = initial_potentials['exc']
 
     # Add neuron groups to the network
-    net.add([MN, IA, IN, EX])
+    net.add([MN, inh, inhb, exc])
 
     # Create group mapping for connections
     group_map = {
@@ -1069,12 +1046,12 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
         "II_extensor": II[n_II_flexor:],
         "MN_flexor": MN[:n_MN_flexor],
         "MN_extensor": MN[n_MN_flexor:],
-        "inh_flexor": IA[:n_IA_flexor],
-        "inh_extensor": IA[n_IA_flexor:],
-        "inhb_flexor": IN[:n_IN_flexor],
-        "inhb_extensor": IN[n_IN_flexor:],
-        "exc_flexor": EX[:n_EX_flexor],
-        "exc_extensor": EX[n_EX_flexor:],
+        "inh_flexor": inh[:n_inh_flexor],
+        "inh_extensor": inh[n_inh_flexor:],
+        "inhb_flexor": inhb[:n_inhb_flexor],
+        "inhb_extensor": inhb[n_inhb_flexor:],
+        "exc_flexor": exc[:n_exc_flexor],
+        "exc_extensor": exc[n_exc_flexor:],
     }
     
     # Create synaptic connections based on the network architecture
@@ -1114,9 +1091,9 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
     mon_Ib = SpikeMonitor(Ib)
     mon_II = SpikeMonitor(II)
     mon_MN = SpikeMonitor(MN)
-    mon_IA = SpikeMonitor(IA)
-    mon_IN = SpikeMonitor(IN)
-    mon_EX = SpikeMonitor(EX)
+    mon_inh = SpikeMonitor(inh)
+    mon_inhb = SpikeMonitor(inhb)
+    mon_exc = SpikeMonitor(exc)
     
     # State monitors for key neurons
     mon_MN_flexor = StateMonitor(MN, ['Isyn'], n_MN_flexor//2)
@@ -1124,7 +1101,7 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
     
     # Add all monitors to the network
     monitors = [
-        mon_Ia, mon_Ib, mon_II, mon_MN, mon_IA, mon_IN, mon_EX,
+        mon_Ia, mon_Ib, mon_II, mon_MN, mon_inh, mon_inhb, mon_exc,
         mon_MN_flexor, mon_MN_extensor
     ]
     net.add(monitors)
@@ -1161,9 +1138,9 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
     # Final membrane potentials
     final_potentials = {
         'MN': MN.v[:],
-        'IA': IA.v[:],
-        'IN': IN.v[:],
-        'EX': EX.v[:]
+        'inh': inh.v[:],
+        'inhb': inhb.v[:],
+        'exc': exc.v[:]
     }
     
     # Store state monitors for plotting
@@ -1180,9 +1157,9 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
         "Ib": {i: mon_Ib.spike_trains()[i] for i in range(n_Ib_flexor)},
         "II": {i: mon_II.spike_trains()[i] for i in range(n_II_flexor)},
         "MN": MN_flexor_spikes,
-        "IA": {i: mon_IA.spike_trains()[i] for i in range(n_IA_flexor)},
-        "IN": {i: mon_IN.spike_trains()[i] for i in range(n_IN_flexor)},
-        "EX": {i: mon_EX.spike_trains()[i] for i in range(n_EX_flexor)}
+        "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh_flexor)},
+        "inhb": {i: mon_inhb.spike_trains()[i] for i in range(n_inhb_flexor)},
+        "exc": {i: mon_exc.spike_trains()[i] for i in range(n_exc_flexor)}
     }
     
     result_extensor = {
@@ -1190,9 +1167,9 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
         "Ib": {i%n_Ib_flexor: mon_Ib.spike_trains()[i] for i in range(n_Ib_flexor, n_Ib_flexor + n_Ib_extensor)},
         "II": {i%n_II_flexor: mon_II.spike_trains()[i] for i in range(n_II_flexor, n_II_flexor + n_II_extensor)},
         "MN": MN_extensor_spikes,
-        "IA": {i%n_IA_flexor: mon_IA.spike_trains()[i] for i in range(n_IA_flexor, n_IA_flexor + n_IA_extensor)},
-        "IN": {i%n_IN_flexor: mon_IN.spike_trains()[i] for i in range(n_IN_flexor, n_IN_flexor + n_IN_extensor)},
-        "EX": {i%n_EX_flexor: mon_EX.spike_trains()[i] for i in range(n_EX_flexor, n_EX_flexor + n_EX_extensor)}
+        "inh": {i%n_inh_flexor: mon_IA.spike_trains()[i] for i in range(n_inh_flexor, n_inh_flexor + n_inh_extensor)},
+        "inhb": {i%n_inhb_flexor: mon_IN.spike_trains()[i] for i in range(n_inhb_flexor, n_inhb_flexor + n_inhb_extensor)},
+        "exc": {i%n_exc_flexor: mon_EX.spike_trains()[i] for i in range(n_exc_flexor, n_exc_flexor + n_exc_extensor)}
     }
 
     return [result_flexor, result_extensor], final_potentials, state_monitors
