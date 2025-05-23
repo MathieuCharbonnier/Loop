@@ -283,20 +283,20 @@ class ReciprocalInhibition(BiologicalSystem):
         # Setup specialized neuron populations for reciprocal inhibition
         self.neurons_population = {
             # Afferents for each muscle
-            f"Ia_flexor": 280,
-            f"II_flexor": 280,
-            f"Ia_extensor": 160,
-            f"II_extensor": 160,
+            "Ia_flexor": 280,
+            "II_flexor": 280,
+            "Ia_extensor": 160,
+            "II_extensor": 160,
             
             # Interneurons
-            f"exc_flexor": 500,
-            f"exc_extensor": 500,
-            f"inh_flexor": 500,
-            f"inh_extensor": 500,
+            "exc_flexor": 500,
+            "exc_extensor": 500,
+            "inh_flexor": 500,
+            "inh_extensor": 500,
             
             # Motor neurons
-            f"MN_flexor": 450,
-            f"MN_extensor": 580
+            "MN_flexor": 450,
+            "MN_extensor": 580
         }
         
         # Override with custom values if provided
@@ -306,32 +306,32 @@ class ReciprocalInhibition(BiologicalSystem):
         # Set default connections with reciprocal inhibition pattern
         self.connections = {
             # Direct pathways
-            (f"Ia_flexor", f"MN_flexor"): {"w": 2*2.1*nS, "p": 0.9},
-            (f"Ia_extensor", f"MN_extensor"): {"w": 2*2.1*nS, "p": 0.9},
+            ("Ia_flexor", "MN_flexor"): {"w": 2*2.1*nS, "p": 0.9},
+            ("Ia_extensor", "MN_extensor"): {"w": 2*2.1*nS, "p": 0.9},
             
             # Ia inhibition pathways
-            (f"Ia_flexor", f"inh_flexor"): {"w": 2*3.64*nS, "p": 0.9},
-            (f"Ia_extensor", f"inh_extensor"): {"w": 2*3.64*nS, "p": 0.9},
+            ("Ia_flexor", "inh_flexor"): {"w": 2*3.64*nS, "p": 0.9},
+            ("Ia_extensor", "inh_extensor"): {"w": 2*3.64*nS, "p": 0.9},
             
             # Type II excitation pathways
-            (f"II_flexor", f"exc_flexor"): {"w": 2*1.65*nS, "p": 0.9},
-            (f"II_extensor", f"exc_extensor"): {"w": 2*1.65*nS, "p": 0.9},
+            ("II_flexor", "exc_flexor"): {"w": 2*1.65*nS, "p": 0.9},
+            ("II_extensor", "exc_extensor"): {"w": 2*1.65*nS, "p": 0.9},
             
             # Type II inhibition pathways
-            (f"II_flexor", f"inh_flexor"): {"w": 2*2.19*nS, "p": 0.9},
-            (f"II_extensor", f"inh_extensor"): {"w": 2*2.19*nS, "p": 0.9},
+            ("II_flexor", "inh_flexor"): {"w": 2*2.19*nS, "p": 0.9},
+            ("II_extensor", "inh_extensor"): {"w": 2*2.19*nS, "p": 0.9},
             
             # Excitatory interneuron to motoneuron pathways
-            (f"exc_flexor", f"MN_flexor"): {"w": 2*0.7*nS, "p": 0.6},
-            (f"exc_extensor", f"MN_extensor"): {"w": 2*0.7*nS, "p": 0.6},
+            ("exc_flexor", "MN_flexor"): {"w": 2*0.7*nS, "p": 0.6},
+            ("exc_extensor", "MN_extensor"): {"w": 2*0.7*nS, "p": 0.6},
             
             # Reciprocal inhibition pathways
-            (f"inh_flexor", f"MN_extensor"): {"w": 2*0.2*nS, "p": 0.8},
-            (f"inh_extensor", f"MN_flexor"): {"w": 2*0.2*nS, "p": 0.8},
+            ("inh_flexor", "MN_extensor"): {"w": 2*0.2*nS, "p": 0.8},
+            ("inh_extensor", "MN_flexor"): {"w": 2*0.2*nS, "p": 0.8},
             
             # Inhibitory interneuron interactions
-            (f"inh_flexor", f"inh_extensor"): {"w": 2*0.76*nS, "p": 0.3},
-            (f"inh_extensor", f"inh_flexor"): {"w": 2*0.76*nS, "p": 0.3}
+            ("inh_flexor", "inh_extensor"): {"w": 2*0.76*nS, "p": 0.3},
+            ("inh_extensor", "inh_flexor"): {"w": 2*0.76*nS, "p": 0.3}
         }
         
         # Override with custom connections if provided
@@ -340,8 +340,9 @@ class ReciprocalInhibition(BiologicalSystem):
             
         # Set default spindle model - need to handle specific muscle names
         self.spindle_model = {}
-        self.spindle_model[f"Ia"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
-        self.spindle_model[f"II"] = "20 + 13.5*stretch"
+        self.spindle_model["Ia"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+        self.spindle_model["II"] = "20 + 13.5*stretch"
+        self.spindle_model["II_Ia_delta_delay"]= 15*ms
         
         # Override with custom spindle model if provided
         if custom_spindle is not None:
@@ -394,10 +395,9 @@ class ReciprocalInhibition(BiologicalSystem):
 
 class ComplexSpinalCircuit(BiologicalSystem):
     """
-    Specialized class that integrate more complex realistic biological neural network reflexes and Ib .
+    Specialized class that integrate Ib fibers in the realistic biological neural network between two ntagonistic muscles systems.
+    We only consider known di-synaptic pathways.
     
-    Reciprocal inhibition reflexes involve complex connections between two antagonistic
-    muscle systems, with both excitatory and inhibitory connections.
     """
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
@@ -493,74 +493,46 @@ class ComplexSpinalCircuit(BiologicalSystem):
             self.neurons_population.update(custom_neurons)
             
         # Set default connections with reciprocal inhibition pattern
+                            
         self.connections =  {
-            # MONOSYNAPTIC PATHWAYS
-            # Ia e5 → MN (positive, within population)
-            ("Ia_flexor", "MN_flexor"): {"w": 5.0*nS, "p": 0.8},  # 5 nS, 80% connection probability
-            ("Ia_extensor", "MN_extensor"): {"w": 5.0*nS, "p": 0.8},
+            # Direct pathways
+            ("Ia_flexor", "MN_flexor"): {"w": 2*2.1*nS, "p": 0.9},
+            ("Ia_extensor", "MN_extensor"): {"w": 2*2.1*nS, "p": 0.9},
+                                           
+            # Ia inhibition pathways
+            ("Ia_flexor", "inh_flexor"): {"w": 2*3.64*nS, "p": 0.9},
+            ("Ia_extensor", "inh_extensor"): {"w": 2*3.64*nS, "p": 0.9},
+            ("Ia_flexor", "inhb_flexor"): {"w": 3.0*nS, "p": 0.6},  # e14
+            ("Ia_extensor", "inhb_extensor"): {"w": 3.0*nS, "p": 0.6},  # e14
             
-            # DISYNAPTIC PATHWAYS
-            # Ia e14 → IA i2 ⇒ MN (positive, cross-population)
-            ("Ia_flexor", "IA_flexor"): {"w": 3.0*nS, "p": 0.6},  # e14
-            ("IA_flexor", "MN_extensor"): {"w": 2.0*nS, "p": 0.5},  # i2 (inhibitory, cross)
-            ("Ia_extensor", "IA_extensor"): {"w": 3.0*nS, "p": 0.6},  # e14
-            ("IA_extensor", "MN_flexor"): {"w": 2.0*nS, "p": 0.5},  # i2 (inhibitory, cross)
+            # Type II excitation pathways
+            ("II_flexor", "exc_flexor"): {"w": 2*1.65*nS, "p": 0.9},
+            ("II_extensor", "exc_extensor"): {"w": 2*1.65*nS, "p": 0.9},
             
-            # Ia e20 → IN i3 → MN (negative, within population)
-            ("Ia_flexor", "IN_flexor"): {"w": 4.0*nS, "p": 0.7},  # e20
-            ("IN_flexor", "MN_flexor"): {"w": 3.0*nS, "p": 0.6},  # i3 (inhibitory)
-            ("Ia_extensor", "IN_extensor"): {"w": 4.0*nS, "p": 0.7},  # e20
-            ("IN_extensor", "MN_extensor"): {"w": 3.0*nS, "p": 0.6},  # i3 (inhibitory)
+            # Type II inhibition pathways
+            ("II_flexor", "inh_flexor"): {"w": 2*2.19*nS, "p": 0.9},
+            ("II_extensor", "inh_extensor"): {"w": 2*2.19*nS, "p": 0.9},
+
+            # Type Ib pathways e21 → IN i3 → MN (negative, within population)
+            ("Ib_flexor", "inhb_flexor"): {"w": 3.5*nS, "p": 0.6},  # e21
+            ("Ib_extensor", "inhb_extensor"): {"w": 3.5*nS, "p": 0.6},  # e21
+                                
+            # Excitatory interneuron to motoneuron pathways
+            ("exc_flexor", "MN_flexor"): {"w": 2*0.7*nS, "p": 0.6},
+            ("exc_extensor", "MN_extensor"): {"w": 2*0.7*nS, "p": 0.6},
+                                
+            # inhb interneuron to motoneuron pathways
+            ("inhb_flexor", "MN_flexor"): {"w": 3.0*nS, "p": 0.6},  # i3 (inhibitory)
+            ("inhb_extensor", "MN_extensor"): {"w": 3.0*nS, "p": 0.6},  # i3 (inhibitory)
             
-            # Ib e21 → IN i3 → MN (negative, within population)
-            ("Ib_flexor", "IN_flexor"): {"w": 3.5*nS, "p": 0.6},  # e21
-            ("Ib_extensor", "IN_extensor"): {"w": 3.5*nS, "p": 0.6},  # e21
-            # Note: IN → MN connections already defined above (i3)
+            # Reciprocal inhibition pathways
+            ("inh_flexor", "MN_extensor"): {"w": 2*0.2*nS, "p": 0.8},
+            ("inh_extensor", "MN_flexor"): {"w": 2*0.2*nS, "p": 0.8},
             
-            # II e15 → IA i2 ⇒ MN (positive, cross-population)
-            ("II_flexor", "IA_flexor"): {"w": 2.5*nS, "p": 0.5},  # e15
-            ("II_extensor", "IA_extensor"): {"w": 2.5*nS, "p": 0.5},  # e15
-            # Note: IA → MN connections already defined above (i2)
-            
-            # II e23 → EX e4 → MN (positive, cross-population)
-            ("II_flexor", "EX_flexor"): {"w": 3.0*nS, "p": 0.6},  # e23
-            ("EX_flexor", "MN_extensor"): {"w": 2.5*nS, "p": 0.5},  # e4 (excitatory, cross)
-            ("II_extensor", "EX_extensor"): {"w": 3.0*nS, "p": 0.6},  # e23
-            ("EX_extensor", "MN_flexor"): {"w": 2.5*nS, "p": 0.5},  # e4 (excitatory, cross)
-            
-            # TRISYNAPTIC PATHWAYS
-            # Ia e14 → IA i10 ⇒ RC i1 → MN (negative, cross then within)
-            # Note: Ia → IA connection already defined above (e14)
-            ("IA_flexor", "RC_extensor"): {"w": 2.5*nS, "p": 0.4},  # i10 (inhibitory, cross)
-            ("RC_extensor", "MN_flexor"): {"w": 2.0*nS, "p": 0.5},  # i1 (inhibitory, back to flexor)
-            ("IA_extensor", "RC_flexor"): {"w": 2.5*nS, "p": 0.4},  # i10 (inhibitory, cross)
-            ("RC_flexor", "MN_extensor"): {"w": 2.0*nS, "p": 0.5},  # i1 (inhibitory, back to extensor)
-            
-            # Ia e14 → IA i13 ⇒ IA i2 ⇒ MN (positive, cross then cross)
-            # Note: First Ia → IA connection already defined above (e14)
-            ("IA_flexor", "IA_extensor"): {"w": 1.5*nS, "p": 0.3},  # i13 (inhibitory, cross)
-            ("IA_extensor", "IA_flexor"): {"w": 1.5*nS, "p": 0.3},  # i13 (inhibitory, cross)
-            # Note: Final IA → MN connections already defined above (i2)
-            
-            # Ia e17 → IB e19 → IN i3 → MN (negative, within then within)
-            ("Ia_flexor", "IB_flexor"): {"w": 2.0*nS, "p": 0.4},  # e17
-            ("IB_flexor", "IN_flexor"): {"w": 2.5*nS, "p": 0.5},  # e19
-            ("Ia_extensor", "IB_extensor"): {"w": 2.0*nS, "p": 0.4},  # e17
-            ("IB_extensor", "IN_extensor"): {"w": 2.5*nS, "p": 0.5},  # e19
-            # Note: IN → MN connections already defined above (i3)
-            
-            # Ia e17 → IB e22 ⇒ EX e4 → MN (negative, within then cross)
-            # Note: Ia → IB connection already defined above (e17)
-            ("IB_flexor", "EX_extensor"): {"w": 2.0*nS, "p": 0.4},  # e22 (excitatory, cross)
-            ("IB_extensor", "EX_flexor"): {"w": 2.0*nS, "p": 0.4},  # e22 (excitatory, cross)
-            # Note: EX → MN connections already defined above (e4)
-            
-            # Ib e18 → IB e19 → IN i3 → MN (negative, within then within)
-            ("Ib_flexor", "IB_flexor"): {"w": 2.5*nS, "p": 0.5},  # e18
-            ("Ib_extensor", "IB_extensor"): {"w": 2.5*nS, "p": 0.5},  # e18
-            # Note: IB → IN and IN → MN connections already defined above
-            
-        }
+            # Inhibitory interneuron interactions
+            ("inh_flexor", "inh_extensor"): {"w": 2*0.76*nS, "p": 0.3},
+            ("inh_extensor", "inh_flexor"): {"w": 2*0.76*nS, "p": 0.3}
+        } 
                 
         # Override with custom connections if provided
         if custom_connections is not None:
@@ -568,9 +540,10 @@ class ComplexSpinalCircuit(BiologicalSystem):
             
         # Set default spindle model - need to handle specific muscle names
         self.spindle_model = {}
-        self.spindle_model[f"Ia"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
-        self.spindle_model[f"II"] = "20 + 13.5*stretch"
-        self.spindle_model[f"Ib"] = "10 + 1*force_normalized**0.2"
+        self.spindle_model["Ia"] = "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+        self.spindle_model["II"] = "20 + 13.5*stretch"
+        self.spindle_model["Ib"] = "10 + 1*force_normalized**0.2"
+        self.spindle_model["II_Ia_delta_delay"]= 15*ms
                     
         # Override with custom spindle model if provided
         if custom_spindle is not None:
