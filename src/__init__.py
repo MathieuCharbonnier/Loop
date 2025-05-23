@@ -1,7 +1,8 @@
-from .SpecializedBiologicalSystems import Monosynaptic, Trisynaptic, ReciprocalInhibition
+from .SpecializedBiologicalSystems import Monosynaptic, Disynaptic, ReciprocalInhibition, SpinalCircuitWithIb
 
 __all__ = [
     "Monosynaptic",
-    "Trisynaptic",
-    "ReciprocalInhibition"
+    "Disynaptic",
+    "ReciprocalInhibition",
+    "SpinalCircuitWithIb"
 ]
