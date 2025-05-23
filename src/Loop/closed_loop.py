@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from scipy.stats import gaussian_kde
 
-from .neural_dynamics import run_monosynaptic_simulation, run_trisynaptic_simulation, run_flexor_extensor_neuron_simulation
+from .neural_dynamics import run_monosynaptic_simulation, run_disynaptic_simulation, run_flexor_extensor_neuron_simulation, run_spinal_circuit_with_Ib
 from .activation import decode_spikes_to_activation
 
 
@@ -86,7 +86,9 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     }
     if num_muscles == 2:
         initial_potentials["inh"] = biophysical_params['Eleaky']
-
+        if Ib in neurons_population:
+            initial_potentials["inhb"] = biophysical_params['Eleaky']
+          
     # Initialize parameters for each motoneuron
     initial_params = [
         [{
@@ -185,7 +187,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 )
             
                 if has_II_pathway:
-                    all_spikes, final_potentials, state_monitors = run_trisynaptic_simulation(
+                    all_spikes, final_potentials, state_monitors = run_disynaptic_simulation(
                         stretch, stretch_velocity, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
                         initial_potentials, **biophysical_params, ees_params=ees_params
@@ -208,12 +210,17 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     if isinstance(freq, tuple) and len(freq) == 2:
                         dominant = 0 if np.mean(activations[0]) >= np.mean(activations[1]) else 1
                         ees_params_copy["freq"] = freq[dominant]
-            
-                all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
-                    stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
-                    spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
-                )
-
+                      
+                if "Ib" in neurons_population:
+                    all_spikes, final_potentials, state_monitors = run_spinal_circuit_with_Ib(
+                        stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
+                        spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
+                    )
+                else:
+                    all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
+                        stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
+                        spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
+                    )
                 
             # Update initial potentials for next iteration
             initial_potentials.update(final_potentials)
