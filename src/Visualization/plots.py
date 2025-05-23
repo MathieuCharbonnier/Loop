@@ -226,7 +226,7 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
         axs[current_axis].legend()
         current_axis+=1
         
-    if not has torque:
+    if not has_torque:
         # if there is no torque, plot joint at the end
         # Plot joint angle
         joint_column = f"Joint_{joint_name}"
