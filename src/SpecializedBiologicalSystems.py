@@ -101,7 +101,7 @@ class Monosynaptic(BiologicalSystem):
         self.biophysical_params, self.muscles_names, self.number_muscles,self.ees_recruitment_profile )
 
 
-class Trisynaptic(BiologicalSystem):
+class Disynaptic(BiologicalSystem):
     """
     Specialized class for trisynaptic reflexes.
     
@@ -197,6 +197,7 @@ class Trisynaptic(BiologicalSystem):
         self.spindle_model = {
             "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
             "II": "20 + 13.5*stretch"
+            "II_Ia_delta_delay": 15*ms
         }
         
         # Override with custom spindle model if provided
@@ -393,7 +394,7 @@ class ReciprocalInhibition(BiologicalSystem):
 
 
 
-class ComplexSpinalCircuit(BiologicalSystem):
+class SpinalCircuitWithIb(BiologicalSystem):
     """
     Specialized class that integrate Ib fibers in the realistic biological neural network between two ntagonistic muscles systems.
     We only consider known di-synaptic pathways.
