@@ -2,10 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
-from ..Loop import closed_loop
 
-class HierarchicalAnkleController:
-    def __init__(self, target_amplitude, target_period, 
+class Controller:
+    def __init__(self, biologicalsystem, target_amplitude, target_period, 
                  update_interval=200, prediction_horizon=1000):
         """
         Hierarchical controller for ankle movement using EES parameters.
@@ -16,7 +15,7 @@ class HierarchicalAnkleController:
             update_interval: Controller update interval in ms (should be multiple of model step)
             prediction_horizon: How far ahead to predict for MPC (milliseconds)
         """
-  
+        self.biologicalsystem=biologicalsystem
         self.target_amplitude = target_amplitude
         self.target_period = target_period
         self.update_interval = update_interval
@@ -30,9 +29,9 @@ class HierarchicalAnkleController:
         self.steps_per_update = update_interval // self.model_step
         
         # Current parameters
-        self.current_state = None  # Will be set when sim starts
-        self.ees_frequency = 30.0  # Initial EES frequency
-        self.balance = 0.0    # Initial balance ratio (-1, 1)
+        self. ees_params={'freq': 30*hertz,
+                    'intensity':intensity,# fix
+                    'balance: 0.0} # initial balance paramater between flexor and extensor [-1,1]
         
         # Controller memory
         self.history = {
@@ -40,7 +39,7 @@ class HierarchicalAnkleController:
             'actual_angle': [],
             'desired_angle': [],
             'ees_frequency': [],
-            'flexor_ratio': [],
+            'balance': [],
             'error': []
         }
         
@@ -98,7 +97,7 @@ class HierarchicalAnkleController:
             next_state, angle = closed_loop(
                 state, 
                 ees_frequency=ees_freq, 
-                flexor_ratio=balance
+                balance=balance
             )
             
             states.append(next_state)
@@ -159,28 +158,30 @@ class HierarchicalAnkleController:
         self.history['actual_angle'].append(current_angle)
         self.history['desired_angle'].append(desired_angle)
         self.history['ees_frequency'].append(self.ees_frequency)
-        self.history['flexor_ratio'].append(self.flexor_ratio)
+        self.history['balance'].append(self.flexor_ratio)
         self.history['error'].append(desired_angle - current_angle)
         
         # Optimize parameters for next interval
-        optimal_ees, optimal_ratio = self.optimize_parameters()
+        optimal_ees, optimal_balance = self.optimize_parameters()
         
         # Update control parameters
-        self.ees_frequency = optimal_ees
-        self.flexor_ratio = optimal_ratio
+
         
         # Run reflex model for the steps in this control interval
-        for _ in range(self.steps_per_update):
-            # Apply current parameters
-            next_state, _ = self.reflex_model(
-                self.current_state,
-                ees_frequency=self.ees_frequency,
-                flexor_ratio=self.flexor_ratio
-            )
+
+        # Apply current parameters
+        spikes, time_series = self.biologicalsystem.run_simulation(
+            n_iteration,
+            time_steps,
+            ees_stimulation_params=self.ees_stimulation_params,
+            torque_profile=None, 
+            seed=42,
+            base_output_path=None, 
+            plot=True)
             
-            # Update state and time
-            self.current_state = next_state
-            self.current_time += self.model_step
+        # Update state and time
+        self.current_state = next_state
+        self.current_time += self.model_step
     
     def run_simulation(self, duration_ms):
         """
@@ -231,30 +232,3 @@ class HierarchicalAnkleController:
         print(f"Max error: {np.max(np.abs(errors)):.2f} degrees")
 
 
-# Run a test simulation
-def run_test():
-    # Initial state
-    initial_state = {
-        'joint_angle': 0.0,
-        'joint_velocity': 0.0,
-        'flexor_activation': 0.0,
-        'extensor_activation': 0.0
-    }
-    
-    # Create controller
-    controller = HierarchicalAnkleController(
-        target_amplitude=15.0,  # 15 degrees
-        target_period=2000.0,   # 2 seconds (2000ms)
-        update_interval=200,    # 200ms controller update
-        prediction_horizon=1000  # 1000ms prediction
-    )
-    
-    # Initialize and run simulation
-    controller.initialize_simulation(initial_state)
-    controller.run_simulation(10000)  # 10 seconds
-    
-    # Plot results
-    controller.plot_results()
-
-if __name__ == "__main__":
-    run_test()
