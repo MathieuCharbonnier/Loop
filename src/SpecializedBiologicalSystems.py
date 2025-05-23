@@ -352,47 +352,7 @@ class ReciprocalInhibition(BiologicalSystem):
         validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
         self.biophysical_parameters, self.muscles_names, self.number_muscles,self.ees_recruitment_profile)
     
-    def analyse_unbalanced_recruitment_effects(self, b_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
-        """
-        Analyze the effects of unbalanced afferent recruitment between antagonistic muscles.
-        
-        Parameters:
-        -----------
-        b_range : array-like
-            Range of balance values to analyze (0-1 where 0.5 is balanced)
-        base_ees_params : dict
-            Base parameters for EES
-        n_iterations : int
-            Number of iterations for each simulation
-        time_step : brian2.units.fundamentalunits.Quantity
-            Time step for simulations
-        seed : int
-            Random seed for reproducibility
-        
-        Returns:
-        --------
-        dict
-            Analysis results
-        """
-        vary_param = {
-            'param_name': 'balance',
-            'values': b_range,
-            'label': 'Afferent Fiber Unbalanced Recruitment'
-        }
-
-        # Compute parameter sweep
-        results = self._compute_ees_parameter_sweep(
-            base_ees_params,
-            vary_param,
-            n_iterations,
-            time_step, 
-            seed
-        )
-        
-        plot_ees_analysis_results(results, save_dir="balance_analysis", seed=seed)
-
-
-
+ 
 
 class SpinalCircuitWithIb(BiologicalSystem):
     """
@@ -553,43 +513,6 @@ class SpinalCircuitWithIb(BiologicalSystem):
         validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
         self.biophysical_parameters, self.muscles_names, self.number_muscles,self.ees_recruitment_profile)
     
-    def analyse_unbalanced_recruitment_effects(self, b_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
-        """
-        Analyze the effects of unbalanced afferent recruitment between antagonistic muscles.
-        
-        Parameters:
-        -----------
-        b_range : array-like
-            Range of balance values to analyze (0-1 where 0.5 is balanced)
-        base_ees_params : dict
-            Base parameters for EES
-        n_iterations : int
-            Number of iterations for each simulation
-        time_step : brian2.units.fundamentalunits.Quantity
-            Time step for simulations
-        seed : int
-            Random seed for reproducibility
-        
-        Returns:
-        --------
-        dict
-            Analysis results
-        """
-        vary_param = {
-            'param_name': 'balance',
-            'values': b_range,
-            'label': 'Afferent Fiber Unbalanced Recruitment'
-        }
-
-        # Compute parameter sweep
-        results = self._compute_ees_parameter_sweep(
-            base_ees_params,
-            vary_param,
-            n_iterations,
-            time_step, 
-            seed
-        )
-        
-        plot_ees_analysis_results(results, save_dir="balance_analysis", seed=seed)
+    
 
 
