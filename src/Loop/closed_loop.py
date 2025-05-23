@@ -148,7 +148,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 current_torque = torque_array[start_idx:end_idx]
 
             # Run muscle simulation with file paths
-            fiber_lengths, joint = simulator.run_muscle_simulation(
+            fiber_lengths, normalized_force, joint = simulator.run_muscle_simulation(
                 time_step/second,
                 reaction_time/second,
                 muscles_names,
@@ -159,6 +159,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 
             # Process muscle simulation results
             fiber_lengths = fiber_lengths[:, :nb_points]
+            normalized_force=normalized_force[:, :nb_points]
             joint = joint[:nb_points]
             joint_all[iteration*nb_points: (iteration+1)*nb_points] = joint
             
@@ -213,7 +214,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                       
                 if "Ib" in neurons_population:
                     all_spikes, final_potentials, state_monitors = run_spinal_circuit_with_Ib(
-                        stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
+                        stretch, stretch_velocity, normalized_force,  neurons_population, connections, time_step, reaction_time, 
                         spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
                     )
                 else:
@@ -277,6 +278,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                         f'Fiber_length_{muscles_names[muscle_idx]}': fiber_lengths[muscle_idx],
                         f'Stretch_{muscles_names[muscle_idx]}': stretch[muscle_idx],
                         f'Stretch_Velocity_{muscles_names[muscle_idx]}': stretch_velocity[muscle_idx],
+                        f'Normalized_Force_{muscles_names[muscle_idx]}': normalized_force[muscle_idx],
                         f'mean_e_{muscles_names[muscle_idx]}': mean_e[muscle_idx],
                         f'mean_u_{muscles_names[muscle_idx]}': mean_u[muscle_idx],
                         f'mean_c_{muscles_names[muscle_idx]}': mean_c[muscle_idx],
@@ -327,6 +329,15 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                            )
 
             df[f'II_rate_baseline_{muscle_name}'] = II_rate
+
+        # Compute Ib firing rate if applicable
+        if "Ib" in neurons_population and "Ib" in spindle_model:
+            Ib_rate = eval(spindle_model['Ib'], 
+                          {"__builtins__": {}}, 
+                          {"stretch": stretch_values, "stretch_velocity": stretch_velocity_values}
+                           )
+
+            df[f'Ib_rate_baseline_{muscle_name}'] = Ib_rate
 
         # Calculate all firing rate using 
         for fiber_name, fiber_spikes in spike_data[muscle_name].items():
@@ -411,6 +422,7 @@ class CoLabSimulator(SimulatorBase):
         self.input_activation_path = tempfile.mktemp(suffix='.npy')
         self.input_torque_path = tempfile.mktemp(suffix='.npy')
         self.output_stretch_path = tempfile.mktemp(suffix='.npy')
+        self.output_force_path = tempfile.mktemp(suffix='.npy')
         self.output_joint_path = tempfile.mktemp(suffix='.npy')
         self.state_path = tempfile.mktemp(suffix='.json')
         
@@ -421,6 +433,7 @@ class CoLabSimulator(SimulatorBase):
             self.input_activation_path,
             self.input_torque_path, 
             self.output_stretch_path,
+            self.output_force_path,
             self.output_joint_path,
             self.state_path
         ]
@@ -450,6 +463,7 @@ class CoLabSimulator(SimulatorBase):
             '--joint_name', joint_name,
             '--activation', self.input_activation_path,
             '--output_stretch', self.output_stretch_path,
+            '--output_force', self.output_force_path,
             '--output_joint', self.output_joint_path,
             '--state', self.state_path
         ]
@@ -473,10 +487,11 @@ class CoLabSimulator(SimulatorBase):
 
         # Load simulation results
         fiber_lengths = np.load(self.output_stretch_path)
+        normalized_force=np.load(self.output_force_path)
         joint = np.load(self.output_joint_path)
         
 
-        return fiber_lengths, joint
+        return fiber_lengths,normailzed_force, joint
     
     
 
@@ -491,7 +506,7 @@ class LocalSimulator(SimulatorBase):
         """Run a single muscle simulation iteration using direct function call with in-memory state"""
         from muscle_sim import run_simulation
         # Run simulation directly with in-memory state
-        fiber_lengths, joint, new_state = run_simulation(
+        fiber_lengths,normalized_force, joint, new_state = run_simulation(
             dt, T, muscle_names, joint_name, activation,
             self.current_state
         )
@@ -499,7 +514,7 @@ class LocalSimulator(SimulatorBase):
         self.current_state = new_state
         
         
-        return fiber_lengths, joint
+        return fiber_lengths, normalized_force, joint
     
  
 def is_running_on_colab():
