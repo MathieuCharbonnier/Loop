@@ -1,8 +1,8 @@
 import numpy as np
 from tqdm import tqdm
-from BiologicalSystemAnalyzer import BiologicalSystemAnalyzer
-
-class ReciprocalInhibitoryAnalyzer(BiologicalSystemAnalyzer):
+from .Analyzer import Analyzer
+from  .Visualization.plot_parameters_variations import plot_ees_analysis_results
+class ReciprocalInhibitoryAnalyzer(Analyzer):
     """
     Specialized analyzer for ReciprocalInhibitorySystem.
     
