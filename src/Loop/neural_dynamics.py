@@ -140,7 +140,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
         weight = conn_info["w"]
         p = conn_info["p"]
         
-        # Extract the base name for the conductance update (e.g., 'Ia' from 'Ia_1')
+        # Extract the base name for the conductance update 
         pre_base = pre_name.split('_')[0]
         
         syn = Synapses(pre, post, 
@@ -199,7 +199,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
     return [result], final_potentials, state_monitors
 
 
-def run_trisynaptic_simulation(stretch_input, stretch_velocity_input,  
+def run_disynaptic_simulation(stretch_input, stretch_velocity_input,  
                              neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
                              initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                              ees_params=None):
@@ -389,7 +389,7 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input,
     
     # Create synaptic connections
     synapses = {}
-    
+    Ia_II_delta_delay=spindle_model["Ia_II_delta_delay"]
     for (pre_name, post_name), conn_info in connections.items():
         key = f"{pre_name}_to_{post_name}"
         pre = group_map[pre_name]
@@ -408,7 +408,10 @@ def run_trisynaptic_simulation(stretch_input, stretch_velocity_input,
         syn.connect(p=p)
         noise=0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
+        if pre_base=='II':
+            syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
+        else:
+            syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         net.add(syn)
         synapses[key] = syn
     
@@ -632,6 +635,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     
     # Create synaptic connections
     synapses = {}
+    Ia_II_delta_delay=spindle_model["Ia_II_delta_delay"]
     for (pre_name, post_name), conn_info in connections.items():
         key = f"{pre_name}_to_{post_name}"
         pre = group_map[pre_name]
@@ -643,7 +647,10 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         syn.connect(p=p)
         noise=0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms) 
+        if pre_base=='II':
+            syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
+        else:
+            syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         net.add(syn)
         synapses[key] = syn
           
@@ -1045,14 +1052,12 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
 
     # Initialize membrane potentials
     MN.v = initial_potentials['MN']
-    RC.v = initial_potentials['RC']
     IA.v = initial_potentials['IA']
-    IB.v = initial_potentials['IB']
     IN.v = initial_potentials['IN']
     EX.v = initial_potentials['EX']
 
     # Add neuron groups to the network
-    net.add([MN, RC, IA, IB, IN, EX])
+    net.add([MN, IA, IN, EX])
 
     # Create group mapping for connections
     group_map = {
@@ -1064,20 +1069,17 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
         "II_extensor": II[n_II_flexor:],
         "MN_flexor": MN[:n_MN_flexor],
         "MN_extensor": MN[n_MN_flexor:],
-        "RC_flexor": RC[:n_RC_flexor],
-        "RC_extensor": RC[n_RC_flexor:],
-        "IA_flexor": IA[:n_IA_flexor],
-        "IA_extensor": IA[n_IA_flexor:],
-        "IB_flexor": IB[:n_IB_flexor],
-        "IB_extensor": IB[n_IB_flexor:],
-        "IN_flexor": IN[:n_IN_flexor],
-        "IN_extensor": IN[n_IN_flexor:],
-        "EX_flexor": EX[:n_EX_flexor],
-        "EX_extensor": EX[n_EX_flexor:],
+        "inh_flexor": IA[:n_IA_flexor],
+        "inh_extensor": IA[n_IA_flexor:],
+        "inhb_flexor": IN[:n_IN_flexor],
+        "inhb_extensor": IN[n_IN_flexor:],
+        "exc_flexor": EX[:n_EX_flexor],
+        "exc_extensor": EX[n_EX_flexor:],
     }
     
     # Create synaptic connections based on the network architecture
     synapses = {}
+    Ia_II_delta_delay=spindle_model["Ia_II_delta_delay"]
     for (pre_name, post_name), conn_info in connections.items():
         key = f"{pre_name}_to_{post_name}"
         pre = group_map[pre_name]
@@ -1099,7 +1101,10 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
         # Add noise to weights and delays
         noise = 0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        syn.delay = np.clip(1*ms + 0.25*ms * noise * randn(len(syn.delay)), 0*ms, np.inf*ms)
+        if pre_base=='II':
+            syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
+        else:
+            syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         
         net.add(syn)
         synapses[key] = syn
@@ -1109,22 +1114,18 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
     mon_Ib = SpikeMonitor(Ib)
     mon_II = SpikeMonitor(II)
     mon_MN = SpikeMonitor(MN)
-    mon_RC = SpikeMonitor(RC)
     mon_IA = SpikeMonitor(IA)
-    mon_IB = SpikeMonitor(IB)
     mon_IN = SpikeMonitor(IN)
     mon_EX = SpikeMonitor(EX)
     
     # State monitors for key neurons
     mon_MN_flexor = StateMonitor(MN, ['Isyn'], n_MN_flexor//2)
     mon_MN_extensor = StateMonitor(MN, ['Isyn'], n_MN_flexor + n_MN_extensor//2)
-    mon_RC_flexor = StateMonitor(RC, ['Isyn'], n_RC_flexor//2)
-    mon_RC_extensor = StateMonitor(RC, ['Isyn'], n_RC_flexor + n_RC_extensor//2)
     
     # Add all monitors to the network
     monitors = [
-        mon_Ia, mon_Ib, mon_II, mon_MN, mon_RC, mon_IA, mon_IB, mon_IN, mon_EX,
-        mon_MN_flexor, mon_MN_extensor, mon_RC_flexor, mon_RC_extensor
+        mon_Ia, mon_Ib, mon_II, mon_MN, mon_IA, mon_IN, mon_EX,
+        mon_MN_flexor, mon_MN_extensor
     ]
     net.add(monitors)
     
@@ -1160,20 +1161,16 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
     # Final membrane potentials
     final_potentials = {
         'MN': MN.v[:],
-        'RC': RC.v[:],
         'IA': IA.v[:],
-        'IB': IB.v[:],
         'IN': IN.v[:],
         'EX': EX.v[:]
     }
     
     # Store state monitors for plotting
     state_monitors = [{
-            'IPSP_MN': mon_MN_flexor.Isyn[0]/nA,
-            'IPSP_RC': mon_RC_flexor.Isyn[0]/nA
+            'IPSP_MN': mon_MN_flexor.Isyn[0]/nA
         }, {
-            'IPSP_MN': mon_MN_extensor.Isyn[0]/nA,
-            'IPSP_RC': mon_RC_extensor.Isyn[0]/nA
+            'IPSP_MN': mon_MN_extensor.Isyn[0]/nA
         }
     ]
     
@@ -1183,9 +1180,7 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
         "Ib": {i: mon_Ib.spike_trains()[i] for i in range(n_Ib_flexor)},
         "II": {i: mon_II.spike_trains()[i] for i in range(n_II_flexor)},
         "MN": MN_flexor_spikes,
-        "RC": {i: mon_RC.spike_trains()[i] for i in range(n_RC_flexor)},
         "IA": {i: mon_IA.spike_trains()[i] for i in range(n_IA_flexor)},
-        "IB": {i: mon_IB.spike_trains()[i] for i in range(n_IB_flexor)},
         "IN": {i: mon_IN.spike_trains()[i] for i in range(n_IN_flexor)},
         "EX": {i: mon_EX.spike_trains()[i] for i in range(n_EX_flexor)}
     }
@@ -1195,9 +1190,7 @@ def run_complex_spinal_reflex_simulation(stretch_input, stretch_velocity_input, 
         "Ib": {i%n_Ib_flexor: mon_Ib.spike_trains()[i] for i in range(n_Ib_flexor, n_Ib_flexor + n_Ib_extensor)},
         "II": {i%n_II_flexor: mon_II.spike_trains()[i] for i in range(n_II_flexor, n_II_flexor + n_II_extensor)},
         "MN": MN_extensor_spikes,
-        "RC": {i%n_RC_flexor: mon_RC.spike_trains()[i] for i in range(n_RC_flexor, n_RC_flexor + n_RC_extensor)},
         "IA": {i%n_IA_flexor: mon_IA.spike_trains()[i] for i in range(n_IA_flexor, n_IA_flexor + n_IA_extensor)},
-        "IB": {i%n_IB_flexor: mon_IB.spike_trains()[i] for i in range(n_IB_flexor, n_IB_flexor + n_IB_extensor)},
         "IN": {i%n_IN_flexor: mon_IN.spike_trains()[i] for i in range(n_IN_flexor, n_IN_flexor + n_IN_extensor)},
         "EX": {i%n_EX_flexor: mon_EX.spike_trains()[i] for i in range(n_EX_flexor, n_EX_flexor + n_EX_extensor)}
     }
