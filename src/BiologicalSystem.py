@@ -16,7 +16,8 @@ class BiologicalSystem:
     handling the core simulation and analysis functionality.
     """
     
-    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint, fast_type_mu, initial_state_opensim):
+    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, 
+                 associated_joint, fast_type_mu, initial_state_opensim, activation_function=None):
         """
         Initialize the biological system with common parameters.
         
@@ -36,6 +37,10 @@ class BiologicalSystem:
             If True, use fast twitch motor units
         initial_state_opensim : dict
             Initial state for OpenSim simulation
+        activation_function : callable, optional
+            Function f(muscle_idx, t) -> activation_value where t is in [0, reaction_time]
+            If None, uses values from initial_condition_spike_activation
+            If provided, automatically updates a0 in initial_condition_spike_activation for consistency
         """
         self.reaction_time = reaction_time
         self.ees_recruitment_profile = ees_recruitment_profile
@@ -45,6 +50,10 @@ class BiologicalSystem:
         self.associated_joint = associated_joint
         self.fast_type_mu = fast_type_mu
         self.initial_state_opensim = initial_state_opensim
+        self.activation_function = activation_function
+        
+        # Cache for activation history
+        self._activation_cache = {}
         
         # These will be set by subclasses
         self.neurons_population = {}
@@ -53,9 +62,25 @@ class BiologicalSystem:
         self.initial_potentials = {}
         self.initial_condition_spike_activation = {}
     
-    def _initialize_activation_history(self, time_step):
+    def _ensure_activation_consistency(self):
         """
-        Initialize activation history based on initial_condition_spike_activation and time parameters.
+        Ensure consistency between activation_function and initial_condition_spike_activation.
+        If activation_function is provided, update a0 values to match activation at t=reaction_time.
+        """
+        if self.activation_function is not None and self.initial_condition_spike_activation:
+            T_reaction_seconds = float(self.reaction_time / second)
+            
+            for muscle_idx in range(self.number_muscles):
+                if muscle_idx < len(self.initial_condition_spike_activation):
+                    muscle_conditions = self.initial_condition_spike_activation[muscle_idx]
+                    if muscle_conditions:
+                        for condition in muscle_conditions:
+                            # Update a0 to match activation function at end of reaction time
+                            condition['a0'] = self.activation_function(muscle_idx, T_reaction_seconds)
+    
+    def get_activation_history(self, time_step):
+        """
+        Get activation history for a given time step.
         
         Parameters:
         -----------
@@ -67,25 +92,33 @@ class BiologicalSystem:
         numpy.ndarray
             Activation history array of shape (number_muscles, int(reaction_time/time_step))
         """
-        n_time_steps = int(self.reaction_time / time_step)
-        activation_history = np.zeros((self.number_muscles, n_time_steps))
+        cache_key = float(time_step / ms)
         
-        # Initialize with values from initial_condition_spike_activation
-        for muscle_idx in range(self.number_muscles):
-            if muscle_idx < len(self.initial_condition_spike_activation):
-                # Get the initial activation value for this muscle
-                muscle_initial_conditions = self.initial_condition_spike_activation[muscle_idx]
-                if muscle_initial_conditions and len(muscle_initial_conditions) > 0:
-                    # Use the activation value from the first motor neuron as baseline
-                    initial_activation = muscle_initial_conditions[0].get('a0', 0.0)
-                    activation_history[muscle_idx, :] = initial_activation
-        
-        return activation_history
+        if cache_key not in self._activation_cache:
+            n_steps = int(self.reaction_time / time_step)
+            activation_history = np.zeros((self.number_muscles, n_steps))
+            
+            if self.activation_function is not None:
+                # Sample the user function
+                times = np.linspace(0, float(self.reaction_time/second), n_steps)
+                for muscle_idx in range(self.number_muscles):
+                    for i, t in enumerate(times):
+                        activation_history[muscle_idx, i] = self.activation_function(muscle_idx, t)
+            else:
+                # Use default from initial_condition_spike_activation
+                for muscle_idx in range(self.number_muscles):
+                    if muscle_idx < len(self.initial_condition_spike_activation):
+                        muscle_conditions = self.initial_condition_spike_activation[muscle_idx]
+                        if muscle_conditions and len(muscle_conditions) > 0:
+                            a0 = muscle_conditions[0].get('a0', 0.0)
+                            activation_history[muscle_idx, :] = a0
+            
+            self._activation_cache[cache_key] = activation_history
+            
+        return self._activation_cache[cache_key].copy()
 
     def validate_input(self):
-        """
-        Base validation method - should be overridden by subclasses.
-        """
+        """Base validation method - should be overridden by subclasses."""
         raise NotImplementedError("Subclasses must implement validate_input method")
 
     def run_simulation(self, n_iterations, time_step=0.1*ms, 
@@ -117,8 +150,10 @@ class BiologicalSystem:
             (spikes, time_series) containing simulation results
         """
         
-        # Initialize activation history
-        activation_history = self._initialize_activation_history(time_step)
+        # Ensure consistency between activation function and initial conditions
+        self._ensure_activation_consistency()
+        
+        activation_history = self.get_activation_history(time_step)
         
         torque_array = None
         if torque_profile is not None:
@@ -138,7 +173,6 @@ class BiologicalSystem:
             activation_history, torque_array=torque_array, ees_params=ees_params,
             fast=self.fast_type_mu, seed=seed, base_output_path=base_output_path)
         
-        # Generate standard plots
         if plot:
             if ees_stimulation_params is not None:
                 plot_recruitment_curves(self.ees_recruitment_profile, current_current=ees_stimulation_params.get('intensity'),
