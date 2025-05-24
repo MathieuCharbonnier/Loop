@@ -18,7 +18,7 @@ class BiologicalSystem:
     handling the core simulation and analysis functionality.
     """
     
-    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint, fast_type_mu):
+    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint, fast_type_mu, initial_state_opensim):
         """
         Initialize the biological system with common parameters.
         
@@ -42,14 +42,18 @@ class BiologicalSystem:
         self.number_muscles = len(muscles_names)
         self.associated_joint = associated_joint
         self.fast_type_mu=fast_type_mu
+         self.initial_state_opensim=initial_state_opensim
         
         # These will be set by subclasses
         self.neurons_population = {}
         self.connections = {}
         self.spindle_model = {}
+                    
+        self.initial_potentials={}
+        self.initial_condition_spike_activation={}
+       
     
-  
-    
+
 def run_simulation(self, n_iterations, time_step=0.1*ms, 
                   ees_stimulation_params=None,torque_profile=None, 
                   seed=42,base_output_path=None, plot=True):
@@ -93,7 +97,8 @@ def run_simulation(self, n_iterations, time_step=0.1*ms,
         spikes, time_series = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
-             torque_array=torque_array,ees_params=ees_params,
+            self.initial_potentials, self.initial_condition_spike_activation, self.initial_state_opensim,
+             activation_history, torque_array=torque_array,ees_params=ees_params,
              fast=self.fast_type_mu, seed=seed, base_output_path=base_output_path)
         
         # Generate standard plots
@@ -120,7 +125,8 @@ class Monosynaptic(BiologicalSystem):
     
     def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_profile=None):
+                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True,
+                custom_initial_potentials=None, custom_initial_condition_spike_activation=None, initial_state_opensim=None):
         """
         Initialize a monosynaptic reflex system with default or custom parameters.
         
@@ -140,8 +146,8 @@ class Monosynaptic(BiologicalSystem):
             Custom neural connections (if None, use defaults)
         custom_spindle : dict, optional
             Custom spindle model equations (if None, use defaults)
-        custom_ees_recruitment_params : dict, optional
-            Custom EES recruitment parameters (if None, use defaults)
+        ees_recruitment_params : dict, optional
+            EES recruitment parameters (if None, use defaults)
         """
         # Set default parameters if not provided
         if muscles_names is None:
@@ -158,7 +164,7 @@ class Monosynaptic(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if custom_ees_recruitment_profile is None:
+        if ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
                     'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
@@ -172,8 +178,9 @@ class Monosynaptic(BiologicalSystem):
         else:
             ees_recruitment_profile = custom_ees_recruitment_profile
             
+            
         # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint,fast_type_mu, initial_state_opensim)
         
         # Set default neuron populations
         self.neurons_population = {
@@ -203,11 +210,29 @@ class Monosynaptic(BiologicalSystem):
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
             
+
+        self.initial_potentials={
+            "MN": self.biophysical_params['Eleaky']
+        }
+        if custom_initial_potentials is not None:
+            self.initial_potentials=custom_initial_potential
+            
+        # Initialize parameters for each motoneuron
+        
+        self.initial_condition_spike_activation = [
+            [{
+                'u0': [0.0, 0.0],    # Initial fiber AP state
+                'c0': [0.0, 0.0],    # Initial calcium concentration state
+                'P0': 0.0,           # Initial calcium-troponin binding state
+                'a0': 0.0            # Initial activation state
+            } for _ in range(self.neurons_population['MN'])] ]
+        if custom_initial_condition_spike_activation is not None:   
+            self.initial_condition_spike_activation=custom_initial_condition_spike_activation
+        
         # Validate parameters
         validate_parameters(self.neurons_population, self.connections, self.spindle_model, 
         self.biophysical_params, self.muscles_names, self.number_muscles,self.ees_recruitment_profile )
-
-
+                    
 class Disynaptic(BiologicalSystem):
     """
     Specialized class for trisynaptic reflexes.
@@ -218,7 +243,8 @@ class Disynaptic(BiologicalSystem):
     
     def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_profile=None):
+                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=False,
+                 custom_initial_potentials=None, custom_intial_condition_spike_activation=None, initial_state_opensim=None):
         """
         Initialize a trisynaptic reflex system with default or custom parameters.
         
@@ -275,7 +301,7 @@ class Disynaptic(BiologicalSystem):
             ees_recruitment_params = custom_ees_recruitment_profile
             
         # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint)
+        super().__init__(reaction_time, ees_recruitment_params, biophysical_params, muscles_names, associated_joint,fast_type_mu, initial_state_opensim )
         
         # Set default neuron populations
         self.neurons_population = {
@@ -310,6 +336,29 @@ class Disynaptic(BiologicalSystem):
         # Override with custom spindle model if provided
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
+
+        self.initial_potentials={
+            "exc":self.biophysical_params['Eleaky'],
+            "MN": self.biophysical_params['Eleaky']
+        }
+        if custom_initial_potentials is not None:
+            self.initial_potentials=custom_initial_potential
+            
+        # Initialize parameters for each motoneuron
+        
+        self.initial_condition_spike_activation = [
+            [{
+                'u0': [0.0, 0.0],    # Initial fiber AP state
+                'c0': [0.0, 0.0],    # Initial calcium concentration state
+                'P0': 0.0,           # Initial calcium-troponin binding state
+                'a0': 0.0            # Initial activation state
+            } for _ in range(self.neurons_population['MN'])] ]
+        if custom_initial_condition_spike_activation is not None:   
+            self.initial_condition_spike_activation=custom_initial_condition_spike_activation
+
+        # Validate parameters
+        validate_parameters(self.neurons_population, self.connections, self.spindle_model, 
+        self.biophysical_params, self.muscles_names, self.number_muscles,self.ees_recruitment_profile )
             
         # Validate parameters
         validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
@@ -327,7 +376,9 @@ class ReciprocalInhibition(BiologicalSystem):
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_profile=None):
+                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True,
+                 custom_initial_potential=None,
+                 custom_initial_conditions_spike_activation=None, initial_state_opensim=None):
         """
         Initialize a reciprocal inhibition system with default or custom parameters.
         
@@ -369,7 +420,7 @@ class ReciprocalInhibition(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if custom_ees_recruitment_profile is None:
+        if ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
                     'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
@@ -385,7 +436,7 @@ class ReciprocalInhibition(BiologicalSystem):
               }  
             }
         # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint, fast_type_mu, initial_state_opensim)
         
         
         # Setup specialized neuron populations for reciprocal inhibition
@@ -456,6 +507,26 @@ class ReciprocalInhibition(BiologicalSystem):
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
 
+        self.initial_potentials={
+            "inh": self.biophysical_params['Eleaky'],
+            "exc":self.biophysical_params['Eleaky'],
+            "MN": self.biophysical_params['Eleaky']
+        }
+        if custom_initial_potentials is not None:
+            self.initial_potentials=custom_initial_potential
+            
+        # Initialize parameters for each motoneuron
+        self.initial_condition_spike_activation = [
+            [{
+                'u0': [0.0, 0.0],    # Initial fiber AP state
+                'c0': [0.0, 0.0],    # Initial calcium concentration state
+                'P0': 0.0,           # Initial calcium-troponin binding state
+                'a0': 0.0            # Initial activation state
+            } for _ in range(self.neurons_population['MN'])] for i in range(2)] #two muscles
+                    
+        if custom_initial_condition_spike_activation is not None:   
+            self.initial_condition_spike_activation=custom_initial_condition_spike_activation
+
         validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
         self.biophysical_parameters, self.muscles_names, self.number_muscles,self.ees_recruitment_profile)
     
@@ -470,7 +541,9 @@ class SpinalCircuitWithIb(BiologicalSystem):
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, custom_ees_recruitment_profile=None):
+                custom_spindle=None, custom_ees_recruitment_profile=None, fast_type_mu=True,
+                 custom_initial_potentials=None, custom_initial_conditon_spike_activation=None,
+                initial_state_opensim=None):
         """
         Initialize a reciprocal inhibition system with default or custom parameters.
         
@@ -512,7 +585,7 @@ class SpinalCircuitWithIb(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if custom_ees_recruitment_profile is None:
+        if ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
                     'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
@@ -531,8 +604,10 @@ class SpinalCircuitWithIb(BiologicalSystem):
                       'saturation_90pct': 0.9  
               }  
             }
+
+                
         # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint)
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint, fast_type_mu, initial_state_opensim)
         
         
         # Setup specialized neuron populations for reciprocal inhibition
@@ -616,6 +691,28 @@ class SpinalCircuitWithIb(BiologicalSystem):
         # Override with custom spindle model if provided
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
+
+        
+        self.initial_potentials={
+            "inh": self.biophysical_params['Eleaky'],
+            "inhb" : seld.biophysical_params['Eleaky']
+            "exc":self.biophysical_params['Eleaky'],
+            "MN": self.biophysical_params['Eleaky']
+        }
+        if custom_initial_potentials is not None:
+            self.initial_potentials=custom_initial_potential
+            
+        # Initialize parameters for each motoneuron
+        self.initial_condition_spike_activation = [
+            [{
+                'u0': [0.0, 0.0],    # Initial fiber AP state
+                'c0': [0.0, 0.0],    # Initial calcium concentration state
+                'P0': 0.0,           # Initial calcium-troponin binding state
+                'a0': 0.0            # Initial activation state
+            } for _ in range(self.neurons_population['MN'])] for i in range(2)] #two muscles
+                    
+        if custom_initial_condition_spike_activation is not None:   
+            self.initial_condition_spike_activation=custom_initial_condition_spike_activation
 
         validate_parameters(self.neurons_population, self.connections, self.spindle_models, 
         self.biophysical_parameters, self.muscles_names, self.number_muscles,self.ees_recruitment_profile)
