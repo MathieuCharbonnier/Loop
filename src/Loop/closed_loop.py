@@ -15,8 +15,9 @@ from .activation import decode_spikes_to_activation
 
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
-              spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, 
-              ees_params=None, torque_array=None, fast=True, seed=42,base_output_path=None):
+              spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, fast,
+              initial_condition_spike_activation,initial_potentials,initial_state_opensim, activation_history,
+              ees_params=None, torque_array=None, seed=42, base_output_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
     
@@ -74,31 +75,15 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     time_=np.arange(0, reaction_time, time_step)
     nb_points=len(time_)
-    activations = np.zeros((num_muscles, nb_points))
+
+    if activation_history is None:
+        activation_history = np.zeros((num_muscles, nb_points))
+
     time_points = np.arange(0, reaction_time*n_iterations, time_step)
     joint_all = np.zeros((len(time_points)))
     activations_all = np.zeros((num_muscles, len(time_points)))
 
-
-    initial_potentials = {
-        "exc": biophysical_params['Eleaky'],
-        "MN": biophysical_params['Eleaky']
-    }
-    if num_muscles == 2:
-        initial_potentials["inh"] = biophysical_params['Eleaky']
-        if Ib in neurons_population:
-            initial_potentials["inhb"] = biophysical_params['Eleaky']
-          
-    # Initialize parameters for each motoneuron
-    initial_params = [
-        [{
-            'u0': [0.0, 0.0],    # Initial fiber AP state
-            'c0': [0.0, 0.0],    # Initial calcium concentration state
-            'P0': 0.0,           # Initial calcium-troponin binding state
-            'a0': 0.0            # Initial activation state
-        } for _ in range(neurons_population['MN'])]
-        for _ in range(num_muscles)]
-
+    
     # Containers for simulation data
     muscle_data = [[] for _ in range(num_muscles)]
     resting_lengths = [None] * num_muscles
@@ -153,7 +138,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 reaction_time/second,
                 muscles_names,
                 associated_joint,
-                activation=activations,
+                activation=activation_history,
                 torque=current_torque
                 )
                 
@@ -209,7 +194,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             
                     freq = ees_params.get("freq")
                     if isinstance(freq, tuple) and len(freq) == 2:
-                        dominant = 0 if np.mean(activations[0]) >= np.mean(activations[1]) else 1
+                        dominant = 0 if np.mean(activation_history[0]) >= np.mean(activation_history[1]) else 1
                         ees_params_copy["freq"] = freq[dominant]
                       
                 if "Ib" in neurons_population:
@@ -251,7 +236,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                         mn_spikes_sec,
                         time_step/second,
                         reaction_time/second,
-                        initial_params[muscle_idx],
+                        initial_condition_spike_activation[muscle_idx],
                         fast=fast
                     )
 
@@ -263,14 +248,14 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     mean_activation[muscle_idx] = np.mean(activations_result, axis=0)
 
                     # Update activation for next iteration
-                    activations[muscle_idx] = mean_activation[muscle_idx]
+                    activation_history[muscle_idx] = mean_activation[muscle_idx]
                     
                     # Store activations to relaunch the entire opensim simulation at the end
                     if (activations_all.shape[1]>=(iteration+2)*nb_points):
                         activations_all[muscle_idx,(iteration+1)*nb_points: (iteration+2)*nb_points] = mean_activation[muscle_idx]
                     
                     # Save final state for next iteration
-                    initial_params[muscle_idx] = final_values
+                    initial_condition_spike_activation[muscle_idx] = final_values
 
                     # Create batch data for current iteration
                     batch_data = {
@@ -293,6 +278,11 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     # Store batch data for this muscle
                     muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
 
+    final_state={
+      "opensim": simulator.recover_final_state(),
+      "potentials":initial_potentials,
+      "spike_activation": initial_condition_spike_activation
+    }
     # =============================================================================
     # Combine Results and Compute Firing rates
     # =============================================================================
@@ -334,7 +324,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         if "Ib" in neurons_population and "Ib" in spindle_model:
             Ib_rate = eval(spindle_model['Ib'], 
                           {"__builtins__": {}}, 
-                          {"normalized_force": normalize_force}
+                          {"normalized_force": normalized_force}
                            )
 
             df[f'Ib_rate_baseline_{muscle_name}'] = Ib_rate
@@ -403,7 +393,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     plt.show()
     """
 
-    return spike_data, combined_df
+    return spike_data, combined_df, final_state
 
 class SimulatorBase:
     """Base class for simulation strategies"""
@@ -417,7 +407,7 @@ class SimulatorBase:
 class CoLabSimulator(SimulatorBase):
     """Simulator implementation for Google Colab using subprocess"""
 
-    def __init__(self):
+    def __init__(self, initial_state=None):
         # Create reusable temporary files for the whole simulation
         self.input_activation_path = tempfile.mktemp(suffix='.npy')
         self.input_torque_path = tempfile.mktemp(suffix='.npy')
@@ -425,7 +415,16 @@ class CoLabSimulator(SimulatorBase):
         self.output_force_path = tempfile.mktemp(suffix='.npy')
         self.output_joint_path = tempfile.mktemp(suffix='.npy')
         self.state_path = tempfile.mktemp(suffix='.json')
-        
+
+        if initial_state is not None:
+              with open(self.state_path, "w") as f:
+                  json.dump(initial_state, f, indent=4)
+
+    def recover_final_state():
+        with open(self.state_path, 'r') as f:
+                state = json.load(f)
+        return state  
+
     def __del__(self):
         """Clean up temporary files when the object is destroyed"""
         # List of all temporary files to remove
@@ -441,18 +440,16 @@ class CoLabSimulator(SimulatorBase):
         # Remove each temporary file if it exists
         for file_path in temp_files:
             if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                except (IOError, OSError):
-                    # Silently ignore errors during cleanup
-                    pass
+                os.remove(file_path)
+
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
-                              activation, torque=None, state_file=None):
+                              activation, torque=None, initial_state=None):
         """Run a single muscle simulation iteration using conda subprocess"""
         
         # Save activation to temp file
         np.save(self.input_activation_path, activation)
+
         
         # Build command for OpenSim muscle simulation
         cmd = [
@@ -491,15 +488,18 @@ class CoLabSimulator(SimulatorBase):
         joint = np.load(self.output_joint_path)
         
 
-        return fiber_lengths,normailzed_force, joint
+        return fiber_lengths,normalized_force, joint
     
     
 
 class LocalSimulator(SimulatorBase):
     """Simulator implementation for local execution with in-memory state"""
     
-    def __init__(self):
-        self.current_state = {}  # Store simulation state in memory
+    def __init__(self, current_state={}):
+        self.current_state = current_state 
+
+    def recover_final_state():
+        return self.current_state   
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
                               activation, torque):
