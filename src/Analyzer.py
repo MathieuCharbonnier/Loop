@@ -1,8 +1,8 @@
 import copy
 import numpy as np
 from tqdm import tqdm
+from brian2 import *
 from .Visualization.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results, plot_ees_analysis_results
-from .Stimulation.controller import HierarchicalAnkleController
 from .helpers.sensitivity_analysis import sensitivity_analysis_func
 
 class Analyzer:
@@ -367,7 +367,7 @@ class ReciprocalInhibitoryAnalyzer(Analyzer):
         -----------
         reciprocal_system : ReciprocalInhibitorySystem
             The reciprocal inhibitory biological system to analyze
-
+        """
         
         super().__init__(reciprocal_system)
         
