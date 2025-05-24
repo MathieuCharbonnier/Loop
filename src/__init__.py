@@ -1,5 +1,5 @@
-from .SpecializedBiologicalSystems import Monosynaptic, Disynaptic, ReciprocalInhibition, SpinalCircuitWithIb
-from .Analyser import Analyzer
+from .BiologicalSystems import Monosynaptic, Disynaptic, ReciprocalInhibition, SpinalCircuitWithIb
+from .Analyzer import Analyzer
 from .Controller import Controller
 __all__ = [
     "Monosynaptic",
