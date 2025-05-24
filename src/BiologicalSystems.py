@@ -18,7 +18,7 @@ class BiologicalSystem:
     handling the core simulation and analysis functionality.
     """
     
-    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint):
+    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, associated_joint, fast_type_mu):
         """
         Initialize the biological system with common parameters.
         
@@ -41,6 +41,7 @@ class BiologicalSystem:
         self.muscles_names = muscles_names
         self.number_muscles = len(muscles_names)
         self.associated_joint = associated_joint
+        self.fast_type_mu=fast_type_mu
         
         # These will be set by subclasses
         self.neurons_population = {}
@@ -302,7 +303,7 @@ class Disynaptic(BiologicalSystem):
         # Set default spindle model
         self.spindle_model = {
             "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
-            "II": "20 + 13.5*stretch"
+            "II": "20 + 13.5*stretch",
             "II_Ia_delta_delay": 15*ms
         }
         
