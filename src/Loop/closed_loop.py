@@ -76,8 +76,6 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     time_=np.arange(0, reaction_time, time_step)
     nb_points=len(time_)
 
-    if activation_history is None:
-        activation_history = np.zeros((num_muscles, nb_points))
 
     time_points = np.arange(0, reaction_time*n_iterations, time_step)
     joint_all = np.zeros((len(time_points)))
