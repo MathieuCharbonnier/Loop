@@ -30,8 +30,8 @@ class Controller:
         
         # Current parameters
         self. ees_params={'freq': 30*hertz,
-                    'intensity':intensity,# fix
-                    'balance: 0.0} # initial balance paramater between flexor and extensor [-1,1]
+                    'intensity':intensity,#fixed during all the simulation
+                    'balance': 0.0} # initial balance paramater between flexor and extensor [-1,1]
         
         # Controller memory
         self.history = {
