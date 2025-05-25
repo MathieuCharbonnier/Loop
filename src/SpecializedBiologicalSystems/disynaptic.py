@@ -1,5 +1,5 @@
 from brian2 import *
-from .base_system import BiologicalSystem
+from .BiologicalSystem import BiologicalSystem
 
 
 class Disynaptic(BiologicalSystem):
@@ -12,9 +12,7 @@ class Disynaptic(BiologicalSystem):
     
     def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=False,
-                custom_initial_potentials=None, custom_initial_condition_spike_activation=None, 
-                initial_state_opensim=None):
+                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=False):
         """
         Initialize a disynaptic reflex system with default or custom parameters.
         """
@@ -51,7 +49,7 @@ class Disynaptic(BiologicalSystem):
             
         # Initialize the base class
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names, associated_joint, fast_type_mu, initial_state_opensim)
+                        muscles_names, associated_joint, fast_type_mu)
         
         # Set default neuron populations
         self.neurons_population = {
@@ -91,8 +89,6 @@ class Disynaptic(BiologicalSystem):
             "exc": self.biophysical_params['Eleaky'],
             "MN": self.biophysical_params['Eleaky']
         }
-        if custom_initial_potentials is not None:
-            self.initial_potentials = custom_initial_potentials
             
         # Initialize parameters for each motoneuron
         self.initial_condition_spike_activation = [
@@ -103,8 +99,6 @@ class Disynaptic(BiologicalSystem):
                 'a0': 0.0            # Initial activation state
             } for _ in range(self.neurons_population['MN'])]
         ]
-        if custom_initial_condition_spike_activation is not None:   
-            self.initial_condition_spike_activation = custom_initial_condition_spike_activation
 
         # Validate parameters
         self.validate_input()
