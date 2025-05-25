@@ -1,5 +1,5 @@
 from brian2 import *
-from .base_system import BiologicalSystem
+from .BiologicalSystem import BiologicalSystem
 
 
 class Monosynaptic(BiologicalSystem):
@@ -12,9 +12,7 @@ class Monosynaptic(BiologicalSystem):
     
     def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True,
-                custom_initial_potentials=None, custom_initial_condition_spike_activation=None, 
-                initial_state_opensim=None):
+                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True):
         """
         Initialize a monosynaptic reflex system with default or custom parameters.
         """
@@ -80,8 +78,6 @@ class Monosynaptic(BiologicalSystem):
         self.initial_potentials = {
             "MN": self.biophysical_params['Eleaky']
         }
-        if custom_initial_potentials is not None:
-            self.initial_potentials = custom_initial_potentials
             
         # Initialize parameters for each motoneuron
         self.initial_condition_spike_activation = [
@@ -92,8 +88,7 @@ class Monosynaptic(BiologicalSystem):
                 'a0': 0.0            # Initial activation state
             } for _ in range(self.neurons_population['MN'])]
         ]
-        if custom_initial_condition_spike_activation is not None:   
-            self.initial_condition_spike_activation = custom_initial_condition_spike_activation
+
         
         # Validate parameters
         self.validate_input()
