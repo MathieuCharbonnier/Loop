@@ -364,18 +364,6 @@ class SpinalCircuitWithIb(BiologicalSystem):
                 if hasattr(weight, 'dim') and not weight.dim == siemens.dim:
                     issues["errors"].append(f"Connection weight for {connection} should have siemens units, got {weight.unit}")
         
-        # Check initial potentials (should include inhb for Ib interneurons)
-        required_initial_potentials = ["inh", "inhb", "exc", "MN"]
-        for neuron_type in required_initial_potentials:
-            if neuron_type not in self.initial_potentials:
-                issues["errors"].append(f"Missing initial potential for neuron type '{neuron_type}'")
-            else:
-                potential = self.initial_potentials[neuron_type]
-                if hasattr(potential, 'dim') and not potential.dim == volt.dim:
-                    issues["errors"].append(f"Initial potential for '{neuron_type}' should have volt units, got {potential.unit}")
-        
-
-
         
         # Raise error if there are critical issues
         if issues["errors"]:
