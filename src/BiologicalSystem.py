@@ -55,7 +55,7 @@ class BiologicalSystem(ABC):
         self.initial_potentials = {}
         self.initial_state_opensim = {}
         self.initial_condition_spike_activation = {}
-        self.activation_history = None
+        self.activation_function = None
                      
         # Store the results:
         self.spikes = None
@@ -107,9 +107,6 @@ class BiologicalSystem(ABC):
             (spikes, time_series) containing simulation results
         """
         
-        # Ensure neural network is setup before simulation
-        self._ensure_neural_network_setup()
-        
         torque_array = None
         if torque_profile is not None:
             time_points = np.arange(0, self.reaction_time*n_iterations, time_step)
@@ -125,7 +122,7 @@ class BiologicalSystem(ABC):
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
             self.initial_potentials, self.initial_condition_spike_activation, self.initial_state_opensim,
-            self.activation_history, torque_array=torque_array, ees_params=ees_params,
+            self.activation_function, torque_array=torque_array, ees_params=ees_params,
             fast=self.fast_type_mu, seed=seed, base_output_path=base_output_path)
         
         return self.spikes, self.time_series
@@ -169,10 +166,8 @@ class BiologicalSystem(ABC):
         self.initial_potentials = self.final_state['potentials']
         self.initial_condition_spike_activation = self.final_state['spikes_activation']
         self.initial_state_opensim = self.final_state['opensim']
-        self.activation_history = np.array([
-            self.time_series[f'activation_{muscle_name}'].values 
-            for muscle_name in self.muscles_names
-        ])
+        self.activation_function=self.final_state['last_activation']
+
             
     def clone_with(self, **params):
         """
