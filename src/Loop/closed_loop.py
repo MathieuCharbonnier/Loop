@@ -8,6 +8,7 @@ import json
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from scipy.stats import gaussian_kde
+from scipy.interpolate import interp1d
 
 from .neural_dynamics import run_monosynaptic_simulation, run_disynaptic_simulation, run_flexor_extensor_neuron_simulation, run_spinal_circuit_with_Ib
 from .activation import decode_spikes_to_activation
@@ -16,7 +17,7 @@ from .activation import decode_spikes_to_activation
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
               spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, fast,
-              initial_condition_spike_activation,initial_potentials,initial_state_opensim, activation_history=None,
+              initial_condition_spike_activation,initial_potentials,initial_state_opensim, activation_function=None,
               ees_params=None, torque_array=None, seed=42, base_output_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
@@ -75,9 +76,9 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     time_=np.arange(0, reaction_time, time_step)
     nb_points=len(time_)
-    if activation_history is None:
-        activation_history = np.zeros((num_muscles, nb_points))
-        
+    activation_history = np.zeros((num_muscles, nb_points))
+    if activation_function is not None:
+          activation_history=activation_function(time_)
     time_points = np.arange(0, reaction_time*n_iterations, time_step)
     joint_all = np.zeros((len(time_points)))
     activations_all = np.zeros((num_muscles, len(time_points)))
@@ -280,7 +281,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     final_state={
       "opensim": simulator.recover_final_state(),
       "potentials":initial_potentials,
-      "spike_activation": initial_condition_spike_activation
+      "spike_activation": initial_condition_spike_activation,
+      "last_activation":interp1d(time_, activation_history, axis=0, kind='linear', bounds_error=False, fill_value='extrapolate')
     }
     # =============================================================================
     # Combine Results and Compute Firing rates
