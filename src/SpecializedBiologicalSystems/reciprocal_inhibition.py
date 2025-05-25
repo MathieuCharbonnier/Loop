@@ -308,50 +308,9 @@ class ReciprocalInhibition(BiologicalSystem):
                 # Check if weight has proper siemens units
                 if hasattr(weight, 'dim') and not weight.dim == siemens.dim:
                     issues["errors"].append(f"Connection weight for {connection} should have siemens units, got {weight.unit}")
+   
         
-        # Check initial potentials
-        required_initial_potentials = ["inh", "exc", "MN"]
-        for neuron_type in required_initial_potentials:
-            if neuron_type not in self.initial_potentials:
-                issues["errors"].append(f"Missing initial potential for neuron type '{neuron_type}'")
-            else:
-                potential = self.initial_potentials[neuron_type]
-                if hasattr(potential, 'dim') and not potential.dim == volt.dim:
-                    issues["errors"].append(f"Initial potential for '{neuron_type}' should have volt units, got {potential.unit}")
-        
-        # Check initial condition spike activation structure
-        if len(self.initial_condition_spike_activation) != 2:
-            issues["errors"].append("initial_condition_spike_activation should have exactly 2 elements (for 2 muscles)")
-        else:
-            # Check that each muscle has the correct number of motor neurons
-            for i, muscle_conditions in enumerate(self.initial_condition_spike_activation):
-                muscle_type = "flexor" if i == 0 else "extensor"
-                expected_mn_count = self.neurons_population[f'MN_{muscle_type}']
-                if len(muscle_conditions) != expected_mn_count:
-                    issues["errors"].append(
-                        f"Muscle {i} should have {expected_mn_count} motor neuron initial conditions, "
-                        f"but got {len(muscle_conditions)}"
-                    )
-                
-                # Check structure of each initial condition
-                for j, condition in enumerate(muscle_conditions):
-                    required_keys = ['u0', 'c0', 'P0', 'a0']
-                    for key in required_keys:
-                        if key not in condition:
-                            issues["errors"].append(
-                                f"Missing '{key}' in initial condition for muscle {i}, motor neuron {j}"
-                            )
-        
-        # Validate that inhibitory reversal potential is more negative than leak potential
-        if 'E_inh' in self.biophysical_params and 'Eleaky' in self.biophysical_params:
-            e_inh = self.biophysical_params['E_inh']
-            e_leak = self.biophysical_params['Eleaky']
-            if e_inh >= e_leak:
-                issues["warnings"].append(
-                    f"Inhibitory reversal potential ({e_inh}) should be more negative than "
-                    f"leak potential ({e_leak}) for effective inhibition"
-                )
-        
+
         # Raise error if there are critical issues
         if issues["errors"]:
             error_messages = "\n".join(issues["errors"])
