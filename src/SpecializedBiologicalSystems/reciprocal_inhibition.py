@@ -1,4 +1,5 @@
 from brian2 import *
+from .BiologicalSystem import BiologicalSystem
 
 class ReciprocalInhibition(BiologicalSystem):
     """
@@ -10,9 +11,7 @@ class ReciprocalInhibition(BiologicalSystem):
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                 custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True,
-                 custom_initial_potentials=None, custom_initial_condition_spike_activation=None, 
-                 initial_state_opensim=None):
+                 custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True):
         """
         Initialize a reciprocal inhibition system with default or custom parameters.
         
@@ -149,8 +148,6 @@ class ReciprocalInhibition(BiologicalSystem):
             "MN": self.biophysical_params['Eleaky']
         }
         
-        if custom_initial_potentials is not None:
-            self.initial_potentials.update(custom_initial_potentials)
             
         # Initialize parameters for each motoneuron
         self.initial_condition_spike_activation = [
@@ -163,259 +160,208 @@ class ReciprocalInhibition(BiologicalSystem):
             for i in range(2)  # two muscles
         ]
                     
-        if custom_initial_condition_spike_activation is not None:   
-            self.initial_condition_spike_activation = custom_initial_condition_spike_activation
-
         # Validate the configuration
         self.validate_reciprocal_inhibition_parameters()
 
     def validate_reciprocal_inhibition_parameters(self):
         """
-        Validates the configuration parameters specifically for the ReciprocalInhibition class.
-        
-        This method extends the base validation with specific checks for reciprocal inhibition
-        circuits and their required pathways.
+        Validates the configuration parameters for reciprocal inhibition reflex system.
         
         Raises:
-            ValueError: If critical errors are found in the reciprocal inhibition configuration
+            ValueError: If critical errors are found in the configuration
         """
         issues = {"warnings": [], "errors": []}
         
-        # Get neuron types from population
+        # Check muscle count (should be exactly 2 for reciprocal inhibition)
+        if self.number_muscles != 2:
+            issues["errors"].append("Reciprocal inhibition reflex should have exactly 2 muscles")
+        
+        # Check required neuron types for reciprocal inhibition
+        required_neurons = {
+            "Ia_flexor", "II_flexor", "Ia_extensor", "II_extensor",
+            "exc_flexor", "exc_extensor", "inh_flexor", "inh_extensor",
+            "MN_flexor", "MN_extensor"
+        }
         defined_neurons = set(self.neurons_population.keys())
-        neuron_types = {n.split('_')[0] if '_' in n else n for n in defined_neurons}
         
-        # Specific validation for reciprocal inhibition requirements
-        self._validate_reciprocal_inhibition_requirements(issues, defined_neurons, neuron_types)
-        self._validate_reciprocal_connections(issues)
-        self._validate_reciprocal_spindle_model(issues, neuron_types)
-        self._validate_reciprocal_ees_recruitment(issues, neuron_types)
-        self._validate_circuit_symmetry(issues, defined_neurons)
+        missing_neurons = required_neurons - defined_neurons
+        if missing_neurons:
+            issues["errors"].append(f"Missing required neuron types for reciprocal inhibition: {missing_neurons}")
         
-        # Call the base validation function
-        try:
-            from your_module import validate_parameters  # Import the original function
-            validate_parameters(
-                self.neurons_population, 
-                self.connections, 
-                self.spindle_model, 
-                self.biophysical_params, 
-                self.muscles_names, 
-                len(self.muscles_names),
-                self.ees_recruitment_profile
-            )
-        except ValueError as e:
-            issues["errors"].append(f"Base validation failed: {str(e)}")
+        # Check for unexpected neuron types
+        unexpected_neurons = defined_neurons - required_neurons
+        if unexpected_neurons:
+            issues["warnings"].append(f"Unexpected neuron types for reciprocal inhibition: {unexpected_neurons}")
+        
+        # Check required connections for reciprocal inhibition
+        required_connections = {
+            # Direct pathways
+            ("Ia_flexor", "MN_flexor"),
+            ("Ia_extensor", "MN_extensor"),
+            
+            # Ia inhibition pathways
+            ("Ia_flexor", "inh_flexor"),
+            ("Ia_extensor", "inh_extensor"),
+            
+            # Type II excitation pathways
+            ("II_flexor", "exc_flexor"),
+            ("II_extensor", "exc_extensor"),
+            
+            # Type II inhibition pathways
+            ("II_flexor", "inh_flexor"),
+            ("II_extensor", "inh_extensor"),
+            
+            # Excitatory interneuron to motoneuron pathways
+            ("exc_flexor", "MN_flexor"),
+            ("exc_extensor", "MN_extensor"),
+            
+            # Reciprocal inhibition pathways (the key feature)
+            ("inh_flexor", "MN_extensor"),
+            ("inh_extensor", "MN_flexor")
+        }
+        
+        defined_connections = set(self.connections.keys())
+        
+        missing_connections = required_connections - defined_connections
+        if missing_connections:
+            issues["errors"].append(f"Missing required connections for reciprocal inhibition: {missing_connections}")
+        
+        # Check for the presence of key reciprocal inhibition connections
+        reciprocal_connections = {("inh_flexor", "MN_extensor"), ("inh_extensor", "MN_flexor")}
+        if not reciprocal_connections.issubset(defined_connections):
+            missing_reciprocal = reciprocal_connections - defined_connections
+            issues["errors"].append(f"Missing critical reciprocal inhibition connections: {missing_reciprocal}")
+        
+        # Check spindle model
+        required_spindle_equations = ["Ia", "II"]
+        for eq in required_spindle_equations:
+            if eq not in self.spindle_model:
+                issues["errors"].append(f"Missing {eq} equation in spindle model for reciprocal inhibition")
+        
+        # Check EES recruitment parameters
+        for neuron_type in ["Ia", "II", "MN"]:
+            if neuron_type not in self.ees_recruitment_profile:
+                issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
+        
+        # Check mandatory biophysical parameters (including inhibitory ones)
+        required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e', 'E_inh', 'tau_i', 'threshold_v']
+        for param in required_params:
+            if param not in self.biophysical_params:
+                issues["errors"].append(f"Missing mandatory biophysical parameter: '{param}'")
+        
+        # Check units
+        expected_units = {
+            'T_refr': second,
+            'Eleaky': volt,
+            'gL': siemens,  
+            'Cm': farad,
+            'E_ex': volt,
+            'tau_e': second,
+            'E_inh': volt,
+            'tau_i': second,
+            'threshold_v': volt
+        }
+        
+        for param, expected_unit in expected_units.items():
+            if param in self.biophysical_params:
+                value = self.biophysical_params[param]
+                if not value.dim == expected_unit.dim:
+                    issues["errors"].append(
+                        f"Parameter '{param}' has incorrect unit. "
+                        f"Expected unit compatible with {expected_unit}, but got {value.unit}"
+                    )
+        
+        # Validate EES parameters
+        for neuron_type, params in self.ees_recruitment_profile.items():
+            if neuron_type in ["Ia", "II", "MN"]:
+                required_ees_params = ["threshold_10pct", "saturation_90pct"]
+                for param in required_ees_params:
+                    if param not in params:
+                        issues["errors"].append(f"Missing '{param}' in EES recruitment parameters for '{neuron_type}'")
+                
+                if "threshold_10pct" in params and "saturation_90pct" in params:
+                    threshold = params['threshold_10pct']
+                    saturation = params['saturation_90pct']
+                    
+                    if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
+                        issues["errors"].append(
+                            f"EES parameters for '{neuron_type}' must be between 0 and 1. "
+                            f"Got: threshold={threshold}, saturation={saturation}"
+                        )
+                    if threshold >= saturation:
+                        issues["errors"].append(f"Threshold must be less than saturation for '{neuron_type}'")
+        
+        # Check connection weights and probabilities
+        for connection, params in self.connections.items():
+            if "w" not in params:
+                issues["errors"].append(f"Missing weight 'w' for connection {connection}")
+            if "p" not in params:
+                issues["errors"].append(f"Missing probability 'p' for connection {connection}")
+            
+            if "p" in params:
+                prob = params["p"]
+                if not (0 <= prob <= 1):
+                    issues["errors"].append(f"Connection probability for {connection} must be between 0 and 1, got {prob}")
+            
+            if "w" in params:
+                weight = params["w"]
+                # Check if weight has proper siemens units
+                if hasattr(weight, 'dim') and not weight.dim == siemens.dim:
+                    issues["errors"].append(f"Connection weight for {connection} should have siemens units, got {weight.unit}")
+        
+        # Check initial potentials
+        required_initial_potentials = ["inh", "exc", "MN"]
+        for neuron_type in required_initial_potentials:
+            if neuron_type not in self.initial_potentials:
+                issues["errors"].append(f"Missing initial potential for neuron type '{neuron_type}'")
+            else:
+                potential = self.initial_potentials[neuron_type]
+                if hasattr(potential, 'dim') and not potential.dim == volt.dim:
+                    issues["errors"].append(f"Initial potential for '{neuron_type}' should have volt units, got {potential.unit}")
+        
+        # Check initial condition spike activation structure
+        if len(self.initial_condition_spike_activation) != 2:
+            issues["errors"].append("initial_condition_spike_activation should have exactly 2 elements (for 2 muscles)")
+        else:
+            # Check that each muscle has the correct number of motor neurons
+            for i, muscle_conditions in enumerate(self.initial_condition_spike_activation):
+                muscle_type = "flexor" if i == 0 else "extensor"
+                expected_mn_count = self.neurons_population[f'MN_{muscle_type}']
+                if len(muscle_conditions) != expected_mn_count:
+                    issues["errors"].append(
+                        f"Muscle {i} should have {expected_mn_count} motor neuron initial conditions, "
+                        f"but got {len(muscle_conditions)}"
+                    )
+                
+                # Check structure of each initial condition
+                for j, condition in enumerate(muscle_conditions):
+                    required_keys = ['u0', 'c0', 'P0', 'a0']
+                    for key in required_keys:
+                        if key not in condition:
+                            issues["errors"].append(
+                                f"Missing '{key}' in initial condition for muscle {i}, motor neuron {j}"
+                            )
+        
+        # Validate that inhibitory reversal potential is more negative than leak potential
+        if 'E_inh' in self.biophysical_params and 'Eleaky' in self.biophysical_params:
+            e_inh = self.biophysical_params['E_inh']
+            e_leak = self.biophysical_params['Eleaky']
+            if e_inh >= e_leak:
+                issues["warnings"].append(
+                    f"Inhibitory reversal potential ({e_inh}) should be more negative than "
+                    f"leak potential ({e_leak}) for effective inhibition"
+                )
         
         # Raise error if there are critical issues
         if issues["errors"]:
             error_messages = "\n".join(issues["errors"])
-            raise ValueError(f"ReciprocalInhibition configuration errors found:\n{error_messages}")
+            raise ValueError(f"Reciprocal inhibition configuration errors:\n{error_messages}")
         
         # Print warnings if any
         if issues["warnings"]:
             warning_messages = "\n".join(issues["warnings"])
-            print(f"WARNING: ReciprocalInhibition configuration issues detected:\n{warning_messages}")
+            print(f"WARNING: Reciprocal inhibition configuration issues:\n{warning_messages}")
             
         return True
-    
-    def _validate_reciprocal_inhibition_requirements(self, issues, defined_neurons, neuron_types):
-        """Validate core reciprocal inhibition circuit requirements."""
         
-        # Essential neuron types for reciprocal inhibition
-        essential_types = {"Ia", "inh", "MN"}
-        recommended_types = {"Ia", "II", "exc", "inh", "MN"}
         
-        missing_essential = essential_types - neuron_types
-        if missing_essential:
-            issues["errors"].append(
-                f"ReciprocalInhibition requires essential neuron types: {essential_types}. "
-                f"Missing: {missing_essential}"
-            )
-        
-        missing_recommended = recommended_types - neuron_types
-        if missing_recommended:
-            issues["warnings"].append(
-                f"For complete reciprocal inhibition, recommended neuron types are: {recommended_types}. "
-                f"Missing: {missing_recommended}"
-            )
-        
-        # Check for muscle-specific neurons (flexor/extensor pairs)
-        required_muscle_neurons = [
-            ("Ia_flexor", "Ia_extensor"),
-            ("inh_flexor", "inh_extensor"),
-            ("MN_flexor", "MN_extensor")
-        ]
-        
-        for flexor, extensor in required_muscle_neurons:
-            if flexor not in defined_neurons:
-                issues["errors"].append(f"Missing required flexor neuron: {flexor}")
-            if extensor not in defined_neurons:
-                issues["errors"].append(f"Missing required extensor neuron: {extensor}")
-        
-        # Check if both excitatory and inhibitory interneurons are present
-        if "exc" in neuron_types and "inh" not in neuron_types:
-            issues["warnings"].append("Excitatory interneurons defined without inhibitory interneurons")
-        if "inh" in neuron_types and "exc" not in neuron_types:
-            issues["warnings"].append("Inhibitory interneurons defined without excitatory interneurons")
-    
-    def _validate_reciprocal_connections(self, issues):
-        """Validate reciprocal inhibition specific connections."""
-        
-        connection_pairs = list(self.connections.keys())
-        
-        # Essential reciprocal inhibition pathways
-        essential_reciprocal_connections = [
-            # Direct monosynaptic pathways
-            ("Ia_flexor", "MN_flexor"),
-            ("Ia_extensor", "MN_extensor"),
-            
-            # Reciprocal inhibition pathways (cross-inhibition)
-            ("inh_flexor", "MN_extensor"),
-            ("inh_extensor", "MN_flexor"),
-            
-            # Ia to inhibitory interneuron pathways
-            ("Ia_flexor", "inh_flexor"),
-            ("Ia_extensor", "inh_extensor")
-        ]
-        
-        missing_connections = []
-        for connection in essential_reciprocal_connections:
-            if connection not in connection_pairs:
-                missing_connections.append(connection)
-        
-        if missing_connections:
-            issues["errors"].append(f"Missing essential reciprocal inhibition connections: {missing_connections}")
-        
-        # Check for proper reciprocal inhibition pattern
-        reciprocal_pairs = [
-            (("inh_flexor", "MN_extensor"), ("inh_extensor", "MN_flexor")),
-            (("Ia_flexor", "inh_flexor"), ("Ia_extensor", "inh_extensor"))
-        ]
-        
-        for pair1, pair2 in reciprocal_pairs:
-            has_pair1 = pair1 in connection_pairs
-            has_pair2 = pair2 in connection_pairs
-            
-            if has_pair1 and not has_pair2:
-                issues["warnings"].append(f"Asymmetric reciprocal connection: {pair1} present but {pair2} missing")
-            elif has_pair2 and not has_pair1:
-                issues["warnings"].append(f"Asymmetric reciprocal connection: {pair2} present but {pair1} missing")
-        
-        # Validate Type II connections if present
-        if "II_flexor" in [conn[0] for conn in connection_pairs] or "II_extensor" in [conn[0] for conn in connection_pairs]:
-            recommended_ii_connections = [
-                ("II_flexor", "exc_flexor"),
-                ("II_extensor", "exc_extensor"),
-                ("II_flexor", "inh_flexor"),
-                ("II_extensor", "inh_extensor")
-            ]
-            
-            missing_ii = [conn for conn in recommended_ii_connections if conn not in connection_pairs]
-            if missing_ii:
-                issues["warnings"].append(f"Type II neurons present but missing typical connections: {missing_ii}")
-    
-    def _validate_reciprocal_spindle_model(self, issues, neuron_types):
-        """Validate spindle model for reciprocal inhibition."""
-        
-        required_spindle_types = []
-        if "Ia" in neuron_types:
-            required_spindle_types.append("Ia")
-        if "II" in neuron_types:
-            required_spindle_types.append("II")
-        
-        for spindle_type in required_spindle_types:
-            if spindle_type not in self.spindle_model:
-                issues["errors"].append(f"Missing spindle model equation for {spindle_type} neurons")
-        
-        # Check for proper stretch dependency in Ia equation
-        if "Ia" in self.spindle_model:
-            ia_equation = self.spindle_model["Ia"]
-            if "stretch" not in ia_equation.lower():
-                issues["warnings"].append("Ia spindle equation should typically depend on stretch")
-            if "velocity" not in ia_equation.lower():
-                issues["warnings"].append("Ia spindle equation should typically include velocity dependency")
-        
-        # Check for proper stretch dependency in II equation
-        if "II" in self.spindle_model:
-            ii_equation = self.spindle_model["II"]
-            if "stretch" not in ii_equation.lower():
-                issues["warnings"].append("Type II spindle equation should typically depend on stretch")
-        
-        # Check for delay parameter
-        if "II" in neuron_types and "Ia" in neuron_types:
-            if "II_Ia_delta_delay" not in self.spindle_model:
-                issues["warnings"].append("Consider adding II_Ia_delta_delay for realistic timing differences")
-    
-    def _validate_reciprocal_ees_recruitment(self, issues, neuron_types):
-        """Validate EES recruitment parameters for reciprocal inhibition."""
-        
-        if not self.ees_recruitment_profile:
-            return
-        
-        # Check recruitment parameters for all neuron types
-        for neuron_type in ["Ia", "II", "MN"]:
-            if neuron_type in neuron_types and neuron_type not in self.ees_recruitment_profile:
-                issues["errors"].append(f"Missing EES recruitment parameters for {neuron_type}")
-        
-        # Validate recruitment thresholds make biological sense
-        if "Ia" in self.ees_recruitment_profile and "MN" in self.ees_recruitment_profile:
-            ia_threshold = self.ees_recruitment_profile["Ia"]["threshold_10pct"]
-            mn_threshold = self.ees_recruitment_profile["MN"]["threshold_10pct"]
-            
-            if ia_threshold >= mn_threshold:
-                issues["warnings"].append(
-                    "Ia afferents typically have lower EES thresholds than motoneurons"
-                )
-        
-        if "II" in self.ees_recruitment_profile and "Ia" in self.ees_recruitment_profile:
-            ii_threshold = self.ees_recruitment_profile["II"]["threshold_10pct"]
-            ia_threshold = self.ees_recruitment_profile["Ia"]["threshold_10pct"]
-            
-            if ii_threshold <= ia_threshold:
-                issues["warnings"].append(
-                    "Type II afferents typically have higher EES thresholds than Ia afferents"
-                )
-    
-    def _validate_circuit_symmetry(self, issues, defined_neurons):
-        """Validate symmetry between flexor and extensor circuits."""
-        
-        # Check for balanced neuron populations
-        neuron_pairs = [
-            ("Ia_flexor", "Ia_extensor"),
-            ("II_flexor", "II_extensor"),
-            ("exc_flexor", "exc_extensor"),
-            ("inh_flexor", "inh_extensor"),
-            ("MN_flexor", "MN_extensor")
-        ]
-        
-        for flexor, extensor in neuron_pairs:
-            if flexor in defined_neurons and extensor in defined_neurons:
-                flexor_count = self.neurons_population[flexor]
-                extensor_count = self.neurons_population[extensor]
-                
-                # Allow some asymmetry (up to 2:1 ratio) as it's biologically realistic
-                ratio = max(flexor_count, extensor_count) / min(flexor_count, extensor_count)
-                if ratio > 2.5:  # Warning for high asymmetry
-                    issues["warnings"].append(
-                        f"High asymmetry in neuron populations: {flexor}={flexor_count}, "
-                        f"{extensor}={extensor_count} (ratio: {ratio:.1f}:1)"
-                    )
-        
-        # Check for connection weight symmetry
-        connection_pairs = [
-            (("Ia_flexor", "MN_flexor"), ("Ia_extensor", "MN_extensor")),
-            (("inh_flexor", "MN_extensor"), ("inh_extensor", "MN_flexor"))
-        ]
-        
-        for conn1, conn2 in connection_pairs:
-            if conn1 in self.connections and conn2 in self.connections:
-                weight1 = self.connections[conn1].get("w", 0)
-                weight2 = self.connections[conn2].get("w", 0)
-                
-                # Compare weights if they have the same units
-                if hasattr(weight1, 'magnitude') and hasattr(weight2, 'magnitude'):
-                    if abs(weight1.magnitude - weight2.magnitude) / max(weight1.magnitude, weight2.magnitude) > 0.5:
-                        issues["warnings"].append(
-                            f"Asymmetric connection weights: {conn1}={weight1}, {conn2}={weight2}"
-                        )
