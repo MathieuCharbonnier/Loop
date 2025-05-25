@@ -149,15 +149,11 @@ class Analyzer:
             # Update the parameter we're varying
             current_params[param_name] = value
             
-            ees_stimulation_params = transform_intensity_balance_in_recruitment(
-                self.original_system.ees_recruitment_profile, current_params, 
-                self.original_system.neurons_population, self.original_system.num_muscles)
-            
             # Run simulation
             spikes, main_data = self.original_system.run_simulation(
                 n_iterations, 
                 time_step,
-                ees_stimulation_params=ees_stimulation_params,
+                ees_stimulation_params=current_params,
                 torque_profile=None,
                 seed=seed, 
                 base_output_path=None,
@@ -171,17 +167,6 @@ class Analyzer:
             if time_data is None:
                 time_data = main_data['Time']
                 
-                # Initialize activities array for coactivation analysis
-                if self.original_system.num_muscles == 2:
-                    T = len(time_data)
-                    activities = np.zeros((self.original_system.num_muscles, len(param_values), T))
-            
-            # Store activation data for coactivation analysis
-            if self.original_system.num_muscles == 2:
-                for muscle_idx, muscle_name in enumerate(self.original_system.muscles_names):
-                    col_name = f"Activation_{muscle_name}"
-                    if col_name in main_data.columns:
-                        activities[muscle_idx, i, :] = main_data[col_name].values
         
         # Return comprehensive results dictionary
         results = {
@@ -191,7 +176,6 @@ class Analyzer:
             'time_data': time_data,
             'simulation_data': simulation_data,
             'spikes_data': spikes_data,
-            'activities': activities,
             'muscle_names': self.original_system.muscles_names,
             'associated_joint': self.original_system.associated_joint,
             'num_muscles': self.original_system.num_muscles
