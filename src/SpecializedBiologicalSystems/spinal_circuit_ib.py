@@ -1,4 +1,5 @@
 from brian2 import *
+from BiologicalSystem import BiologicalSystem
 
 class SpinalCircuitWithIb(BiologicalSystem):
     """
@@ -8,9 +9,7 @@ class SpinalCircuitWithIb(BiologicalSystem):
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                 custom_spindle=None, custom_ees_recruitment_profile=None, fast_type_mu=True,
-                 custom_initial_potentials=None, custom_initial_condition_spike_activation=None,
-                 initial_state_opensim=None):
+                 custom_spindle=None, custom_ees_recruitment_profile=None, fast_type_mu=True):
         """
         Initialize a reciprocal inhibition system with Ib fibers with default or custom parameters.
         
@@ -76,7 +75,7 @@ class SpinalCircuitWithIb(BiologicalSystem):
                 
         # Initialize the base class
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, 
-                        associated_joint, fast_type_mu, initial_state_opensim)
+                        associated_joint, fast_type_mu)
         
         # Setup specialized neuron populations for reciprocal inhibition with Ib fibers
         self.neurons_population = {
@@ -169,8 +168,6 @@ class SpinalCircuitWithIb(BiologicalSystem):
             "MN": self.biophysical_params['Eleaky']
         }
         
-        if custom_initial_potentials is not None:
-            self.initial_potentials.update(custom_initial_potentials)
             
         # Initialize parameters for each motoneuron
         self.initial_condition_spike_activation = [
@@ -182,151 +179,213 @@ class SpinalCircuitWithIb(BiologicalSystem):
             } for _ in range(self.neurons_population['MN_flexor' if i == 0 else 'MN_extensor'])] 
             for i in range(2)  # two muscles
         ]
-                    
-        if custom_initial_condition_spike_activation is not None:   
-            self.initial_condition_spike_activation = custom_initial_condition_spike_activation
+
         
         # Validate the configuration
         self.validate_ib_circuit_parameters()
 
     def validate_ib_circuit_parameters(self):
         """
-        Validates the configuration parameters specifically for the SpinalCircuitWithIb class.
-        
-        This method extends the base validation with specific checks for Ib fiber integration
-        and di-synaptic pathways.
+        Validates the configuration parameters for spinal circuit with Ib fibers.
         
         Raises:
-            ValueError: If critical errors are found in the Ib circuit configuration
+            ValueError: If critical errors are found in the configuration
         """
         issues = {"warnings": [], "errors": []}
         
-        # Get neuron types from population
+        # Check muscle count (should be exactly 2 for this circuit)
+        if self.number_muscles != 2:
+            issues["errors"].append("Spinal circuit with Ib fibers should have exactly 2 muscles")
+        
+        # Check required neuron types for spinal circuit with Ib fibers
+        required_neurons = {
+            "Ia_flexor", "II_flexor", "Ib_flexor", 
+            "Ia_extensor", "II_extensor", "Ib_extensor",
+            "exc_flexor", "exc_extensor", 
+            "inh_flexor", "inh_extensor",
+            "inhb_flexor", "inhb_extensor",  # Ib inhibitory interneurons
+            "MN_flexor", "MN_extensor"
+        }
         defined_neurons = set(self.neurons_population.keys())
-        neuron_types = {n.split('_')[0] if '_' in n else n for n in defined_neurons}
         
-        # Specific validation for Ib circuit requirements
-        self._validate_ib_specific_requirements(issues, defined_neurons, neuron_types)
-        self._validate_ib_connections(issues)
-        self._validate_ib_spindle_model(issues, neuron_types)
-        self._validate_ib_ees_recruitment(issues, neuron_types)
+        missing_neurons = required_neurons - defined_neurons
+        if missing_neurons:
+            issues["errors"].append(f"Missing required neuron types for Ib circuit: {missing_neurons}")
         
-        # Call the base validation function
-        try:
-            from your_module import validate_parameters  # Import the original function
-            validate_parameters(
-                self.neurons_population, 
-                self.connections, 
-                self.spindle_model, 
-                self.biophysical_params, 
-                self.muscles_names, 
-                len(self.muscles_names),
-                self.ees_recruitment_profile
-            )
-        except ValueError as e:
-            issues["errors"].append(f"Base validation failed: {str(e)}")
+        # Check for unexpected neuron types
+        unexpected_neurons = defined_neurons - required_neurons
+        if unexpected_neurons:
+            issues["warnings"].append(f"Unexpected neuron types for Ib circuit: {unexpected_neurons}")
+        
+        # Check required connections for spinal circuit with Ib fibers
+        required_connections = {
+            # Direct pathways
+            ("Ia_flexor", "MN_flexor"),
+            ("Ia_extensor", "MN_extensor"),
+            
+            # Ia inhibition pathways
+            ("Ia_flexor", "inh_flexor"),
+            ("Ia_extensor", "inh_extensor"),
+            ("Ia_flexor", "inhb_flexor"),    # Ia to Ib interneurons
+            ("Ia_extensor", "inhb_extensor"), # Ia to Ib interneurons
+            
+            # Type II excitation pathways
+            ("II_flexor", "exc_flexor"),
+            ("II_extensor", "exc_extensor"),
+            
+            # Type II inhibition pathways
+            ("II_flexor", "inh_flexor"),
+            ("II_extensor", "inh_extensor"),
+            
+            # Ib pathways (key addition for this circuit)
+            ("Ib_flexor", "inhb_flexor"),
+            ("Ib_extensor", "inhb_extensor"),
+            
+            # Excitatory interneuron to motoneuron pathways
+            ("exc_flexor", "MN_flexor"),
+            ("exc_extensor", "MN_extensor"),
+            
+            # Ib inhibitory interneuron to motoneuron pathways
+            ("inhb_flexor", "MN_flexor"),
+            ("inhb_extensor", "MN_extensor"),
+            
+            # Reciprocal inhibition pathways
+            ("inh_flexor", "MN_extensor"),
+            ("inh_extensor", "MN_flexor"),
+            
+            # Inhibitory interneuron interactions
+            ("inh_flexor", "inh_extensor"),
+            ("inh_extensor", "inh_flexor")
+        }
+        
+        defined_connections = set(self.connections.keys())
+        
+        missing_connections = required_connections - defined_connections
+        if missing_connections:
+            issues["errors"].append(f"Missing required connections for Ib circuit: {missing_connections}")
+        
+        # Check for the presence of key Ib-specific connections
+        ib_specific_connections = {
+            ("Ib_flexor", "inhb_flexor"), 
+            ("Ib_extensor", "inhb_extensor"),
+            ("inhb_flexor", "MN_flexor"),
+            ("inhb_extensor", "MN_extensor")
+        }
+        if not ib_specific_connections.issubset(defined_connections):
+            missing_ib = ib_specific_connections - defined_connections
+            issues["errors"].append(f"Missing critical Ib fiber connections: {missing_ib}")
+        
+        # Check for reciprocal inhibition connections
+        reciprocal_connections = {("inh_flexor", "MN_extensor"), ("inh_extensor", "MN_flexor")}
+        if not reciprocal_connections.issubset(defined_connections):
+            missing_reciprocal = reciprocal_connections - defined_connections
+            issues["errors"].append(f"Missing critical reciprocal inhibition connections: {missing_reciprocal}")
+        
+        # Check spindle model (should include Ib equation)
+        required_spindle_equations = ["Ia", "II", "Ib"]
+        for eq in required_spindle_equations:
+            if eq not in self.spindle_model:
+                issues["errors"].append(f"Missing {eq} equation in spindle model for Ib circuit")
+        
+        # Validate Ib equation includes force dependency
+        if "Ib" in self.spindle_model:
+            ib_equation = self.spindle_model["Ib"]
+            if "force" not in ib_equation.lower():
+                issues["warnings"].append("Ib equation should typically depend on force (force_normalized)")
+        
+        # Check EES recruitment parameters (should include Ib)
+        for neuron_type in ["Ia", "II", "Ib", "MN"]:
+            if neuron_type not in self.ees_recruitment_profile:
+                issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
+        
+        # Check mandatory biophysical parameters (including inhibitory ones)
+        required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e', 'E_inh', 'tau_i', 'threshold_v']
+        for param in required_params:
+            if param not in self.biophysical_params:
+                issues["errors"].append(f"Missing mandatory biophysical parameter: '{param}'")
+        
+        # Check units
+        expected_units = {
+            'T_refr': second,
+            'Eleaky': volt,
+            'gL': siemens,  
+            'Cm': farad,
+            'E_ex': volt,
+            'tau_e': second,
+            'E_inh': volt,
+            'tau_i': second,
+            'threshold_v': volt
+        }
+        
+        for param, expected_unit in expected_units.items():
+            if param in self.biophysical_params:
+                value = self.biophysical_params[param]
+                if not value.dim == expected_unit.dim:
+                    issues["errors"].append(
+                        f"Parameter '{param}' has incorrect unit. "
+                        f"Expected unit compatible with {expected_unit}, but got {value.unit}"
+                    )
+        
+        # Validate EES parameters
+        for neuron_type, params in self.ees_recruitment_profile.items():
+            if neuron_type in ["Ia", "II", "Ib", "MN"]:
+                required_ees_params = ["threshold_10pct", "saturation_90pct"]
+                for param in required_ees_params:
+                    if param not in params:
+                        issues["errors"].append(f"Missing '{param}' in EES recruitment parameters for '{neuron_type}'")
+                
+                if "threshold_10pct" in params and "saturation_90pct" in params:
+                    threshold = params['threshold_10pct']
+                    saturation = params['saturation_90pct']
+                    
+                    if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
+                        issues["errors"].append(
+                            f"EES parameters for '{neuron_type}' must be between 0 and 1. "
+                            f"Got: threshold={threshold}, saturation={saturation}"
+                        )
+                    if threshold >= saturation:
+                        issues["errors"].append(f"Threshold must be less than saturation for '{neuron_type}'")
+        
+        # Check connection weights and probabilities
+        for connection, params in self.connections.items():
+            if "w" not in params:
+                issues["errors"].append(f"Missing weight 'w' for connection {connection}")
+            if "p" not in params:
+                issues["errors"].append(f"Missing probability 'p' for connection {connection}")
+            
+            if "p" in params:
+                prob = params["p"]
+                if not (0 <= prob <= 1):
+                    issues["errors"].append(f"Connection probability for {connection} must be between 0 and 1, got {prob}")
+            
+            if "w" in params:
+                weight = params["w"]
+                # Check if weight has proper siemens units
+                if hasattr(weight, 'dim') and not weight.dim == siemens.dim:
+                    issues["errors"].append(f"Connection weight for {connection} should have siemens units, got {weight.unit}")
+        
+        # Check initial potentials (should include inhb for Ib interneurons)
+        required_initial_potentials = ["inh", "inhb", "exc", "MN"]
+        for neuron_type in required_initial_potentials:
+            if neuron_type not in self.initial_potentials:
+                issues["errors"].append(f"Missing initial potential for neuron type '{neuron_type}'")
+            else:
+                potential = self.initial_potentials[neuron_type]
+                if hasattr(potential, 'dim') and not potential.dim == volt.dim:
+                    issues["errors"].append(f"Initial potential for '{neuron_type}' should have volt units, got {potential.unit}")
+        
+
+
         
         # Raise error if there are critical issues
         if issues["errors"]:
             error_messages = "\n".join(issues["errors"])
-            raise ValueError(f"SpinalCircuitWithIb configuration errors found:\n{error_messages}")
+            raise ValueError(f"Ib circuit configuration errors:\n{error_messages}")
         
         # Print warnings if any
         if issues["warnings"]:
             warning_messages = "\n".join(issues["warnings"])
-            print(f"WARNING: SpinalCircuitWithIb configuration issues detected:\n{warning_messages}")
+            print(f"WARNING: Ib circuit configuration issues:\n{warning_messages}")
             
         return True
-    
-    def _validate_ib_specific_requirements(self, issues, defined_neurons, neuron_types):
-        """Validate Ib-specific circuit requirements."""
-        
-        # Check for mandatory Ib fiber presence
-        if "Ib" not in neuron_types:
-            issues["errors"].append("SpinalCircuitWithIb requires Ib neurons to be defined")
-        
-        # Check for required Ib interneurons (inhb)
-        if "inhb" not in neuron_types:
-            issues["errors"].append("SpinalCircuitWithIb requires inhb (Ib interneurons) to be defined")
-        
-        # For two muscles, check muscle-specific Ib neurons
-        if len(self.muscles_names) == 2:
-            required_ib_neurons = ["Ib_flexor", "Ib_extensor", "inhb_flexor", "inhb_extensor"]
-            missing_ib = [neuron for neuron in required_ib_neurons if neuron not in defined_neurons]
-            
-            if missing_ib:
-                issues["errors"].append(f"Missing required Ib neurons for two-muscle system: {missing_ib}")
-        
-        # Check for balanced populations between flexor and extensor
-        if "Ib_flexor" in defined_neurons and "Ib_extensor" in defined_neurons:
-            flexor_count = self.neurons_population["Ib_flexor"]
-            extensor_count = self.neurons_population["Ib_extensor"]
-            
-            ratio = max(flexor_count, extensor_count) / min(flexor_count, extensor_count)
-            if ratio > 2.0:  # Allow up to 2:1 ratio
-                issues["warnings"].append(
-                    f"Unbalanced Ib populations: flexor={flexor_count}, extensor={extensor_count}"
-                )
-    
-    def _validate_ib_connections(self, issues):
-        """Validate Ib-specific connections."""
-        
-        connection_pairs = list(self.connections.keys())
-        
-        # Check for essential Ib pathways
-        required_ib_connections = [
-            ("Ib_flexor", "inhb_flexor"),
-            ("Ib_extensor", "inhb_extensor"),
-            ("inhb_flexor", "MN_flexor"),
-            ("inhb_extensor", "MN_extensor")
-        ]
-        
-        for connection in required_ib_connections:
-            if connection not in connection_pairs:
-                issues["errors"].append(f"Missing required Ib connection: {connection}")
-        
-        # Check for proper inhibitory nature of Ib connections to MN
-        ib_to_mn_connections = [conn for conn in connection_pairs 
-                               if conn[0].startswith('inhb') and conn[1].startswith('MN')]
-        
-        for connection in ib_to_mn_connections:
-            # These should be inhibitory connections (typically checked by connection strength)
-            weight = self.connections[connection].get('w', 0)
-            if not hasattr(weight, 'unit'):
-                issues["warnings"].append(f"Ib-MN connection {connection} weight should have units")
-    
-    def _validate_ib_spindle_model(self, issues, neuron_types):
-        """Validate Ib-specific spindle model requirements."""
-        
-        if "Ib" in neuron_types:
-            if "Ib" not in self.spindle_model:
-                issues["errors"].append("Ib neurons defined but no Ib equation found in spindle model")
-            else:
-                # Check if Ib equation includes force dependency
-                ib_equation = self.spindle_model["Ib"]
-                if "force" not in ib_equation.lower():
-                    issues["warnings"].append(
-                        "Ib spindle equation should typically depend on force/tension"
-                    )
-    
-    def _validate_ib_ees_recruitment(self, issues, neuron_types):
-        """Validate Ib-specific EES recruitment parameters."""
-        
-        if self.ees_recruitment_profile and "Ib" in neuron_types:
-            if "Ib" not in self.ees_recruitment_profile:
-                issues["errors"].append("Missing EES recruitment parameters for Ib neurons")
-            else:
-                ib_params = self.ees_recruitment_profile["Ib"]
-                
-                # Ib fibers typically have different recruitment characteristics
-                if "threshold_10pct" in ib_params and "saturation_90pct" in ib_params:
-                    threshold = ib_params["threshold_10pct"]
-                    saturation = ib_params["saturation_90pct"]
-                    
-                    # Ib fibers typically have higher thresholds than Ia
-                    if "Ia" in self.ees_recruitment_profile:
-                        ia_threshold = self.ees_recruitment_profile["Ia"]["threshold_10pct"]
-                        if threshold < ia_threshold:
-                            issues["warnings"].append(
-                                "Ib threshold is typically higher than Ia threshold for EES recruitment"
                             )
