@@ -376,4 +376,4 @@ class SpinalCircuitWithIb(BiologicalSystem):
             print(f"WARNING: Ib circuit configuration issues:\n{warning_messages}")
             
         return True
-                            )
+                            
