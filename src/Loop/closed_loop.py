@@ -17,7 +17,7 @@ from .activation import decode_spikes_to_activation
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
               spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, fast,
-              initial_condition_spike_activation,initial_potentials,initial_state_opensim, activation_function=None,
+              initial_potentials,initial_condition_spike_activation,initial_state_opensim, activation_function=None,
               ees_params=None, torque_array=None, seed=42, base_output_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
