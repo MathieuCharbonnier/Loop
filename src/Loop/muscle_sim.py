@@ -89,10 +89,13 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     reporter = osim.TableReporter()
     reporter.setName("MuscleReporter")
     reporter.set_report_time_interval(dt)
+    # Add this debugging code to see available outputs
+
+
     for muscle_name in muscles:
         muscle = model.getMuscles().get(muscle_name)
         reporter.addToReport(muscle.getOutput("fiber_length"), f'{muscle_name}_fiber_length')
-        reporter.addToReport(muscle.getOutput("normalized_fiber_force"), f'{muscle_name}_normalized_force')
+        reporter.addToReport(muscle.getOutput("fiber_force"), f'{muscle_name}_fiber_force')
     coordinate = model.getCoordinateSet().get(joint_name)
     if coordinate is not None:
         reporter.addToReport(coordinate.getOutput("value"), f'{joint_name}_angle')
@@ -138,7 +141,8 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     normalized_force = np.zeros((len(muscles), results_table.getNumRows()))
     for i, muscle_name in enumerate(muscles):
         fiber_length[i] = results_table.getDependentColumn(f'{muscle_name}_fiber_length').to_numpy()
-        normalized_force[i] = results_table.getDependentColumn(f'{muscle_name}_normalized_force').to_numpy()
+        muscle = model.getMuscles().get(muscle_name)
+        normalized_force[i] = results_table.getDependentColumn(f'{muscle_name}_fiber_force').to_numpy()/muscle.getMaxIsometricForce()
     
     joint_angles = None
     if coordinate is not None:
