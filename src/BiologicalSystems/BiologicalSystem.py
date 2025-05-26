@@ -97,7 +97,9 @@ class BiologicalSystem(ABC):
         tuple
             (spikes, time_series) containing simulation results
         """
-        
+        if not time_step.dim == second.dim:
+            raise ValueError(f"Time step has incorrect unit! ")
+
         torque_array = None
         if torque_profile is not None:
             time_points = np.arange(0, self.reaction_time*n_iterations, time_step)
