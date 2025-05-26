@@ -65,7 +65,7 @@ class Monosynaptic(BiologicalSystem):
 
         self.initial_state_neurons = {
             "MN":{'v': biophysical_params['Eleaky'],
-                  'gIa': 0*nS
+                  'gIa': 0*nS}
         }
 
         self.initial_condition_spike_activation = [
