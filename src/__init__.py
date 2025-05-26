@@ -1,9 +1,9 @@
-from .SpecializedBiologicalSystems.monosynaptic import Monosynaptic
-from .SpecializedBiologicalSystems.disynaptic import Disynaptic
-from .SpecializedBiologicalSystems.reciprocal_inhibition import ReciprocalInhibition
-from .SpecializedBiologicalSystems.spinal_circuit_with_ib import SpinalCircuitWithIb
+from .BiologicalSystems.monosynaptic import Monosynaptic
+from .BiologicalSystems.disynaptic import Disynaptic
+from .BiologicalSystems.reciprocal_inhibition import ReciprocalInhibition
+from .BiologicalSystems.spinal_circuit_with_ib import SpinalCircuitWithIb
 from .Analyzer import Analyzer
-from .Controller import Controller
+from .Controller import EESController
 __all__ = [
     "Monosynaptic",
     "Disynaptic",
