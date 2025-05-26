@@ -52,7 +52,7 @@ class BiologicalSystem(ABC):
         self.spindle_model = {}
         
         # Initial conditions
-        self.initial_potentials = {}
+        self.initial_state_neurons = {}
         self.initial_state_opensim = {}
         self.initial_condition_spike_activation = {}
         self.activation_function = None
@@ -112,7 +112,7 @@ class BiologicalSystem(ABC):
         self.spikes, self.time_series, self.final_state = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,self.fast_type_mu,
-            self.initial_potentials, self.initial_condition_spike_activation, self.initial_state_opensim,
+            self.initial_state_neurons, self.initial_condition_spike_activation, self.initial_state_opensim,
             self.activation_function, torque_array=torque_array, ees_params=ees_params,
             seed=seed, base_output_path=base_output_path)
         
@@ -187,14 +187,7 @@ class BiologicalSystem(ABC):
         # Update number_muscles if muscles_names was changed
         if 'muscles_names' in params:
             new_instance.number_muscles = len(params['muscles_names'])
-        
-        # Reset simulation results and neural network
-        new_instance.spikes = None
-        new_instance.time_series = None
-        new_instance.final_state = None
-        new_instance.neurons_population = {}
-        new_instance.connections = {}
-        new_instance.spindle_model = {}
+
         
         # Validate the new configuration
         new_instance.validate_input()
