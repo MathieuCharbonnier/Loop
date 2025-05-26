@@ -115,7 +115,7 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     
     return {
         "recruitment": counts,
-        "freq": ees_stimulation_params['freq']
+        "frequency": ees_stimulation_params['frequency']
     }
 
 def calculate_full_recruitment(normalized_current, ees_recruitment_profile,num_muscles, balance=0):
@@ -234,17 +234,17 @@ def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, n
         issues = {"warnings": [], "errors": []}
         if ees_stimulation_params is not None:
             # Check if freq has hertz unit
-            if 'freq' in ees_stimulation_params:
-                if not str(ees_stimulation_params['freq']).endswith('Hz'):
+            if 'frequency' in ees_stimulation_params:
+                if not str(ees_stimulation_params['frequency']).endswith('Hz'):
                     issues["errors"].append("The frequency of EES must have hertz as unit")
-                if not (0*hertz <= ees_stimulation_params['freq'] ):
+                if not (0*hertz <= ees_stimulation_params['frequency'] ):
                     issues["errors"].append(f"ees frequency must be positive, , got {val}")
                 # Check if freq is a tuple and if so, ensure we have exactly two muscles
-                if isinstance(ees_stimulation_params['freq'], tuple):
+                if isinstance(ees_stimulation_params['frequency'], tuple):
                     if number_muscle != 2:
                         issues["errors"].append("When EES frequency is a tuple, exactly two muscles must be defined")
             else:
-                issues["errors"].append("EES parameters must contain 'freq' parameter")
+                issues["errors"].append("EES parameters must contain 'frequency' parameter")
             
        
             if 'intensity' in ees_stimulation_params:
@@ -257,10 +257,10 @@ def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, n
                     if not (-1 <= ees_stimulation_params["balance"] <= 1):
                         issues["errors"].append(f"'balance parameter ' in ees stimulation must contains values between -1 and 1, got {val}")
                     if number_muscle==1:
-                        issues["warning"].append(f"'balance parameter ' in ees stimulation is for two muscles simulation only, it will be not be considered")
+                        issues["warnings"].append(f"'balance parameter ' in ees stimulation is for two muscles simulation only, it will be not be considered")
             else:
                 if number_muscle==2:
-                     issues["warning"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero")
+                     issues["warnings"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero")
                 
         
 
