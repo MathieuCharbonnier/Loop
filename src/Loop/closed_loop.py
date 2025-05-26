@@ -474,14 +474,14 @@ class CoLabSimulator(SimulatorBase):
         
         # Run OpenSim simulation
         process = subprocess.run(cmd, capture_output=True, text=True)
-        
+        # Display messages:
+        if process.stdout.strip():
+            print("STDOUT:\n", process.stdout)
         # Check for errors
         if process.returncode != 0:
             error_msg = f'Error in muscle simulation. STDERR: {process.stderr}'
             raise RuntimeError(error_msg)
-        # Display messages:
-        #if process.stdout.strip():
-            #print("STDOUT:\n", process.stdout)
+
 
         # Load simulation results
         fiber_lengths = np.load(self.output_stretch_path)
