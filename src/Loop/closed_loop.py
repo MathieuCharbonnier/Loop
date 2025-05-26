@@ -421,7 +421,7 @@ class CoLabSimulator(SimulatorBase):
               with open(self.state_path, "w") as f:
                   json.dump(initial_state, f, indent=4)
 
-    def recover_final_state():
+    def recover_final_state(self):
         with open(self.state_path, 'r') as f:
                 state = json.load(f)
         return state  
@@ -499,7 +499,7 @@ class LocalSimulator(SimulatorBase):
     def __init__(self, current_state={}):
         self.current_state = current_state 
 
-    def recover_final_state():
+    def recover_final_state(self):
         return self.current_state   
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
