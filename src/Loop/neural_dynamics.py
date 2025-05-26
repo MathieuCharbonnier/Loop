@@ -5,7 +5,7 @@ from typing import Dict, List, Union, Tuple, Optional
 
 def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,  
                                 neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
-                                initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
+                                initial_state_neurons, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                                 ees_params=None):
     """
     Run a simulation of monosynaptic reflex pathway (Ia to MN only).
@@ -58,7 +58,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
 
     net = Network()
     group_map = {}
-    final_potentials = {}
+    final_state_neurons = {}
     monitors = []
     
     # Create TimedArray inputs
@@ -118,11 +118,10 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
     
     MN = NeuronGroup(n_MN, mn_eq, 
                    threshold='v > threshold_v', 
-                   reset='v = Eleaky', 
-                   refractory=T_refr, method='euler')
+                   reset='v = Eleaky', method='euler')
     
-    MN.v = initial_potentials['MN']
-    final_potentials['MN'] = MN.v
+    MN.v = initial_state_neurons['MN']['v']
+    MN.gIa=initial_state_neurons['MN']['gIa']
     
     spike_mon_MN = SpikeMonitor(MN)
     
@@ -195,13 +194,16 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
         'IPSP_MN': mon_MN_state.Isyn[0]/nA,
         'potential_MN': mon_MN_state.v[0]/mV
     }]
-    
-    return [result], final_potentials, state_monitors
+    #Store final state
+    final_state_neurons['MN']['v'] = MN.v
+    final_state_neurons['MN']['gIa'] = MN.gIa
+                                  
+    return [result], final_state_neurons, state_monitors
 
 
 def run_disynaptic_simulation(stretch_input, stretch_velocity_input,  
                              neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
-                             initial_potentials, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
+                             initial_state_neurons, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                              ees_params=None):
     """
     Run a simulation with both Ia and II pathways (disynaptic pathway).
@@ -254,7 +256,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
 
     net = Network()
     group_map = {}
-    final_potentials = {}
+    final_state_neurons = {}
     monitors = []
     
     # Create TimedArray inputs
@@ -269,8 +271,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
     if ees_params is not None:
         freq = ees_params['freq']
         Ia_recruited = ees_params['recruitment']['Ia']
-        if 'II' in ees_params:
-            II_recruited = ees_params['recruitment']['II']
+        II_recruited = ees_params['recruitment']['II']
                             
     
     # Create common equation baseline for afferent neurons
@@ -351,11 +352,10 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
     
     exc_neurons = NeuronGroup(n_exc, exc_eq, 
                             threshold='v > threshold_v', 
-                            reset='v = Eleaky', 
-                            refractory=T_refr, method='euler')
+                            reset='v = Eleaky', method='euler')
     
-    exc_neurons.v = initial_potentials['exc']
-    final_potentials['exc'] = exc_neurons.v
+    exc_neurons.v = initial_state_neurons['exc']['v']
+    exc_neurons.gII = initial_state_neurons['exc']['gII']
     
     exc_spike_mon = SpikeMonitor(exc_neurons)
     
@@ -378,9 +378,10 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
                    reset='v = Eleaky', 
                    refractory=T_refr, method='euler')
     
-    MN.v = initial_potentials['MN']
-    final_potentials['MN'] = MN.v
-    
+    MN.v = initial_state_neurons['MN']['v']
+    MN.gIa = initial_state_neurons['MN']['gIa']
+    MN.gexc = initial_state_neurons['MN']['gexc']
+                               
     spike_mon_MN = SpikeMonitor(MN)
     
     net.add([MN, spike_mon_MN])
@@ -457,13 +458,19 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
         'IPSP_MN': mon_MN_state.Isyn[0]/nA,
         'potential_MN': mon_MN_state.v[0]/mV
     }]
-    
-    return [result], final_potentials, state_monitors
+                               
+    final_state_neurons['MN']['v'] = MN.v
+    final_state_neurons['MN']['gIa'] = MN.gIa
+    final_state_neurons['MN']['gexc']= MN.gexc
+    final_state_neurons['exc']['v'] = exc_neurons.v
+    final_state_neurons['MN']['gII'] = exc_neurons.gII
+                               
+    return [result], final_state_neurons, state_monitors
 
  
     
 def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input, neuron_pop, connections, dt_run, T,
-                                          spindle_model, seed_run, initial_potentials, 
+                                          spindle_model, seed_run, initial_state_neurons, 
                                           Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
                                           ees_params):
     """
@@ -613,9 +620,20 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
                      reset='v = Eleaky', refractory=T_refr, method='euler')
                        
     # Initialize membrane potentials
-    inh.v = initial_potentials['inh']
-    exc.v = initial_potentials['exc']
-    MN.v = initial_potentials['MN']
+    inh.v = initial_state_neurons['inh']['v']
+    exc.v = initial_state_neurons['exc']['v']
+    MN.v = initial_state_neurons['MN']['v']
+                                            
+    #Initialize conductances
+    inh.gIa = initial_state_neurons['inh']['gIa']
+    inh.gII = initial_state_neurons['inh']['gII']
+    inh.gi = initial_state_neurons['inh']['gi']
+    inh.ginh = initial_state_neurons['inh']['ginh']
+    exc.gII = initial_state_neurons['exc']['gII']
+    MN.gIa = initial_state_neurons['MN']['gIa']
+    MN.gexc = initial_state_neurons['MN']['gexc']
+    MN.gi = initial_state_neurons['MN']['gi']
+    MN.ginh = initial_state_neurons['MN']['ginh']
 
     # Add neuron groups to the network
     net.add([inh, exc, MN])
@@ -705,12 +723,24 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     recruited_MN_extensor = sum(1 for spikes in MN_extensor_spikes.values() if len(spikes) > 0)
     print(f"Number of extensor recruited motoneuron: {recruited_MN_extensor}/{n_MN_extensor}")
 
-    # Final membrane potentials
-    final_potentials = {
-        'inh': inh.v[:],
-        'exc': exc.v[:],
-        'MN': MN.v[:]
-    } 
+    final_state_neurons = {
+      'inh':{'v':inh.v,
+             'gIa':inh.gIa,
+             'gII':inh.gII,
+             'gi':inh.gi,
+             'ginh':inh.ginh
+            },
+      'exc':{'v':exc.v,
+             'gII':exc.gII,
+            },
+      'MN':{'v':inh.v,
+             'gIa':MN.gIa,
+             'gII':MN.gexc,
+             'gi':Mn.gi,
+             'ginh':Mn.ginh
+            }
+    }
+      
     # Store state monitors for plotting
     state_monitors = [{
             'IPSP_inh': mon_inh_flexor.Isyn[0]/nA,
@@ -737,120 +767,11 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     result_flexor["MN"] = MN_flexor_spikes
     result_extensor["MN"] = MN_extensor_spikes
 
-    return [result_flexor, result_extensor], final_potentials, state_monitors
+    return [result_flexor, result_extensor], final_state_neurons, state_monitors
 
-        
-def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, T_refr: Quantity) -> np.ndarray:
-    """
-    Merge natural and EES-induced spikes, filtering based on refractory period.
-    Natural spikes are preserved unless they violate the refractory period.
-    
-    Parameters:
-    ----------
-    natural_spikes : array-like
-        Array of natural spike times
-    ees_spikes : array-like
-        Array of EES-induced spike times
-    T_refr : Quantity
-        Refractory period
-        
-    Returns:
-    -------
-    array
-        Filtered spike times
-    """
-    # Handle empty arrays efficiently
-    if len(natural_spikes) == 0 and len(ees_spikes) == 0:
-        return np.array([], dtype=float)*second
-    
-    if len(natural_spikes) == 0:
-        natural_spikes = np.array([], dtype=float)*second
-    if len(ees_spikes) == 0:
-        ees_spikes = np.array([], dtype=float)*second
-    
-    # Create structured array for better memory efficiency
-    dtype = [('time', float), ('is_natural', bool)]
-    spikes = np.empty(len(natural_spikes) + len(ees_spikes), dtype=dtype)
-  
-    # Fill the structured array
-    spikes['time'][:len(natural_spikes)] = natural_spikes
-    spikes['time'][len(natural_spikes):] = ees_spikes
-    spikes['is_natural'][:len(natural_spikes)] = True
-    spikes['is_natural'][len(natural_spikes):] = False
-    # Sort by time
-    spikes.sort(order='time')
-    
-    if len(spikes) == 0:
-        return np.array([], dtype=float)
-    
-    # Pre-allocate result array for better performance (assume worst case size)
-    final_spikes = np.zeros(len(spikes), dtype=float)
-    final_count = 0
-    
-    # Add first spike
-    final_spikes[0] = spikes[0]['time']*second
-    final_count = 1
-    last_spike_time = spikes[0]['time']*second
-    
-    # Process remaining spikes more efficiently
-    for i in range(1, len(spikes)):
-        current_time = spikes[i]['time']*second
-        is_natural = spikes[i]['is_natural']
-
-        if is_natural:
-            if current_time - last_spike_time >= T_refr:
-                final_spikes[final_count] = current_time
-                final_count += 1
-                last_spike_time = current_time
-        else:  # EES spike
-            if current_time - last_spike_time >= T_refr:
-                final_spikes[final_count] = current_time
-                final_count += 1
-                last_spike_time = current_time
-
-    # Return only the filled part of the array
-    return final_spikes[:final_count]*second
-
-  
-def process_motoneuron_spikes(neuron_pop: Dict[str, int], MN_spikes: Dict, 
-                            ees_spikes: Dict, 
-                             T_refr: Quantity) -> Dict:
-    """
-    Process motoneuron spike trains, combining natural and EES-induced spikes.
-    
-    Parameters:
-    ----------
-    neuron_pop : dict
-        Dictionary with neuron population sizes
-    MN_spikes : dict
-        Dictionary with natural motoneuron spike trains
-    ees_spikes : dict
-        Dictionary with EES-induced spikes
-    T_refr : Quantity
-        Refractory period
-        
-    Returns:
-    -------
-    dict
-        Dictionary with processed motoneuron spike times
-    """
-    MN_spike_dict = {}
-    
-    for i, nat_spikes in MN_spikes.items():
-        
-        # Get EES-induced spikes for this neuron if it's in the recruited population
-        ees_i_spikes = np.array([])
-        if i < len(ees_spikes):
-            ees_i_spikes = ees_spikes[i]
-        
-        # Merge and filter spikes
-        MN_spike_dict[i] = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
-    
-    return MN_spike_dict
-
-
+      
 def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_force_input, neuron_pop, connections, dt_run, T,
-                                         spindle_model, seed_run, initial_potentials, 
+                                         spindle_model, seed_run, initial_state_neurons, 
                                          Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
                                          ees_params):
     """
@@ -987,11 +908,11 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
     # Motoneuron (MN) 
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gi_*(E_inh - v) + gexc*(E_ex - v)  + gi__*(E_inh - v) : amp
+    Isyn = gIa*(E_ex - v) + gexc*(E_ex - v)+ gi_*(E_inh - v)  + gi__*(E_inh - v) : amp
     dgIa/dt = -gIa / tau_e : siemens 
-    dgi_/dt = (ginh-gi_)/tau_i : siemens
-    dginh/dt = -ginh / tau_i : siemens
     dgexc/dt = -gexc / tau_e : siemens
+    dgi_/dt = (ginh-gi_)/tau_i : siemens
+    dginh/dt = -ginh / tau_i : siemens 
     dgi__/dt = (ginhb-gi__)/tau_i : siemens
     dginhb/dt = -ginhb / tau_i : siemens
     '''
@@ -1005,7 +926,6 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
     dginh/dt = -ginh/tau_i :siemens                                           
     '''
 
-    
     # inhb interneuron - inhibitory
     inhb_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
@@ -1032,11 +952,25 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
                      reset='v = Eleaky', refractory=T_refr, method='euler')
 
     # Initialize membrane potentials
-    MN.v = initial_potentials['MN']
-    inh.v = initial_potentials['inh']
-    inhb.v = initial_potentials['inhb']
-    exc.v = initial_potentials['exc']
-
+    MN.v = initial_state_neurons['MN']
+    inh.v = initial_state_neurons['inh']
+    inhb.v = initial_state_neurons['inhb']
+    exc.v = initial_state_neurons['exc']
+    #Initialize conductances
+    inh.gIa = initial_state_neurons['inh']['gIa']
+    inh.gII = initial_state_neurons['inh']['gII']
+    inh.gi = initial_state_neurons['inh']['gi']
+    inh.ginh = initial_state_neurons['inh']['ginh']
+    inhb.gIa = initial_state_neurons['inhb']['gIa']
+    inhb.gIb = initial_state_neurons['inhb']['gIb']
+    exc.gII = initial_state_neurons['exc']['gII']
+    MN.gIa = initial_state_neurons['MN']['gIa']
+    MN.gexc = initial_state_neurons['MN']['gexc']
+    MN.gi_ = initial_state_neurons['MN']['gi_']
+    MN.ginh = initial_state_neurons['MN']['ginh']
+    MN.gi__ = initial_state_neurons['MN']['gi__']
+    MN.ginhb = initial_state_neurons['MN']['ginhb']
+                                           
     # Add neuron groups to the network
     net.add([MN, inh, inhb, exc])
 
@@ -1139,12 +1073,29 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
     recruited_MN_extensor = sum(1 for spikes in MN_extensor_spikes.values() if len(spikes) > 0)
     print(f"Number of extensor recruited motoneurons: {recruited_MN_extensor}/{n_MN_extensor}")
 
-    # Final membrane potentials
-    final_potentials = {
-        'MN': MN.v[:],
-        'inh': inh.v[:],
-        'inhb': inhb.v[:],
-        'exc': exc.v[:]
+    # Store the final state to continue the simulation
+    final_state_neurons = {
+      'inh':{'v':inh.v,
+             'gIa':inh.gIa,
+             'gII':inh.gII,
+             'gi':inh.gi,
+             'ginh':inh.ginh
+            },
+      'inhb':{'v':inhb.v,
+             'gIa':inhb.gIa,
+             'gIb':inh.gIb
+            },
+      'exc':{'v': exc.v,
+             'gII':exc.gII,
+            },
+      'MN':{'v':inh.v,
+             'gIa':MN.gIa,
+             'gII':MN.gexc,
+             'gi_':Mn.gi_,
+             'ginh':Mn.ginh
+             'gi__':Mn.gi__,
+             'ginhb':Mn.ginhb
+            }
     }
     
     # Store state monitors for plotting
@@ -1176,4 +1127,114 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
         "exc": {i%n_exc_flexor: mon_EX.spike_trains()[i] for i in range(n_exc_flexor, n_exc_flexor + n_exc_extensor)}
     }
 
-    return [result_flexor, result_extensor], final_potentials, state_monitors
+    return [result_flexor, result_extensor], final_state_neurons, state_monitors
+                                           
+                                           
+def merge_and_filter_spikes(natural_spikes: np.ndarray, ees_spikes: np.ndarray, T_refr: Quantity) -> np.ndarray:
+    """
+    Merge natural and EES-induced spikes, filtering based on refractory period.
+    Natural spikes are preserved unless they violate the refractory period.
+    
+    Parameters:
+    ----------
+    natural_spikes : array-like
+        Array of natural spike times
+    ees_spikes : array-like
+        Array of EES-induced spike times
+    T_refr : Quantity
+        Refractory period
+        
+    Returns:
+    -------
+    array
+        Filtered spike times
+    """
+    # Handle empty arrays efficiently
+    if len(natural_spikes) == 0 and len(ees_spikes) == 0:
+        return np.array([], dtype=float)*second
+    
+    if len(natural_spikes) == 0:
+        natural_spikes = np.array([], dtype=float)*second
+    if len(ees_spikes) == 0:
+        ees_spikes = np.array([], dtype=float)*second
+    
+    # Create structured array for better memory efficiency
+    dtype = [('time', float), ('is_natural', bool)]
+    spikes = np.empty(len(natural_spikes) + len(ees_spikes), dtype=dtype)
+  
+    # Fill the structured array
+    spikes['time'][:len(natural_spikes)] = natural_spikes
+    spikes['time'][len(natural_spikes):] = ees_spikes
+    spikes['is_natural'][:len(natural_spikes)] = True
+    spikes['is_natural'][len(natural_spikes):] = False
+    # Sort by time
+    spikes.sort(order='time')
+    
+    if len(spikes) == 0:
+        return np.array([], dtype=float)
+    
+    # Pre-allocate result array for better performance (assume worst case size)
+    final_spikes = np.zeros(len(spikes), dtype=float)
+    final_count = 0
+    
+    # Add first spike
+    final_spikes[0] = spikes[0]['time']*second
+    final_count = 1
+    last_spike_time = spikes[0]['time']*second
+    
+    # Process remaining spikes more efficiently
+    for i in range(1, len(spikes)):
+        current_time = spikes[i]['time']*second
+        is_natural = spikes[i]['is_natural']
+
+        if is_natural:
+            if current_time - last_spike_time >= T_refr:
+                final_spikes[final_count] = current_time
+                final_count += 1
+                last_spike_time = current_time
+        else:  # EES spike
+            if current_time - last_spike_time >= T_refr:
+                final_spikes[final_count] = current_time
+                final_count += 1
+                last_spike_time = current_time
+
+    # Return only the filled part of the array
+    return final_spikes[:final_count]*second
+
+  
+def process_motoneuron_spikes(neuron_pop: Dict[str, int], MN_spikes: Dict, 
+                            ees_spikes: Dict, 
+                             T_refr: Quantity) -> Dict:
+    """
+    Process motoneuron spike trains, combining natural and EES-induced spikes.
+    
+    Parameters:
+    ----------
+    neuron_pop : dict
+        Dictionary with neuron population sizes
+    MN_spikes : dict
+        Dictionary with natural motoneuron spike trains
+    ees_spikes : dict
+        Dictionary with EES-induced spikes
+    T_refr : Quantity
+        Refractory period
+        
+    Returns:
+    -------
+    dict
+        Dictionary with processed motoneuron spike times
+    """
+    MN_spike_dict = {}
+    
+    for i, nat_spikes in MN_spikes.items():
+        
+        # Get EES-induced spikes for this neuron if it's in the recruited population
+        ees_i_spikes = np.array([])
+        if i < len(ees_spikes):
+            ees_i_spikes = ees_spikes[i]
+        
+        # Merge and filter spikes
+        MN_spike_dict[i] = merge_and_filter_spikes(nat_spikes, ees_i_spikes, T_refr)
+    
+    return MN_spike_dict
+
