@@ -104,7 +104,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     print("Start Simulation:")
     if ees_params is not None:
-        freq = ees_params['freq']
+        freq = ees_params['frequency']
         if isinstance(freq, tuple):
            print("Phase specific EES modulation")
            print(f"frequency swing phase: {freq[0]}")
@@ -192,10 +192,10 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 if ees_params is not None:
                     ees_params_copy = ees_params.copy()
             
-                    freq = ees_params.get("freq")
+                    freq = ees_params.get("frequency")
                     if isinstance(freq, tuple) and len(freq) == 2:
                         dominant = 0 if np.mean(activation_history[0]) >= np.mean(activation_history[1]) else 1
-                        ees_params_copy["freq"] = freq[dominant]
+                        ees_params_copy["frequency"] = freq[dominant]
                       
                 if "Ib" in neurons_population:
                     all_spikes, final_state_neurons, state_monitors = run_spinal_circuit_with_Ib(
@@ -475,8 +475,8 @@ class CoLabSimulator(SimulatorBase):
         # Run OpenSim simulation
         process = subprocess.run(cmd, capture_output=True, text=True)
         # Display messages:
-        if process.stdout.strip():
-            print("STDOUT:\n", process.stdout)
+        #if process.stdout.strip():
+            #print("STDOUT:\n", process.stdout)
         # Check for errors
         if process.returncode != 0:
             error_msg = f'Error in muscle simulation. STDERR: {process.stderr}'
