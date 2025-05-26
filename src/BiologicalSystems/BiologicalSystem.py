@@ -62,8 +62,6 @@ class BiologicalSystem(ABC):
         self.time_series = None
         self.final_state = None
         
-        # Call validation after initialization
-        self.validate_input()
 
     @abstractmethod
     def validate_input(self):
@@ -71,13 +69,6 @@ class BiologicalSystem(ABC):
         Validate input parameters and ensure the system is properly configured.
         Must be implemented by subclasses to check their specific requirements.
         """
-        # Base validation that all subclasses should perform
-        if not self.muscles_names:
-            raise ValueError("muscles_names cannot be empty")
-        if self.number_muscles <= 0:
-            raise ValueError("Number of muscles must be positive")
-        if self.reaction_time <= 0:
-            raise ValueError("Reaction time must be positive")
 
 
     def run_simulation(self, n_iterations, time_step=0.1*ms, 
@@ -120,10 +111,10 @@ class BiologicalSystem(ABC):
         
         self.spikes, self.time_series, self.final_state = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
-            self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,
+            self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,self.fast_type_mu,
             self.initial_potentials, self.initial_condition_spike_activation, self.initial_state_opensim,
             self.activation_function, torque_array=torque_array, ees_params=ees_params,
-            fast=self.fast_type_mu, seed=seed, base_output_path=base_output_path)
+            seed=seed, base_output_path=base_output_path)
         
         return self.spikes, self.time_series
 
