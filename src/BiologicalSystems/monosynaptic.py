@@ -63,8 +63,9 @@ class Monosynaptic(BiologicalSystem):
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
 
-        self.initial_potentials = {
-            "MN": biophysical_params['Eleaky']
+        self.initial_state_neurons = {
+            "MN":{'v': biophysical_params['Eleaky'],
+                  'gIa': 0*nS
         }
 
         self.initial_condition_spike_activation = [
