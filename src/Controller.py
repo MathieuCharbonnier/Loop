@@ -1,3 +1,4 @@
+from brian2 import *
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import product
@@ -45,8 +46,8 @@ class EESController:
         # Default EES parameters
         if initial_ees_params is None:
             self.current_ees_params = {
-                'frequency': 50,  # Hz
-                'intensity': 1.0,  # Fixed intensity
+                'frequency': 50*hertz,  # Hz
+                'intensity': 0.6,  # Fixed intensity
                 'balance': 0.0    # Neutral balance
             }
         else:
@@ -106,7 +107,7 @@ class EESController:
         best_params = deepcopy(self.current_ees_params)
         
         # Create time array for the prediction horizon
-        time_step = 0.1e-3  # Assuming 0.1ms time step (adjust as needed)
+        time_step = 0.1*ms 
         prediction_time = np.arange(
             current_time, 
             current_time + self.biological_system.reaction_time * self.update_iterations,
@@ -163,7 +164,7 @@ class EESController:
         
         return best_params, best_cost
     
-    def run_control(self, total_iterations, time_step=0.1e-3, base_output_path=None):
+    def run_control(self, total_iterations, time_step=0.1*ms, base_output_path=None):
         """
         Run the complete control simulation.
         
@@ -182,12 +183,12 @@ class EESController:
             (trajectory_history, desired_trajectory_history, ees_params_history, time_history)
         """
         current_iteration = 0
-        current_time = 0.0
+        current_time = 0.0*ms
         
         print(f"Starting EES control simulation...")
         print(f"Total iterations: {total_iterations}")
         print(f"Update every: {self.update_iterations} iterations")
-        print(f"Time step: {time_step*1000:.1f}ms")
+        print(f"Time step: {time_step:.1f}")
         
         while current_iteration < total_iterations:
             # Determine how many iterations to run this cycle
@@ -204,6 +205,7 @@ class EESController:
             else:
                 self.cost_history.append(0.0)  # No optimization cost for first iteration
             
+            print('time_step ', time_step)
             # Run simulation with current EES parameters
             spikes, time_series = self.biological_system.run_simulation(
                 n_iterations=iterations_this_cycle,
