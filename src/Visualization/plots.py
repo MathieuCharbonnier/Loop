@@ -181,7 +181,7 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
     torque_column = f'Torque'
     has_torque = torque_column in df.columns
 
-    n_subplots = 6 if has_torque else 5
+    n_subplots = 7 if has_torque else 6
     fig, axs = plt.subplots(n_subplots, 1, figsize=(12,3*n_subplots ), sharex=True)
 
     time = df['Time'].values
@@ -202,13 +202,13 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
         axs[current_axis].legend()
         current_axis += 1
 
-    # Plot joint Velocity
-    joint_column = f"Joint_Velocity_{joint_name}"
-    axs[current_axis].plot(time, df[joint_column], label=joint_name+ " velocity")
-    axs[current_axis].set_ylabel("Joint Velocity (°/s)")
-    axs[current_axis].set_xlabel('Time (s)')
-    axs[current_axis].legend()
-    current_axis += 1
+        # Plot joint Velocity
+        joint_column = f"Joint_Velocity_{joint_name}"
+        axs[current_axis].plot(time, df[joint_column], label=joint_name+ " velocity")
+        axs[current_axis].set_ylabel("Joint Velocity (°/s)")
+        axs[current_axis].set_xlabel('Time (s)')
+        axs[current_axis].legend()
+        current_axis += 1
 
 
     # Plot fiber properties: Fiber_length, Stretch, Velocity
@@ -232,6 +232,14 @@ def plot_mouvement(df, muscle_names, joint_name, base_output_path):
         joint_column = f"Joint_{joint_name}"
         axs[current_axis].plot(time, df[joint_column], label=joint_name)
         axs[current_axis].set_ylabel("Joint Angle (°)")
+        axs[current_axis].set_xlabel('Time (s)')
+        axs[current_axis].legend()
+        current_axis += 1
+
+        # Plot joint Velocity
+        joint_column = f"Joint_Velocity_{joint_name}"
+        axs[current_axis].plot(time, df[joint_column], label=joint_name+ " velocity")
+        axs[current_axis].set_ylabel("Joint Velocity (°/s)")
         axs[current_axis].set_xlabel('Time (s)')
         axs[current_axis].legend()
         current_axis += 1
