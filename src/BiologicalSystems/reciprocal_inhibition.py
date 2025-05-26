@@ -142,10 +142,20 @@ class ReciprocalInhibition(BiologicalSystem):
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
 
-        self.initial_potentials = {
-            "inh": self.biophysical_params['Eleaky'],
-            "exc": self.biophysical_params['Eleaky'],
-            "MN": self.biophysical_params['Eleaky']
+        self.initial_state_neurons = {
+            "inh":{'v': self.biophysical_params['Eleaky'],
+                   'gIa':0*nS,
+                   'gII':0*nS,
+                   'gi':0*nS,
+                   'ginh':0*nS
+                  },
+            "exc": {'v':self.biophysical_params['Eleaky'],
+                    'gII':0*nS},
+            "MN": {'v':self.biophysical_params['Eleaky'],
+                   'gexc':0*nS,
+                   'gIa':0*nS,
+                   'ginh':0*ns,
+                   'gi':0*nS}
         }
         
             
