@@ -5,9 +5,9 @@ import os
 from abc import ABC, abstractmethod
 from copy import deepcopy
 
-from .Loop.closed_loop import closed_loop
-from .Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
-from .Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
+from ..Loop.closed_loop import closed_loop
+from ..Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
+from ..Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
 
 
 class BiologicalSystem(ABC):
