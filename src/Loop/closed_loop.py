@@ -17,7 +17,7 @@ from .activation import decode_spikes_to_activation
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
               spindle_model, biophysical_params, muscles_names, num_muscles, associated_joint, fast,
-              initial_potentials,initial_condition_spike_activation,initial_state_opensim, activation_function=None,
+              initial_state_neurons,initial_condition_spike_activation,initial_state_opensim, activation_function=None,
               ees_params=None, torque_array=None, seed=42, base_output_path=None):
     """
     Neuromuscular Simulation Pipeline with Initial Dorsiflexion
@@ -173,16 +173,16 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 )
             
                 if has_II_pathway:
-                    all_spikes, final_potentials, state_monitors = run_disynaptic_simulation(
+                    all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation(
                         stretch, stretch_velocity, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
-                        initial_potentials, **biophysical_params, ees_params=ees_params
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params
                     )
                 else:
-                    all_spikes, final_potentials, state_monitors = run_monosynaptic_simulation(
+                    all_spikes, final_state_neurons, state_monitors = run_monosynaptic_simulation(
                         stretch, stretch_velocity, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
-                        initial_potentials, **biophysical_params, ees_params=ees_params
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params
                     )
             
             else:  # num_muscles == 2
@@ -198,18 +198,18 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                         ees_params_copy["freq"] = freq[dominant]
                       
                 if "Ib" in neurons_population:
-                    all_spikes, final_potentials, state_monitors = run_spinal_circuit_with_Ib(
+                    all_spikes, final_state_neurons, state_monitors = run_spinal_circuit_with_Ib(
                         stretch, stretch_velocity, normalized_force,  neurons_population, connections, time_step, reaction_time, 
-                        spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
+                        spindle_model, seed, initial_state_neurons, **biophysical_params, ees_params=ees_params_copy
                     )
                 else:
-                    all_spikes, final_potentials, state_monitors = run_flexor_extensor_neuron_simulation(
+                    all_spikes, final_state_neurons, state_monitors = run_flexor_extensor_neuron_simulation(
                         stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
-                        spindle_model, seed, initial_potentials, **biophysical_params, ees_params=ees_params_copy
+                        spindle_model, seed, initial_state_neurons, **biophysical_params, ees_params=ees_params_copy
                     )
                 
             # Update initial potentials for next iteration
-            initial_potentials.update(final_potentials)
+            initial_state_neurons.update(final_state_neurons)
 
             # Store spike times for visualization
             for muscle_idx, muscle_name in enumerate(muscles_names):
@@ -280,9 +280,9 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     final_state={
       "opensim": simulator.recover_final_state(),
-      "potentials":initial_potentials,
+      "neurons":final_state_neurons,
       "spike_activation": initial_condition_spike_activation,
-      "last_activation":interp1d(time_, activation_history, axis=0, kind='linear', bounds_error=False, fill_value='extrapolate')
+      "last_activation":interp1d(time_, activation_history, axis=1, kind='linear', bounds_error=False, fill_value='extrapolate')
     }
     # =============================================================================
     # Combine Results and Compute Firing rates
