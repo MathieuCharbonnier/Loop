@@ -58,7 +58,6 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
 
     net = Network()
     group_map = {}
-    final_state_neurons = {}
     monitors = []
     
     # Create TimedArray inputs
@@ -69,7 +68,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
     Ia_recruited = 0
     freq = 0
     if ees_params is not None:
-        freq = ees_params['freq']
+        freq = ees_params['frequency']
         Ia_recruited = ees_params['recruitment']['Ia']
     
     
@@ -195,8 +194,10 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
         'potential_MN': mon_MN_state.v[0]/mV
     }]
     #Store final state
-    final_state_neurons['MN']['v'] = MN.v
-    final_state_neurons['MN']['gIa'] = MN.gIa
+    final_state_neurons={
+      'MN':{'v' : MN.v,
+      'gIa':MN.gIa}
+    }
                                   
     return [result], final_state_neurons, state_monitors
 
@@ -256,7 +257,6 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
 
     net = Network()
     group_map = {}
-    final_state_neurons = {}
     monitors = []
     
     # Create TimedArray inputs
@@ -269,7 +269,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
     II_recruited = 0
     freq = 0
     if ees_params is not None:
-        freq = ees_params['freq']
+        freq = ees_params['frequency']
         Ia_recruited = ees_params['recruitment']['Ia']
         II_recruited = ees_params['recruitment']['II']
                             
@@ -459,11 +459,17 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
         'potential_MN': mon_MN_state.v[0]/mV
     }]
                                
-    final_state_neurons['MN']['v'] = MN.v
-    final_state_neurons['MN']['gIa'] = MN.gIa
-    final_state_neurons['MN']['gexc']= MN.gexc
-    final_state_neurons['exc']['v'] = exc_neurons.v
-    final_state_neurons['MN']['gII'] = exc_neurons.gII
+    final_state_neurons={
+      'MN': {'v' :MN.v,
+      'gIa' : MN.gIa,
+      'gexc' :MN.gexc
+      },
+      'exc':{
+      'v':exc_neurons.v,
+      'gII':exc_neurons.gII
+      }
+    }
+
                                
     return [result], final_state_neurons, state_monitors
 
@@ -547,7 +553,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
 
     #Extract EES_Params:
     if ees_params is not None:
-        ees_freq=ees_params['freq']
+        ees_freq=ees_params['frequency']
         Ia_flexor_recruited=ees_params['recruitement']['Ia_flexor']
         II_flexor_recruited=ees_params['recruitment']['II_flexor']
         MN_flexor_recruited=ees_params['recruitment']['MN_flexor']
@@ -769,7 +775,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
 
     return [result_flexor, result_extensor], final_state_neurons, state_monitors
 
-      
+
+
 def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_force_input, neuron_pop, connections, dt_run, T,
                                          spindle_model, seed_run, initial_state_neurons, 
                                          Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
@@ -857,7 +864,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
 
     # Extract EES parameters
     if ees_params is not None:
-        ees_freq = ees_params['freq']
+        ees_freq = ees_params['frequency']
         Ia_flexor_recruited = ees_params['recruitment']['Ia_flexor']
         Ib_flexor_recruited = ees_params['recruitment']['Ib_flexor']
         II_flexor_recruited = ees_params['recruitment']['II_flexor']
@@ -1092,7 +1099,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
              'gIa':MN.gIa,
              'gII':MN.gexc,
              'gi_':Mn.gi_,
-             'ginh':Mn.ginh
+             'ginh':Mn.ginh,
              'gi__':Mn.gi__,
              'ginhb':Mn.ginhb
             }
