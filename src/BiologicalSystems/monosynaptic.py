@@ -9,20 +9,16 @@ class Monosynaptic(BiologicalSystem):
     Monosynaptic reflexes involve a direct connection from afferent (Ia) neurons
     to motor neurons (MN) without intermediate interneurons.
     """
-    
     def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
-                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True):
-        """
-        Initialize a monosynaptic reflex system with default or custom parameters.
-        """
-        # Set default parameters if not provided
+             associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
+             custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True):
+    
         if muscles_names is None:
             muscles_names = ["soleus_r"]
-            
+
         if biophysical_params is None:
             biophysical_params = {
-                'T_refr': 5 * ms,  # Refractory period
+                'T_refr': 5 * ms,
                 'Eleaky': -70*mV,
                 'gL': 10*nS,
                 'Cm': 0.3*nF,  
@@ -30,68 +26,59 @@ class Monosynaptic(BiologicalSystem):
                 'tau_e': 0.5*ms,
                 'threshold_v': -50*mV
             }
-            
+
         if ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                    'threshold_10pct': 0.3,
+                    'saturation_90pct': 0.7
                 },
                 'MN': {
-                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
-                    'saturation_90pct': 0.9  
+                    'threshold_10pct': 0.7,
+                    'saturation_90pct': 0.9
                 }
             }
-            
-        # Initialize the base class
+
+        # Initialize base class first
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names, associated_joint, fast_type_mu, initial_state_opensim)
-        
-        # Set default neuron populations
+                        muscles_names, associated_joint, fast_type_mu)
+
+        # Now safely set subclass-specific fields
         self.neurons_population = {
-            "Ia": 410,       # Type Ia afferent neurons
-            "MN": 500       # Motor neurons
+            "Ia": 410,
+            "MN": 500
         }
-        
-        # Override with custom values if provided
         if custom_neurons is not None:
             self.neurons_population.update(custom_neurons)
-            
-        # Set default connections
+
         self.connections = {
             ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7}
         }
-        
-        # Override with custom connections if provided
         if custom_connections is not None:
             self.connections.update(custom_connections)
-            
-        # Set default spindle model
+
         self.spindle_model = {
             "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
         }
-        
-        # Override with custom spindle model if provided
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
 
         self.initial_potentials = {
-            "MN": self.biophysical_params['Eleaky']
+            "MN": biophysical_params['Eleaky']
         }
-            
-        # Initialize parameters for each motoneuron
+
         self.initial_condition_spike_activation = [
             [{
-                'u0': [0.0, 0.0],    # Initial fiber AP state
-                'c0': [0.0, 0.0],    # Initial calcium concentration state
-                'P0': 0.0,           # Initial calcium-troponin binding state
-                'a0': 0.0            # Initial activation state
+                'u0': [0.0, 0.0],
+                'c0': [0.0, 0.0],
+                'P0': 0.0,
+                'a0': 0.0
             } for _ in range(self.neurons_population['MN'])]
         ]
 
-        
-        # Validate parameters
+        # Validate final configuration
         self.validate_input()
+
 
     def validate_input(self):
         """
@@ -105,11 +92,11 @@ class Monosynaptic(BiologicalSystem):
         # Check muscle count (should be 1 for monosynaptic)
         if self.number_muscles != 1:
             issues["errors"].append("Monosynaptic reflex should have exactly 1 muscle")
-        
+  
         # Check required neuron types
         required_neurons = {"Ia", "MN"}
         defined_neurons = set(self.neurons_population.keys())
-        
+
         missing_neurons = required_neurons - defined_neurons
         if missing_neurons:
             issues["errors"].append(f"Missing required neuron types for monosynaptic reflex: {missing_neurons}")
