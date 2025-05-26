@@ -71,7 +71,7 @@ class ReciprocalInhibition(BiologicalSystem):
             
         # Initialize the base class
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, 
-                        associated_joint, fast_type_mu, initial_state_opensim)
+                        associated_joint, fast_type_mu)
         
         # Setup specialized neuron populations for reciprocal inhibition
         self.neurons_population = {
