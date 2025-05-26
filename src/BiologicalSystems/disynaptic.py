@@ -85,9 +85,12 @@ class Disynaptic(BiologicalSystem):
         if custom_spindle is not None:
             self.spindle_model.update(custom_spindle)
 
-        self.initial_potentials = {
-            "exc": self.biophysical_params['Eleaky'],
-            "MN": self.biophysical_params['Eleaky']
+        self.initial_state_neurons = {
+            "exc":{'v': self.biophysical_params['Eleaky'],
+                   'gII': 0*nS},
+            "MN":{ 'v' :self.biophysical_params['Eleaky'],
+                  'gIa':0*nS,
+                  'gexc':0*nS}
         }
             
         # Initialize parameters for each motoneuron
