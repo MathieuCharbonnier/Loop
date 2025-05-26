@@ -375,8 +375,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
     
     MN = NeuronGroup(n_MN, mn_eq, 
                    threshold='v > threshold_v', 
-                   reset='v = Eleaky', 
-                   refractory=T_refr, method='euler')
+                   reset='v = Eleaky', method='euler')
     
     MN.v = initial_state_neurons['MN']['v']
     MN.gIa = initial_state_neurons['MN']['gIa']
@@ -617,13 +616,13 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
   
     # Create neuron groups
     inh = NeuronGroup(n_inh_flexor+ n_inh_extensor, inh_eq, threshold='v > threshold_v', 
-                      reset='v = Eleaky', refractory=T_refr, method='euler')
+                      reset='v = Eleaky', method='euler')
   
     exc = NeuronGroup(n_exc_flexor+n_exc_extensor, ex_eq, threshold='v > threshold_v', 
-                      reset='v = Eleaky', refractory=T_refr, method='euler')
+                      reset='v = Eleaky', method='euler')
                                          
     MN = NeuronGroup(n_MN_flexor+n_MN_extensor, mn_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', refractory=T_refr, method='euler')
+                     reset='v = Eleaky', method='euler')
                        
     # Initialize membrane potentials
     inh.v = initial_state_neurons['inh']['v']
@@ -950,13 +949,13 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
 
     # Create neuron groups
     MN = NeuronGroup(n_MN_flexor + n_MN_extensor, mn_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', refractory=T_refr, method='euler')
-    inh = NeuronGroup(n_IA_flexor + n_IA_extensor, inh_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', refractory=T_refr, method='euler')
-    inhb = NeuronGroup(n_IN_flexor + n_IN_extensor, inhb_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', refractory=T_refr, method='euler')
-    exc = NeuronGroup(n_EX_flexor + n_EX_extensor, ex_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', refractory=T_refr, method='euler')
+                     reset='v = Eleaky', method='euler')
+    inh = NeuronGroup(n_Ia_flexor + n_Ia_extensor, inh_eq, threshold='v > threshold_v', 
+                     reset='v = Eleaky',  method='euler')
+    inhb = NeuronGroup(n_inhb_flexor + n_inh_extensor, inhb_eq, threshold='v > threshold_v', 
+                     reset='v = Eleaky', method='euler')
+    exc = NeuronGroup(n_exc_flexor + n_exc_extensor, ex_eq, threshold='v > threshold_v', 
+                     reset='v = Eleaky', method='euler')
 
     # Initialize membrane potentials
     MN.v = initial_state_neurons['MN']
