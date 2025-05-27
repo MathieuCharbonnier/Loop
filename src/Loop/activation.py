@@ -68,8 +68,9 @@ def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, 
         params=params_all['fast']
     else:
         params=params_all['slow']
-        
-    time = np.arange(0, T, dt)
+    nb_points=int(T/dt)
+    time=np.linspace(0, T, nb_points)   
+    #time = np.arange(0, T, dt)
     num_motoneurons = len(spikes_times)
     num_timesteps = len(time)
     
