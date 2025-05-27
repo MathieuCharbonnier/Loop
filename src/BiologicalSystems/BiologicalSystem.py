@@ -116,7 +116,7 @@ class BiologicalSystem(ABC):
         self.spikes, self.time_series, self.final_state = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,self.fast_type_mu,
-            self.copy_brian_dict(self.initial_state_neurons), deepcopy(self.initial_condition_spike_activation), deepcopy(self.initial_state_opensim),
+            BiologicalSystem.copy_brian_dict(self.initial_state_neurons), deepcopy(self.initial_condition_spike_activation), deepcopy(self.initial_state_opensim),
             self.activation_function, torque_array=torque_array, ees_params=ees_params,
             seed=seed, base_output_path=base_output_path)
         
@@ -188,10 +188,10 @@ class BiologicalSystem(ABC):
 
 
     @staticmethod 
-    def copy_brian_dict(self,d):
+    def copy_brian_dict(d):
         if isinstance(d, dict):
             # If d is a dictionary, apply the function to each value
-            return {k: self.copy_brian_dict(v) for k, v in d.items()}
+            return {k: BiologicalSystem.copy_brian_dict(v) for k, v in d.items()}
         elif hasattr(d, 'copy'):
             # If the object has a `.copy()` method (e.g., Brian2 Quantity), use it
             return d.copy()
