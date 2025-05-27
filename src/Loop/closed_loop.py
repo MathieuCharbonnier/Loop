@@ -207,8 +207,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                         stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
                         spindle_model, seed, initial_state_neurons, **biophysical_params, ees_params=ees_params_copy
                     )
-            print('final state neurons exc ', final_state_neurons['exc']['v'].shape) 
-            print('final state neurons MN ', final_state_neurons['MN']['v'].shape) 
+
             # Update initial potentials for next iteration
             initial_state_neurons.update(final_state_neurons)
 
