@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from itertools import product
 from copy import deepcopy
 import os
+from .BiologicalSystems.BiologicalSystem import copy_brian_dict
 
 class EESController:
     """
@@ -14,8 +15,8 @@ class EESController:
     """
     
     def __init__(self, biological_system, desired_trajectory_func, update_iterations, 
-                 initial_ees_params=None, frequency_range=(20, 100)*hertz, balance_range=(-1.0, 1.0),
-                 frequency_step=20*hertz, balance_step=0.5, time_step=0.1*ms):
+                 initial_ees_params=None, frequency_range=(0, 80)*hertz, balance_range=(-1.0, 1.0),
+                 frequency_step=40*hertz, balance_step=0.6, time_step=0.1*ms):
         """
         Initialize the EES controller.
         
@@ -84,17 +85,7 @@ class EESController:
         
         # Storage for optimization trajectories
         self.optimization_trajectories = []  # List of dicts with 'time', 'trajectory', 'params', 'cost'
-
-    def copy_brian_dict(self,d):
-        if isinstance(d, dict):
-            # If d is a dictionary, apply the function to each value
-            return {k: self.copy_brian_dict(v) for k, v in d.items()}
-        elif hasattr(d, 'copy'):
-            # If the object has a `.copy()` method (e.g., Brian2 Quantity), use it
-            return d.copy()
-        else:
-            # Otherwise, return the value as-is (int, float, string, etc.)
-            return d 
+ 
 
     def _compute_trajectory_cost(self, actual_trajectory, desired_trajectory):
         """
