@@ -15,7 +15,7 @@ class EESController:
     
     def __init__(self, biological_system, desired_trajectory_func, update_iterations, 
                  initial_ees_params=None, frequency_range=(20, 100)*hertz, balance_range=(-1.0, 1.0),
-                 frequency_step=20*hertz, balance_step=0.5):
+                 frequency_step=20*hertz, balance_step=0.5, time_step=0.1*ms):
         """
         Initialize the EES controller.
         
@@ -41,7 +41,7 @@ class EESController:
         self.biological_system = biological_system.clone_with()
         self.desired_trajectory_func = desired_trajectory_func
         self.update_iterations = update_iterations
-        
+        self.time_step=time_step
         # Check if system has multiple muscles
         self.has_multiple_muscles = self.biological_system.number_muscles > 1
         
@@ -82,6 +82,20 @@ class EESController:
         self.time_history = []
         self.cost_history = []
         
+        # Storage for optimization trajectories
+        self.optimization_trajectories = []  # List of dicts with 'time', 'trajectory', 'params', 'cost'
+
+    def copy_brian_dict(self,d):
+        if isinstance(d, dict):
+            # If d is a dictionary, apply the function to each value
+            return {k: self.copy_brian_dict(v) for k, v in d.items()}
+        elif hasattr(d, 'copy'):
+            # If the object has a `.copy()` method (e.g., Brian2 Quantity), use it
+            return d.copy()
+        else:
+            # Otherwise, return the value as-is (int, float, string, etc.)
+            return d 
+
     def _compute_trajectory_cost(self, actual_trajectory, desired_trajectory):
         """
         Compute the cost between actual and desired trajectories.
@@ -116,100 +130,99 @@ class EESController:
             Optimal EES parameters
         """
         best_cost = float('inf')
-        best_params = deepcopy(self.current_ees_params)
-        
-        # Create time array for the prediction horizon
-        time_step = 0.1*ms 
-        prediction_time = np.arange(
-            current_time, 
-            current_time + self.biological_system.reaction_time * self.update_iterations,
-            time_step
-        )*second
-        
-        # Get desired trajectory for prediction horizon
-        desired_trajectory = self.desired_trajectory_func(prediction_time)
+        best_params = self.copy_brian_dict(self.current_ees_params)
+
         
         print(f"Optimizing EES parameters at time {current_time:.3f}s...")
+        
+        # Store trajectories for this optimization cycle
+        optimization_cycle_trajectories = []
         
         if self.has_multiple_muscles:
             print(f"Testing {len(self.frequency_grid)} frequency × {len(self.balance_grid)} balance combinations")
             # Test all combinations of frequency and balance for multiple muscles
             for freq, balance in product(self.frequency_grid, self.balance_grid):
                 # Create test parameters
-                test_params = deepcopy(self.current_ees_params)
+                test_params = self.copy_brian_dict(self.current_ees_params)
                 test_params['frequency'] = freq
                 test_params['balance'] = balance
 
-                try:
-                    # Clone the biological system to avoid modifying the original
-                    test_system = self.biological_system.clone_with()
+                # Clone the biological system to avoid modifying the original
+                test_system = self.biological_system
                     
-                    # Run simulation with test parameters
-                    spikes, time_series = test_system.run_simulation(
+                # Run simulation with test parameters
+                spikes, time_series = test_system.run_simulation(
                         n_iterations=self.update_iterations,
+                        time_step=self.time_step,
                         ees_stimulation_params=test_params
-                    )
+                )
+                
+                # Extract joint trajectory
+                joint_col = f"Joint_{self.biological_system.associated_joint}"
+                if joint_col in time_series.columns:
+                    actual_trajectory = time_series[joint_col].values
+                    prediction_time=time_series['Time']+current_time
+                    desired_trajectory= self.desired_trajectory_func(prediction_time)
+
+                    # Compute cost
+                    cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory)
                     
-                    # Extract joint trajectory
-                    joint_col = f"Joint_{self.biological_system.associated_joint}"
-                    if joint_col in time_series.columns:
-                        actual_trajectory = time_series[joint_col].values
+                    # Store this trajectory for plotting
+                    optimization_cycle_trajectories.append({
+                        'time': prediction_time[:len(actual_trajectory)],
+                        'trajectory': actual_trajectory,
+                        'params': deepcopy(test_params),
+                        'cost': cost
+                    })
                         
-                        # Ensure trajectories have the same length
-                        min_len = min(len(actual_trajectory), len(desired_trajectory))
-                        actual_trajectory = actual_trajectory[:min_len]
-                        desired_trajectory_truncated = desired_trajectory[:min_len]
-                        
-                        # Compute cost
-                        cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory_truncated)
-                        
-                        # Update best parameters if this is better
-                        if cost < best_cost:
-                            best_cost = cost
-                            best_params = test_params
+                    # Update best parameters if this is better
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_params = test_params
                             
-                except Exception as e:
-                    print(f"Warning: Simulation failed for freq={freq}, balance={balance}: {e}")
-                    continue
         else:
-            print(f"Testing {len(self.frequency_grid)} frequency values (single muscle system)")
+            print(f"Testing {len(self.frequency_grid)} frequency values ")
             # Test only frequency for single muscle systems
             for freq in self.frequency_grid:
                 # Create test parameters
-                test_params = deepcopy(self.current_ees_params)
+                test_params = self.copy_brian_dict(self.current_ees_params)
                 test_params['frequency'] = freq
 
-                try:
-                    # Clone the biological system to avoid modifying the original
-                    test_system = self.biological_system.clone_with()
+                # Clone the biological system to avoid modifying the original
+                test_system = self.biological_system
                     
-                    # Run simulation with test parameters
-                    spikes, time_series = test_system.run_simulation(
-                        n_iterations=self.update_iterations,
-                        ees_stimulation_params=test_params
-                    )
+                # Run simulation with test parameters
+                spikes, time_series = test_system.run_simulation(
+                    n_iterations=self.update_iterations,
+                    time_step=self.time_step,
+                    ees_stimulation_params=test_params
+                )
+                test_system.plot() 
+                # Extract joint trajectory
+                joint_col = f"Joint_{self.biological_system.associated_joint}"
+                if joint_col in time_series.columns:
+                    actual_trajectory = time_series[joint_col].values
+                    prediction_time=time_series['Time']+current_time
+                    desired_trajectory= self.desired_trajectory_func(prediction_time)    
+
+                    # Compute cost
+                    cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory)
                     
-                    # Extract joint trajectory
-                    joint_col = f"Joint_{self.biological_system.associated_joint}"
-                    if joint_col in time_series.columns:
-                        actual_trajectory = time_series[joint_col].values
+                    # Store this trajectory for plotting
+                    optimization_cycle_trajectories.append({
+                        'time': prediction_time[:len(actual_trajectory)],
+                        'trajectory': actual_trajectory,
+                        'params': deepcopy(test_params),
+                        'cost': cost
+                    })
                         
-                        # Ensure trajectories have the same length
-                        min_len = min(len(actual_trajectory), len(desired_trajectory))
-                        actual_trajectory = actual_trajectory[:min_len]
-                        desired_trajectory_truncated = desired_trajectory[:min_len]
-                        
-                        # Compute cost
-                        cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory_truncated)
-                        
-                        # Update best parameters if this is better
-                        if cost < best_cost:
-                            best_cost = cost
-                            best_params = test_params
-                            
-                except Exception as e:
-                    print(f"Warning: Simulation failed for freq={freq}: {e}")
-                    continue
+                    # Update best parameters if this is better
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_params = test_params
+        
+        # Store all trajectories from this optimization cycle
+        self.optimization_trajectories.append(optimization_cycle_trajectories)
         
         print(f"Best cost: {best_cost:.6f}")
         if self.has_multiple_muscles:
@@ -260,7 +273,7 @@ class EESController:
                 self.cost_history.append(cost)
             else:
                 self.cost_history.append(0.0)  # No optimization cost for first iteration
-            
+         
             # Run simulation with current EES parameters
             spikes, time_series = self.biological_system.run_simulation(
                 n_iterations=iterations_this_cycle,
@@ -268,7 +281,7 @@ class EESController:
                 ees_stimulation_params=self.current_ees_params,
                 base_output_path=base_output_path
             )
-            
+           
             # Extract joint trajectory
             joint_col = f"Joint_{self.biological_system.associated_joint}"
             if joint_col not in time_series.columns:
@@ -294,7 +307,7 @@ class EESController:
             # Store EES parameters for this segment
             for _ in range(len(actual_trajectory)):
                 self.ees_params_history.append(deepcopy(self.current_ees_params))
-            
+
             # Update system state for next iteration
             self.biological_system.update_system_state()
             
@@ -307,6 +320,27 @@ class EESController:
         
         return (self.trajectory_history, self.desired_trajectory_history, 
                 self.ees_params_history, self.time_history)
+    
+    
+        
+        # Plot cost evolution
+        if len(self.cost_history) > 1:  # Only plot if we have optimization costs
+            plt.figure(figsize=(10, 6))
+            optimization_points = np.arange(1, len(self.cost_history)) * self.update_iterations
+            costs = self.cost_history[1:]  # Skip first point (no optimization)
+            
+            plt.plot(optimization_points, costs, 'o-', linewidth=2, markersize=6)
+            plt.xlabel('Iteration')
+            plt.ylabel('Optimization Cost (MSE)')
+            plt.title('EES Parameter Optimization Cost Evolution')
+            plt.grid(True, alpha=0.3)
+            plt.yscale('log')  # Log scale often better for cost visualization
+            
+            if base_output_path:
+                plt.savefig(os.path.join(base_output_path, 'optimization_cost.png'), 
+                           dpi=300, bbox_inches='tight')
+            
+            plt.show()
     
     def plot_results(self, base_output_path=None):
         """
@@ -331,30 +365,106 @@ class EESController:
         # Determine number of subplots based on system type
         if self.has_multiple_muscles:
             balances = [params['balance'] for params in self.ees_params_history]
-            fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+            fig, axes = plt.subplots(3, 1, figsize=(12, 15))  # Made figure taller
         else:
-            fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+            fig, axes = plt.subplots(2, 1, figsize=(12, 12))  # Made figure taller
         
-        # Plot 1: Trajectory comparison
-        axes[0].plot(time_array, desired_traj, 'b-', linewidth=2, label='Desired trajectory')
-        axes[0].plot(time_array, actual_traj, 'r--', linewidth=1.5, label='Actual trajectory')
-        axes[0].set_xlabel('Time (s)')
-        axes[0].set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)')
-        axes[0].set_title('Trajectory Tracking Performance')
-        axes[0].legend()
+        # Color-blind friendly palette (Wong 2011)
+        cb_colors = [
+            '#000000',  # Black
+            '#E69F00',  # Orange
+            '#56B4E9',  # Sky Blue
+            '#009E73',  # Bluish Green
+            '#F0E442',  # Yellow
+            '#0072B2',  # Blue
+            '#D55E00',  # Vermillion
+            '#CC79A7',  # Reddish Purple
+            '#999999',  # Gray
+            '#8B4513',  # Brown
+            '#FF1493',  # Deep Pink
+            '#32CD32',  # Lime Green
+            '#4169E1',  # Royal Blue
+            '#FF8C00',  # Dark Orange
+            '#9370DB',  # Medium Purple
+            '#20B2AA'   # Light Sea Green
+        ]
+        
+        # Plot 1: Enhanced trajectory comparison with optimization trajectories
+        axes[0].plot(time_array, desired_traj, color='#000000', linewidth=3, 
+                    label='Desired trajectory', zorder=10)
+        axes[0].plot(time_array, actual_traj, color='#E69F00', linestyle='--', linewidth=2, 
+                    label='Actual trajectory (selected)', zorder=9)
+        
+        # Create a mapping from parameter combinations to colors
+        param_to_color = {}
+        plotted_params = set()  # Track which parameter combinations have been plotted
+        
+        for optimization_cycle in self.optimization_trajectories:
+            # Sort trajectories by cost to show best ones more prominently
+            sorted_trajectories = sorted(optimization_cycle, key=lambda x: x['cost'])
+            
+            for traj_idx, traj_data in enumerate(sorted_trajectories):
+                # Skip the best trajectory as it's already shown as "Actual trajectory"
+                if traj_idx == 0:
+                    continue
+                
+                # Create parameter key for consistent coloring
+                if self.has_multiple_muscles:
+                    param_key = (float(traj_data['params']['frequency']), 
+                               float(traj_data['params']['balance']))
+                    param_label = f"f={traj_data['params']['frequency']:.0f}Hz, b={traj_data['params']['balance']:.2f}"
+                else:
+                    param_key = (float(traj_data['params']['frequency']),)
+                    param_label = f"f={traj_data['params']['frequency']:.0f}Hz"
+                
+                # Assign color if not already assigned
+                if param_key not in param_to_color:
+                    color_idx = len(param_to_color) % len(cb_colors)
+                    # Skip black and orange as they're used for desired and actual trajectories
+                    if color_idx == 0:  # Skip black
+                        color_idx = 2
+                    elif color_idx == 1:  # Skip orange  
+                        color_idx = 3
+                    param_to_color[param_key] = cb_colors[color_idx]
+                
+                # Determine if this should be in legend (only first occurrence of each param combination)
+                show_in_legend = param_key not in plotted_params
+                if show_in_legend:
+                    plotted_params.add(param_key)
+                
+                # Plot with transparency and thinner lines for non-optimal trajectories
+                alpha = 0.4 if traj_idx > 2 else 0.7  # Make worst trajectories more transparent
+                linewidth = 0.8 if traj_idx > 2 else 1.2
+                
+                axes[0].plot(traj_data['time'], traj_data['trajectory'], 
+                           color=param_to_color[param_key], 
+                           alpha=alpha, linewidth=linewidth, 
+                           label=param_label if show_in_legend else "", 
+                           zorder=1)
+        
+        axes[0].set_xlabel('Time (s)', fontsize=12)
+        axes[0].set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)', fontsize=12)
+        axes[0].set_title('Trajectory Tracking Performance with EES Parameter Optimization', 
+                         fontsize=14, fontweight='bold')
+        
+        # Create a smaller legend
+        legend = axes[0].legend(bbox_to_anchor=(1.02, 1), loc='upper left', 
+                              fontsize=8, frameon=True, fancybox=True, 
+                              shadow=True, framealpha=0.9)
+        legend.get_frame().set_facecolor('white')
         axes[0].grid(True, alpha=0.3)
         
         # Plot 2: EES Frequency evolution
-        axes[1].plot(time_array, frequencies, 'g-', linewidth=2)
+        axes[1].plot(time_array, frequencies, color='#009E73', linewidth=2)
         axes[1].set_xlabel('Time (s)')
         axes[1].set_ylabel('EES Frequency (Hz)')
         axes[1].set_title('EES Frequency Evolution')
         axes[1].grid(True, alpha=0.3)
-        axes[1].set_ylim([self.frequency_range[0] - 5, self.frequency_range[1] + 5])
+        axes[1].set_ylim([self.frequency_range[0] - 5*hertz, self.frequency_range[1] + 5*hertz])
         
         # Plot 3: EES Balance evolution (only for multiple muscle systems)
         if self.has_multiple_muscles:
-            axes[2].plot(time_array, balances, 'm-', linewidth=2)
+            axes[2].plot(time_array, balances, color='#D55E00', linewidth=2)
             axes[2].set_xlabel('Time (s)')
             axes[2].set_ylabel('EES Balance')
             axes[2].set_title('EES Balance Evolution (Flexor-Extensor)')
@@ -378,7 +488,7 @@ class EESController:
             optimization_points = np.arange(1, len(self.cost_history)) * self.update_iterations
             costs = self.cost_history[1:]  # Skip first point (no optimization)
             
-            plt.plot(optimization_points, costs, 'o-', linewidth=2, markersize=6)
+            plt.plot(optimization_points, costs, 'o-', color='#0072B2', linewidth=2, markersize=6)
             plt.xlabel('Iteration')
             plt.ylabel('Optimization Cost (MSE)')
             plt.title('EES Parameter Optimization Cost Evolution')
