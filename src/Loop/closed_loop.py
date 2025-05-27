@@ -88,15 +88,15 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     muscle_data = [[] for _ in range(num_muscles)]
     resting_lengths = [None] * num_muscles
 
- 
+    neuron_types = set(k.split('_')[0] for k in neurons_population.keys())
     spike_data = {
         muscle_name: {
             neuron_type: defaultdict(list)
-            for neuron_type in neurons_population.keys()
+            for neuron_type in neuron_types
         }
         for muscle_name in muscles_names
     }
-
+    print('spikes_data ', spike_data)
 
     # =============================================================================
     # Main Simulation Loop
@@ -207,7 +207,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                         stretch, stretch_velocity, neurons_population, connections, time_step, reaction_time, 
                         spindle_model, seed, initial_state_neurons, **biophysical_params, ees_params=ees_params_copy
                     )
-                
+            print('final state neurons exc ', final_state_neurons['exc']['v'].shape) 
+            print('final state neurons MN ', final_state_neurons['MN']['v'].shape) 
             # Update initial potentials for next iteration
             initial_state_neurons.update(final_state_neurons)
 
