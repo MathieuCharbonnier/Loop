@@ -189,7 +189,7 @@ def plot_ees_analysis_results(results, save_dir="stimulation_analysis", seed=42)
         ax.set_xlabel("Time (s)")
         ax.set_ylabel(f"{associated_joint} Angle (deg)")
         ax.grid(True, linestyle='--', alpha=0.3)
-        ax.plot(main_data['Time'], main_data[f'Joints_{associated_joint}'],
+        ax.plot(main_data['Time'], main_data[f'Joint_{associated_joint}'],
                 color='darkred', label='Joint Angle', linewidth=2.5)
         ax.legend()
     fig_joint.tight_layout()
