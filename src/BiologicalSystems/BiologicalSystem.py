@@ -114,7 +114,7 @@ class BiologicalSystem(ABC):
         self.spikes, self.time_series, self.final_state = closed_loop(
             n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
             self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, self.associated_joint,self.fast_type_mu,
-            self.initial_state_neurons, self.initial_condition_spike_activation, self.initial_state_opensim,
+            self.copy_brian_dict(self.initial_state_neurons), deepcopy(self.initial_condition_spike_activation), deepcopy(self.initial_state_opensim),
             self.activation_function, torque_array=torque_array, ees_params=ees_params,
             seed=seed, base_output_path=base_output_path)
         
@@ -161,6 +161,7 @@ class BiologicalSystem(ABC):
         self.initial_state_opensim = self.final_state['opensim']
         self.activation_function=self.final_state['last_activations']
 
+
     def clone_with(self, **params):
         cls = self.__class__
         sig = inspect.signature(cls.__init__)
@@ -169,8 +170,27 @@ class BiologicalSystem(ABC):
             if name == 'self':
                 continue
             if hasattr(self, name):
-                kwargs[name] = getattr(self, name)
+                attr = getattr(self, name)
+                # Use deep copy or custom logic for specific types
+                if isinstance(attr, dict):
+                    # Safe copy for Brian2 quantities
+                    kwargs[name] = self.copy_brian_dict(attr)
+                else:
+                    kwargs[name] = deepcopy(attr)
             elif param.default is not inspect.Parameter.empty:
                 kwargs[name] = param.default
         kwargs.update(params)
         return cls(**kwargs)
+
+      
+    def copy_brian_dict(self,d):
+        if isinstance(d, dict):
+            # If d is a dictionary, apply the function to each value
+            return {k: self.copy_brian_dict(v) for k, v in d.items()}
+        elif hasattr(d, 'copy'):
+            # If the object has a `.copy()` method (e.g., Brian2 Quantity), use it
+            return d.copy()
+        else:
+            # Otherwise, return the value as-is (int, float, string, etc.)
+            return d
+
