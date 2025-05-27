@@ -10,9 +10,11 @@ class Disynaptic(BiologicalSystem):
     to motor neurons (MN) through excitatory interneurons.
     """
     
-    def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
-                associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=False):
+    def __init__(self, reaction_time=40*ms,biophysical_params=None, muscles_names=None, 
+             associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
+             spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
+             initial_state_neurons=None, initial_condition_spike_activation=None, 
+             initial_state_opensim=None, activation_funct=None):
         """
         Initialize a disynaptic reflex system with default or custom parameters.
         """
@@ -47,62 +49,52 @@ class Disynaptic(BiologicalSystem):
                 }
             }
             
-        # Initialize the base class
+        if neurons_population is None:
+            # Set default neuron populations
+            neurons_population = {
+                "Ia": 280,       # Type Ia afferent neurons
+                "II": 280,       # Type II afferent neurons
+                "exc": 500,      # Excitatory interneurons
+                "MN": 450        # Motor neurons
+            }
+        
+        if connections is None:
+            connections = {
+                ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9},
+                ("II", "exc"): {"w": 2*3.64*nS, "p": 0.9},
+                ("exc", "MN"): {"w": 2*2.1*nS, "p": 0.9}
+            }
+
+        if spindle_model is None:
+            spindle_model = {
+                "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
+                "II": "20 + 13.5*stretch",
+                "II_Ia_delta_delay": 15*ms
+            }
+
+        if initial_state_neurons is None:
+            initial_state_neurons = {
+                "exc":{'v': biophysical_params['Eleaky'],
+                      'gII': 0*nS},
+                "MN":{ 'v' :biophysical_params['Eleaky'],
+                      'gIa':0*nS,
+                      'gexc':0*nS}
+            }
+        if initial_condition_spike_activation is None:   
+            # Initialize parameters for each motoneuron
+            initial_condition_spike_activation = [
+                [{
+                    'u0': [0.0, 0.0],    # Initial fiber AP state
+                    'c0': [0.0, 0.0],    # Initial calcium concentration state
+                    'P0': 0.0,           # Initial calcium-troponin binding state
+                    'a0': 0.0            # Initial activation state
+                } for _ in range(neurons_population['MN'])]
+            ]
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names, associated_joint, fast_type_mu)
-        
-        # Set default neuron populations
-        self.neurons_population = {
-            "Ia": 280,       # Type Ia afferent neurons
-            "II": 280,       # Type II afferent neurons
-            "exc": 500,      # Excitatory interneurons
-            "MN": 450        # Motor neurons
-        }
-        
-        # Override with custom values if provided
-        if custom_neurons is not None:
-            self.neurons_population.update(custom_neurons)
-            
-        # Set default connections
-        self.connections = {
-            ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9},
-            ("II", "exc"): {"w": 2*3.64*nS, "p": 0.9},
-            ("exc", "MN"): {"w": 2*2.1*nS, "p": 0.9}
-        }
-        
-        # Override with custom connections if provided
-        if custom_connections is not None:
-            self.connections.update(custom_connections)
-            
-        # Set default spindle model
-        self.spindle_model = {
-            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
-            "II": "20 + 13.5*stretch",
-            "II_Ia_delta_delay": 15*ms
-        }
-        
-        # Override with custom spindle model if provided
-        if custom_spindle is not None:
-            self.spindle_model.update(custom_spindle)
-
-        self.initial_state_neurons = {
-            "exc":{'v': self.biophysical_params['Eleaky'],
-                   'gII': 0*nS},
-            "MN":{ 'v' :self.biophysical_params['Eleaky'],
-                  'gIa':0*nS,
-                  'gexc':0*nS}
-        }
-            
-        # Initialize parameters for each motoneuron
-        self.initial_condition_spike_activation = [
-            [{
-                'u0': [0.0, 0.0],    # Initial fiber AP state
-                'c0': [0.0, 0.0],    # Initial calcium concentration state
-                'P0': 0.0,           # Initial calcium-troponin binding state
-                'a0': 0.0            # Initial activation state
-            } for _ in range(self.neurons_population['MN'])]
-        ]
-
+                        muscles_names, associated_joint, fast_type_mu,
+                        neurons_population, connections, spindle_model, 
+                        initial_state_neurons, initial_condition_spike_activation, 
+                        initial_state_opensim, activation_funct)
         # Validate parameters
         self.validate_input()
 
