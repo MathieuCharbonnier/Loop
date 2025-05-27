@@ -73,16 +73,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     # =============================================================================
 
     # Discretization configuration + vector initialization
-    """
-    time_=np.arange(0, reaction_time, time_step)
-    nb_points=len(time_)
-    activation_history = np.zeros((num_muscles, nb_points))
-    if activation_function is not None:
-          activation_history=activation_function(time_)
-    time_points = np.arange(0, reaction_time*n_iterations, time_step)
-    joint_all = np.zeros((len(time_points)))
-    activations_all = np.zeros((num_muscles, len(time_points)))
-    """
+
     nb_points=int(reaction_time/time_step)
     time_=np.linspace(0, reaction_time, nb_points)
     activation_history = np.zeros((num_muscles, nb_points))
@@ -91,8 +82,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     time_points=np.linspace(0, reaction_time*n_iterations, nb_points*n_iterations)
     joint_all = np.zeros((len(time_points)))
     activations_all = np.zeros((num_muscles, len(time_points)))
-    print("nb_points ", nb_points)
-    print("len joint ", len(joint_all))
+
     
     # Containers for simulation data
     muscle_data = [[] for _ in range(num_muscles)]
@@ -129,7 +119,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     # Create a simulator instance based on execution environment
     on_colab=is_running_on_colab()
-    simulator = CoLabSimulator() if on_colab else LocalSimulator()
+    simulator = CoLabSimulator(initial_state_opensim) if on_colab else LocalSimulator(initial_state_opensim)
 
                        
     for iteration in range(n_iterations):
