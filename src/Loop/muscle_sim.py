@@ -15,7 +15,7 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     -----------
     
     dt : float
-        Time step for simulation
+        Time step
     T : float
         Total simulation time
     muscles : list
@@ -35,7 +35,8 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     """
 
     model = osim.Model("Model/gait2392_millard2012_pelvislocked.osim")
-    time_array = np.arange(0, T, dt)
+    nb_points=int(T/dt)
+    time_array = np.linspace(0, T, nb_points)
     # Add muscle controller if activation provided
     if activation_array is not None:
         
