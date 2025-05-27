@@ -5,7 +5,6 @@ from itertools import product
 from copy import deepcopy
 import os
 
-
 class EESController:
     """
     Model Predictive Controller for EES parameters to achieve desired joint trajectories.
@@ -15,8 +14,8 @@ class EESController:
     """
     
     def __init__(self, biological_system, desired_trajectory_func, update_iterations, 
-                 initial_ees_params=None, frequency_range=(20, 100), balance_range=(-1.0, 1.0),
-                 frequency_steps=5, balance_steps=5):
+                 initial_ees_params=None, frequency_range=(20, 100)*hertz, balance_range=(-1.0, 1.0),
+                 frequency_step=20*hertz, balance_step=0.5):
         """
         Initialize the EES controller.
         
@@ -33,35 +32,48 @@ class EESController:
         frequency_range : tuple
             (min_freq, max_freq) range for frequency optimization
         balance_range : tuple
-            (min_balance, max_balance) range for balance optimization
-        frequency_steps : int
-            Number of frequency values to test
-        balance_steps : int
-            Number of balance values to test
+            (min_balance, max_balance) range for balance optimization (ignored for single muscle)
+        frequency_step : float
+            Step size for frequency optimization
+        balance_step : float
+            Step size for balance optimization (ignored for single muscle)
         """
-        self.biological_system = biological_system
+        self.biological_system = biological_system.clone_with()
         self.desired_trajectory_func = desired_trajectory_func
         self.update_iterations = update_iterations
+        
+        # Check if system has multiple muscles
+        self.has_multiple_muscles = self.biological_system.number_muscles > 1
         
         # Default EES parameters
         if initial_ees_params is None:
             self.current_ees_params = {
-                'frequency': 50*hertz,  # Hz
+                'frequency': 50 * hertz,  # Hz
                 'intensity': 0.6,  # Fixed intensity
-                'balance': 0.0    # Neutral balance
             }
+            # Only add balance parameter for multiple muscle systems
+            if self.has_multiple_muscles:
+                self.current_ees_params['balance'] = 0.0  # Neutral balance
         else:
             self.current_ees_params = deepcopy(initial_ees_params)
+            # Remove balance parameter if system has only one muscle
+            if not self.has_multiple_muscles and 'balance' in self.current_ees_params:
+                del self.current_ees_params['balance']
             
         # Optimization ranges
         self.frequency_range = frequency_range
         self.balance_range = balance_range
-        self.frequency_steps = frequency_steps
-        self.balance_steps = balance_steps
+        self.frequency_step = frequency_step
+        self.balance_step = balance_step
         
         # Generate parameter grids for optimization
-        self.frequency_grid = np.linspace(frequency_range[0], frequency_range[1], frequency_steps)
-        self.balance_grid = np.linspace(balance_range[0], balance_range[1], balance_steps)
+        self.frequency_grid = np.arange(frequency_range[0], frequency_range[1], frequency_step)*hertz
+        
+        # Only create balance grid for multiple muscle systems
+        if self.has_multiple_muscles:
+            self.balance_grid = np.arange(balance_range[0], balance_range[1], balance_step)
+        else:
+            self.balance_grid = []  # Empty grid for single muscle
         
         # Storage for results
         self.trajectory_history = []
@@ -112,55 +124,98 @@ class EESController:
             current_time, 
             current_time + self.biological_system.reaction_time * self.update_iterations,
             time_step
-        )
+        )*second
         
         # Get desired trajectory for prediction horizon
         desired_trajectory = self.desired_trajectory_func(prediction_time)
         
         print(f"Optimizing EES parameters at time {current_time:.3f}s...")
-        print(f"Testing {len(self.frequency_grid)} frequency × {len(self.balance_grid)} balance combinations")
         
-        # Test all combinations of frequency and balance
-        for freq, balance in product(self.frequency_grid, self.balance_grid):
-            # Create test parameters
-            test_params = deepcopy(self.current_ees_params)
-            test_params['frequency'] = freq
-            test_params['balance'] = balance
-            
-            try:
-                # Clone the biological system to avoid modifying the original
-                test_system = self.biological_system.clone_with()
-                
-                # Run simulation with test parameters
-                spikes, time_series = test_system.run_simulation(
-                    n_iterations=self.update_iterations,
-                    ees_stimulation_params=test_params
-                )
-                
-                # Extract joint trajectory
-                joint_col = f"joint_{self.biological_system.associated_joint}"
-                if joint_col in time_series.columns:
-                    actual_trajectory = time_series[joint_col].values
+        if self.has_multiple_muscles:
+            print(f"Testing {len(self.frequency_grid)} frequency × {len(self.balance_grid)} balance combinations")
+            # Test all combinations of frequency and balance for multiple muscles
+            for freq, balance in product(self.frequency_grid, self.balance_grid):
+                # Create test parameters
+                test_params = deepcopy(self.current_ees_params)
+                test_params['frequency'] = freq
+                test_params['balance'] = balance
+
+                try:
+                    # Clone the biological system to avoid modifying the original
+                    test_system = self.biological_system.clone_with()
                     
-                    # Ensure trajectories have the same length
-                    min_len = min(len(actual_trajectory), len(desired_trajectory))
-                    actual_trajectory = actual_trajectory[:min_len]
-                    desired_trajectory_truncated = desired_trajectory[:min_len]
+                    # Run simulation with test parameters
+                    spikes, time_series = test_system.run_simulation(
+                        n_iterations=self.update_iterations,
+                        ees_stimulation_params=test_params
+                    )
                     
-                    # Compute cost
-                    cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory_truncated)
-                    
-                    # Update best parameters if this is better
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_params = test_params
+                    # Extract joint trajectory
+                    joint_col = f"Joint_{self.biological_system.associated_joint}"
+                    if joint_col in time_series.columns:
+                        actual_trajectory = time_series[joint_col].values
                         
-            except Exception as e:
-                print(f"Warning: Simulation failed for freq={freq}, balance={balance}: {e}")
-                continue
+                        # Ensure trajectories have the same length
+                        min_len = min(len(actual_trajectory), len(desired_trajectory))
+                        actual_trajectory = actual_trajectory[:min_len]
+                        desired_trajectory_truncated = desired_trajectory[:min_len]
+                        
+                        # Compute cost
+                        cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory_truncated)
+                        
+                        # Update best parameters if this is better
+                        if cost < best_cost:
+                            best_cost = cost
+                            best_params = test_params
+                            
+                except Exception as e:
+                    print(f"Warning: Simulation failed for freq={freq}, balance={balance}: {e}")
+                    continue
+        else:
+            print(f"Testing {len(self.frequency_grid)} frequency values (single muscle system)")
+            # Test only frequency for single muscle systems
+            for freq in self.frequency_grid:
+                # Create test parameters
+                test_params = deepcopy(self.current_ees_params)
+                test_params['frequency'] = freq
+
+                try:
+                    # Clone the biological system to avoid modifying the original
+                    test_system = self.biological_system.clone_with()
+                    
+                    # Run simulation with test parameters
+                    spikes, time_series = test_system.run_simulation(
+                        n_iterations=self.update_iterations,
+                        ees_stimulation_params=test_params
+                    )
+                    
+                    # Extract joint trajectory
+                    joint_col = f"Joint_{self.biological_system.associated_joint}"
+                    if joint_col in time_series.columns:
+                        actual_trajectory = time_series[joint_col].values
+                        
+                        # Ensure trajectories have the same length
+                        min_len = min(len(actual_trajectory), len(desired_trajectory))
+                        actual_trajectory = actual_trajectory[:min_len]
+                        desired_trajectory_truncated = desired_trajectory[:min_len]
+                        
+                        # Compute cost
+                        cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory_truncated)
+                        
+                        # Update best parameters if this is better
+                        if cost < best_cost:
+                            best_cost = cost
+                            best_params = test_params
+                            
+                except Exception as e:
+                    print(f"Warning: Simulation failed for freq={freq}: {e}")
+                    continue
         
         print(f"Best cost: {best_cost:.6f}")
-        print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz, balance={best_params['balance']:.3f}")
+        if self.has_multiple_muscles:
+            print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz, balance={best_params['balance']:.3f}")
+        else:
+            print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz")
         
         return best_params, best_cost
     
@@ -189,6 +244,7 @@ class EESController:
         print(f"Total iterations: {total_iterations}")
         print(f"Update every: {self.update_iterations} iterations")
         print(f"Time step: {time_step:.1f}")
+        print(f"System type: {'Multiple muscles' if self.has_multiple_muscles else 'Single muscle'}")
         
         while current_iteration < total_iterations:
             # Determine how many iterations to run this cycle
@@ -205,7 +261,6 @@ class EESController:
             else:
                 self.cost_history.append(0.0)  # No optimization cost for first iteration
             
-            print('time_step ', time_step)
             # Run simulation with current EES parameters
             spikes, time_series = self.biological_system.run_simulation(
                 n_iterations=iterations_this_cycle,
@@ -215,7 +270,7 @@ class EESController:
             )
             
             # Extract joint trajectory
-            joint_col = f"joint_{self.biological_system.associated_joint}"
+            joint_col = f"Joint_{self.biological_system.associated_joint}"
             if joint_col not in time_series.columns:
                 raise ValueError(f"Joint column '{joint_col}' not found in time series")
             
@@ -226,8 +281,8 @@ class EESController:
                 current_time,
                 current_time + len(actual_trajectory) * time_step,
                 time_step
-            )[:len(actual_trajectory)]
-            
+            )[:len(actual_trajectory)]*second
+      
             # Get desired trajectory for this segment
             desired_trajectory = self.desired_trajectory_func(segment_time)
             
@@ -272,10 +327,13 @@ class EESController:
         
         # Extract EES parameters over time
         frequencies = [params['frequency'] for params in self.ees_params_history]
-        balances = [params['balance'] for params in self.ees_params_history]
         
-        # Create subplots
-        fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+        # Determine number of subplots based on system type
+        if self.has_multiple_muscles:
+            balances = [params['balance'] for params in self.ees_params_history]
+            fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+        else:
+            fig, axes = plt.subplots(2, 1, figsize=(12, 8))
         
         # Plot 1: Trajectory comparison
         axes[0].plot(time_array, desired_traj, 'b-', linewidth=2, label='Desired trajectory')
@@ -294,13 +352,14 @@ class EESController:
         axes[1].grid(True, alpha=0.3)
         axes[1].set_ylim([self.frequency_range[0] - 5, self.frequency_range[1] + 5])
         
-        # Plot 3: EES Balance evolution
-        axes[2].plot(time_array, balances, 'm-', linewidth=2)
-        axes[2].set_xlabel('Time (s)')
-        axes[2].set_ylabel('EES Balance')
-        axes[2].set_title('EES Balance Evolution (Flexor-Extensor)')
-        axes[2].grid(True, alpha=0.3)
-        axes[2].set_ylim([self.balance_range[0] - 0.1, self.balance_range[1] + 0.1])
+        # Plot 3: EES Balance evolution (only for multiple muscle systems)
+        if self.has_multiple_muscles:
+            axes[2].plot(time_array, balances, 'm-', linewidth=2)
+            axes[2].set_xlabel('Time (s)')
+            axes[2].set_ylabel('EES Balance')
+            axes[2].set_title('EES Balance Evolution (Flexor-Extensor)')
+            axes[2].grid(True, alpha=0.3)
+            axes[2].set_ylim([self.balance_range[0] - 0.1, self.balance_range[1] + 0.1])
         
         plt.tight_layout()
         
@@ -365,8 +424,11 @@ class EESController:
             'max_error': max_error,
             'r_squared': r_squared,
             'final_frequency': self.ees_params_history[-1]['frequency'] if self.ees_params_history else None,
-            'final_balance': self.ees_params_history[-1]['balance'] if self.ees_params_history else None
         }
+        
+        # Only include balance metrics for multiple muscle systems
+        if self.has_multiple_muscles:
+            metrics['final_balance'] = self.ees_params_history[-1]['balance'] if self.ees_params_history else None
         
         return metrics
 
