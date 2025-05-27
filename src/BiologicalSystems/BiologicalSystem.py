@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 from abc import ABC, abstractmethod
 from copy import deepcopy
+import inspect
 
 from ..Loop.closed_loop import closed_loop
 from ..Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
@@ -18,7 +19,9 @@ class BiologicalSystem(ABC):
     """
     
     def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, 
-                 associated_joint, fast_type_mu):
+                 associated_joint, fast_type_mu, neurons_population, connections, spindle_model, 
+                 initial_state_neurons, initial_condition_spike_activation,initial_state_opensim,
+                 activation_func):
         """
         Initialize the biological system with common parameters.
         
@@ -46,16 +49,15 @@ class BiologicalSystem(ABC):
         self.associated_joint = associated_joint
         self.fast_type_mu = fast_type_mu
         
-        # These will be set by subclasses in their constructors
-        self.neurons_population = {}
-        self.connections = {}
-        self.spindle_model = {}
+        self.neurons_population = neurons_population
+        self.connections = connections
+        self.spindle_model = spindle_model
         
         # Initial conditions
-        self.initial_state_neurons = {}
-        self.initial_state_opensim = {}
-        self.initial_condition_spike_activation = {}
-        self.activation_function = None
+        self.initial_state_neurons = initial_state_neurons
+        self.initial_state_opensim = initial_state_opensim
+        self.initial_condition_spike_activation = initial_condition_spike_activation
+        self.activation_function = activation_func
                      
         # Store the results:
         self.spikes = None
@@ -162,6 +164,7 @@ class BiologicalSystem(ABC):
         self.activation_function=self.final_state['last_activations']
 
 
+
     def clone_with(self, **params):
         cls = self.__class__
         sig = inspect.signature(cls.__init__)
@@ -179,10 +182,12 @@ class BiologicalSystem(ABC):
                     kwargs[name] = deepcopy(attr)
             elif param.default is not inspect.Parameter.empty:
                 kwargs[name] = param.default
+
         kwargs.update(params)
         return cls(**kwargs)
 
-      
+
+    @staticmethod 
     def copy_brian_dict(self,d):
         if isinstance(d, dict):
             # If d is a dictionary, apply the function to each value
