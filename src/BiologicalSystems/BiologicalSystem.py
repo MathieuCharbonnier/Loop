@@ -156,42 +156,21 @@ class BiologicalSystem(ABC):
         if self.final_state is None:
             raise ValueError("You should first launch a simulation!")
         
-        self.initial_potentials = self.final_state['potentials']
-        self.initial_condition_spike_activation = self.final_state['spikes_activation']
+        self.initial_state_neurons = self.final_state['neurons']
+        self.initial_condition_spike_activation = self.final_state['spikes_activations']
         self.initial_state_opensim = self.final_state['opensim']
-        self.activation_function=self.final_state['last_activation']
+        self.activation_function=self.final_state['last_activations']
 
-            
     def clone_with(self, **params):
-        """
-        Create a copy of the current system with modified parameters.
-        
-        Parameters:
-        -----------
-        **params : dict
-            Parameters to modify in the cloned system
-            
-        Returns:
-        --------
-        BiologicalSystem
-            A new instance with modified parameters
-        """
-        # Create a deep copy of the current instance
-        new_instance = deepcopy(self)
-        
-        # Update parameters directly
-        for param_name, param_value in params.items():
-            if hasattr(new_instance, param_name):
-                setattr(new_instance, param_name, param_value)
-            else:
-                raise AttributeError(f"Parameter '{param_name}' does not exist")
-        
-        # Update number_muscles if muscles_names was changed
-        if 'muscles_names' in params:
-            new_instance.number_muscles = len(params['muscles_names'])
-
-        
-        # Validate the new configuration
-        new_instance.validate_input()
-        
-        return new_instance
+        cls = self.__class__
+        sig = inspect.signature(cls.__init__)
+        kwargs = {}
+        for name, param in sig.parameters.items():
+            if name == 'self':
+                continue
+            if hasattr(self, name):
+                kwargs[name] = getattr(self, name)
+            elif param.default is not inspect.Parameter.empty:
+                kwargs[name] = param.default
+        kwargs.update(params)
+        return cls(**kwargs)
