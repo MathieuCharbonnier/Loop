@@ -553,7 +553,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     #Extract EES_Params:
     if ees_params is not None:
         ees_freq=ees_params['frequency']
-        Ia_flexor_recruited=ees_params['recruitement']['Ia_flexor']
+        Ia_flexor_recruited=ees_params['recruitment']['Ia_flexor']
         II_flexor_recruited=ees_params['recruitment']['II_flexor']
         MN_flexor_recruited=ees_params['recruitment']['MN_flexor']
         Ia_extensor_recruited=ees_params['recruitment']['Ia_extensor']
@@ -644,16 +644,16 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     net.add([inh, exc, MN])
                                             
     group_map = {
-        "Ia_flexor": Ia[:n_Ia],
-        "Ia_extensor": Ia[n_Ia:],
-        "II_flexor": II[:n_II],
-        "II_extensor": II[n_II:],
-        "exc_flexor": exc[:n_exc],
-        "exc_extensor": exc[n_exc:],
-        "inh_flexor": inh[:n_inh],
-        "inh_extensor": inh[n_inh:],
-        "MN_flexor": MN[:n_MN],
-        "MN_extensor": MN[n_MN:],
+        "Ia_flexor": Ia[:n_Ia_flexor],
+        "Ia_extensor": Ia[n_Ia_flexor:],
+        "II_flexor": II[:n_II_flexor],
+        "II_extensor": II[n_II_flexor:],
+        "exc_flexor": exc[:n_exc_flexor],
+        "exc_extensor": exc[n_exc_flexor:],
+        "inh_flexor": inh[:n_inh_flexor],
+        "inh_extensor": inh[n_inh_flexor:],
+        "MN_flexor": MN[:n_MN_flexor],
+        "MN_extensor": MN[n_MN_flexor:],
     }
     
     # Create synaptic connections
@@ -670,7 +670,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         syn.connect(p=p)
         noise=0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        if pre_base=='II':
+        if 'II' in pre_name:
             syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         else:
             syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
@@ -684,11 +684,11 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     mon_inh = SpikeMonitor(inh)
     mon_MN = SpikeMonitor(MN)
     
-    mon_inh_flexor = StateMonitor(inh, ['Isyn'], n_inh/2)
-    mon_MN_flexor = StateMonitor(MN, ['Isyn'], n_MN/2)
+    mon_inh_flexor = StateMonitor(inh, ['Isyn'], n_inh_flexor/2)
+    mon_MN_flexor = StateMonitor(MN, ['Isyn'], n_MN_flexor/2)
     
-    mon_inh_extensor = StateMonitor(inh, ['Isyn'], 3*n_inh/2)
-    mon_MN_extensor = StateMonitor(MN, ['Isyn'], 3*n_MN/2)
+    mon_inh_extensor = StateMonitor(inh, ['Isyn'], n_inh_flexor+ n_inh_extensor/2)
+    mon_MN_extensor = StateMonitor(MN, ['Isyn'], n_MN_flexor+ n_MN_extensor/2)
     
     # Add all monitors to the network
     monitors = [
@@ -713,7 +713,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     
     # Extract motoneuron spikes
     MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN_flexor)} 
-    MN_extensor_spikes = {i%n_MN: mon_MN.spike_trains()[i] for i in range(n_MN_flexor, n_MN_flexor+n_MN_extensor)} 
+    MN_extensor_spikes = {i%n_MN_flexor: mon_MN.spike_trains()[i] for i in range(n_MN_flexor, n_MN_flexor+n_MN_extensor)} 
 
     if ees_freq > 0 :
         ees_spikes = mon_ees_MN.spike_trains()
@@ -741,8 +741,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
       'MN':{'v':inh.v,
              'gIa':MN.gIa,
              'gII':MN.gexc,
-             'gi':Mn.gi,
-             'ginh':Mn.ginh
+             'gi':MN.gi,
+             'ginh':MN.ginh
             }
     }
       
@@ -762,10 +762,10 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         "inh": {i: mon_inh.spike_trains()[i] for i in range(n_inh_flexor)}
     }
     result_extensor = {
-        "Ia": {i%n_Ia: mon_Ia.spike_trains()[i] for i in range(n_Ia_flexor, n_Ia_flexor+n_Ia_extensor)},
-        "II": {i%n_II: mon_II.spike_trains()[i] for i in range(n_II_flexor, n_II_flexor+n_II_extensor)},
-        "exc": {i%n_exc: mon_exc.spike_trains()[i] for i in range(n_exc_flexor, n_exc_flexor+n_exc_extensor)},
-        "inh": {i%n_inh: mon_inh.spike_trains()[i] for i in range(n_inh_flexor, n_inh_flexor+n_inh_extensor)}
+        "Ia": {i%n_Ia_flexor: mon_Ia.spike_trains()[i] for i in range(n_Ia_flexor, n_Ia_flexor+n_Ia_extensor)},
+        "II": {i%n_II_flexor: mon_II.spike_trains()[i] for i in range(n_II_flexor, n_II_flexor+n_II_extensor)},
+        "exc": {i%n_exc_flexor: mon_exc.spike_trains()[i] for i in range(n_exc_flexor, n_exc_flexor+n_exc_extensor)},
+        "inh": {i%n_inh_flexor: mon_inh.spike_trains()[i] for i in range(n_inh_flexor, n_inh_flexor+n_inh_extensor)}
     }
 
 
@@ -1022,7 +1022,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
         # Add noise to weights and delays
         noise = 0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        if pre_base=='II':
+        if 'II' in pre_name:
             syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         else:
             syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
