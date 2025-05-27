@@ -10,8 +10,10 @@ class ReciprocalInhibition(BiologicalSystem):
     """
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
-                 associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-                 custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True):
+             associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
+             spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
+             initial_state_neurons=None, initial_condition_spike_activation=None, 
+             initial_state_opensim=None, activation_funct=None):
         """
         Initialize a reciprocal inhibition system with default or custom parameters.
         
@@ -68,112 +70,103 @@ class ReciprocalInhibition(BiologicalSystem):
                     'saturation_90pct': 0.9  
                 }  
             }
-            
-        # Initialize the base class
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, 
-                        associated_joint, fast_type_mu)
+        if neurons_population is None:
         
-        # Setup specialized neuron populations for reciprocal inhibition
-        self.neurons_population = {
-            # Afferents for each muscle
-            "Ia_flexor": 280,
-            "II_flexor": 280,
-            "Ia_extensor": 160,
-            "II_extensor": 160,
+            # Setup specialized neuron populations for reciprocal inhibition
+            neurons_population = {
+                # Afferents for each muscle
+                "Ia_flexor": 280,
+                "II_flexor": 280,
+                "Ia_extensor": 160,
+                "II_extensor": 160,
+                
+                # Interneurons
+                "exc_flexor": 500,
+                "exc_extensor": 500,
+                "inh_flexor": 500,
+                "inh_extensor": 500,
+                
+                # Motor neurons
+                "MN_flexor": 450,
+                "MN_extensor": 580
+            }
+        if connections is None:
+            connections = {
+                # Direct pathways
+                ("Ia_flexor", "MN_flexor"): {"w": 2*2.1*nS, "p": 0.9},
+                ("Ia_extensor", "MN_extensor"): {"w": 2*2.1*nS, "p": 0.9},
+                
+                # Ia inhibition pathways
+                ("Ia_flexor", "inh_flexor"): {"w": 2*3.64*nS, "p": 0.9},
+                ("Ia_extensor", "inh_extensor"): {"w": 2*3.64*nS, "p": 0.9},
+                
+                # Type II excitation pathways
+                ("II_flexor", "exc_flexor"): {"w": 2*1.65*nS, "p": 0.9},
+                ("II_extensor", "exc_extensor"): {"w": 2*1.65*nS, "p": 0.9},
+                
+                # Type II inhibition pathways
+                ("II_flexor", "inh_flexor"): {"w": 2*2.19*nS, "p": 0.9},
+                ("II_extensor", "inh_extensor"): {"w": 2*2.19*nS, "p": 0.9},
+                
+                # Excitatory interneuron to motoneuron pathways
+                ("exc_flexor", "MN_flexor"): {"w": 2*0.7*nS, "p": 0.6},
+                ("exc_extensor", "MN_extensor"): {"w": 2*0.7*nS, "p": 0.6},
+                
+                # Reciprocal inhibition pathways
+                ("inh_flexor", "MN_extensor"): {"w": 2*0.2*nS, "p": 0.8},
+                ("inh_extensor", "MN_flexor"): {"w": 2*0.2*nS, "p": 0.8},
+                
+                # Inhibitory interneuron interactions
+                ("inh_flexor", "inh_extensor"): {"w": 2*0.76*nS, "p": 0.3},
+                ("inh_extensor", "inh_flexor"): {"w": 2*0.76*nS, "p": 0.3}
+            }
             
-            # Interneurons
-            "exc_flexor": 500,
-            "exc_extensor": 500,
-            "inh_flexor": 500,
-            "inh_extensor": 500,
+        if spindle_model is None:
+            spindle_model = {
+                "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
+                "II": "20 + 13.5*stretch",
+                "II_Ia_delta_delay": 15*ms
+            }
             
-            # Motor neurons
-            "MN_flexor": 450,
-            "MN_extensor": 580
-        }
-        
-        # Override with custom values if provided
-        if custom_neurons is not None:
-            self.neurons_population.update(custom_neurons)
+        if initial_condition_spike_activation is None:
+            initial_state_neurons = {
+                "inh":{'v': biophysical_params['Eleaky'],
+                      'gIa':0*nS,
+                      'gII':0*nS,
+                      'gi':0*nS,
+                      'ginh':0*nS
+                      },
+                "exc": {'v':biophysical_params['Eleaky'],
+                        'gII':0*nS},
+                "MN": {'v':biophysical_params['Eleaky'],
+                      'gexc':0*nS,
+                      'gIa':0*nS,
+                      'ginh':0*nS,
+                      'gi':0*nS}
+            }
             
-        # Set default connections with reciprocal inhibition pattern
-        self.connections = {
-            # Direct pathways
-            ("Ia_flexor", "MN_flexor"): {"w": 2*2.1*nS, "p": 0.9},
-            ("Ia_extensor", "MN_extensor"): {"w": 2*2.1*nS, "p": 0.9},
-            
-            # Ia inhibition pathways
-            ("Ia_flexor", "inh_flexor"): {"w": 2*3.64*nS, "p": 0.9},
-            ("Ia_extensor", "inh_extensor"): {"w": 2*3.64*nS, "p": 0.9},
-            
-            # Type II excitation pathways
-            ("II_flexor", "exc_flexor"): {"w": 2*1.65*nS, "p": 0.9},
-            ("II_extensor", "exc_extensor"): {"w": 2*1.65*nS, "p": 0.9},
-            
-            # Type II inhibition pathways
-            ("II_flexor", "inh_flexor"): {"w": 2*2.19*nS, "p": 0.9},
-            ("II_extensor", "inh_extensor"): {"w": 2*2.19*nS, "p": 0.9},
-            
-            # Excitatory interneuron to motoneuron pathways
-            ("exc_flexor", "MN_flexor"): {"w": 2*0.7*nS, "p": 0.6},
-            ("exc_extensor", "MN_extensor"): {"w": 2*0.7*nS, "p": 0.6},
-            
-            # Reciprocal inhibition pathways
-            ("inh_flexor", "MN_extensor"): {"w": 2*0.2*nS, "p": 0.8},
-            ("inh_extensor", "MN_flexor"): {"w": 2*0.2*nS, "p": 0.8},
-            
-            # Inhibitory interneuron interactions
-            ("inh_flexor", "inh_extensor"): {"w": 2*0.76*nS, "p": 0.3},
-            ("inh_extensor", "inh_flexor"): {"w": 2*0.76*nS, "p": 0.3}
-        }
-        
-        # Override with custom connections if provided
-        if custom_connections is not None:
-            self.connections.update(custom_connections)
-            
-        # Set default spindle model - need to handle specific muscle names
-        self.spindle_model = {
-            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
-            "II": "20 + 13.5*stretch",
-            "II_Ia_delta_delay": 15*ms
-        }
-        
-        # Override with custom spindle model if provided
-        if custom_spindle is not None:
-            self.spindle_model.update(custom_spindle)
-
-        self.initial_state_neurons = {
-            "inh":{'v': self.biophysical_params['Eleaky'],
-                   'gIa':0*nS,
-                   'gII':0*nS,
-                   'gi':0*nS,
-                   'ginh':0*nS
-                  },
-            "exc": {'v':self.biophysical_params['Eleaky'],
-                    'gII':0*nS},
-            "MN": {'v':self.biophysical_params['Eleaky'],
-                   'gexc':0*nS,
-                   'gIa':0*nS,
-                   'ginh':0*ns,
-                   'gi':0*nS}
-        }
-        
-            
+        if initial_condition_spike_activation is None:  
         # Initialize parameters for each motoneuron
-        self.initial_condition_spike_activation = [
-            [{
-                'u0': [0.0, 0.0],    # Initial fiber AP state
-                'c0': [0.0, 0.0],    # Initial calcium concentration state
-                'P0': 0.0,           # Initial calcium-troponin binding state
-                'a0': 0.0            # Initial activation state
-            } for _ in range(self.neurons_population['MN_flexor' if i == 0 else 'MN_extensor'])] 
-            for i in range(2)  # two muscles
-        ]
-                    
-        # Validate the configuration
-        self.validate_reciprocal_inhibition_parameters()
+            initial_condition_spike_activation = [
+                [{
+                    'u0': [0.0, 0.0],    # Initial fiber AP state
+                    'c0': [0.0, 0.0],    # Initial calcium concentration state
+                    'P0': 0.0,           # Initial calcium-troponin binding state
+                    'a0': 0.0            # Initial activation state
+                } for _ in range(neurons_population['MN_flexor' if i == 0 else 'MN_extensor'])] 
+                for i in range(2)  # two muscles
+            ]
 
-    def validate_reciprocal_inhibition_parameters(self):
+        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
+                        muscles_names, associated_joint, fast_type_mu,
+                        neurons_population, connections, spindle_model, 
+                        initial_state_neurons, initial_condition_spike_activation, 
+                        initial_state_opensim, activation_funct)  
+
+        # Validate the configuration
+        self.validate_input()
+
+    def validate_input(self):
         """
         Validates the configuration parameters for reciprocal inhibition reflex system.
         
