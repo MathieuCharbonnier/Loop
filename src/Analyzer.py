@@ -16,7 +16,7 @@ class Analyzer:
         self.original_system = system
     
           
-    def analyze_frequency_effects(self, freq_range, base_ees_params, n_iterations=20, time_step=0.1, seed=42):
+    def analyze_frequency_effects(self, freq_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
         Analyze the effects of varying EES frequency with fixed afferent and efferent recruitment.
         
@@ -54,10 +54,10 @@ class Analyzer:
         )
         
         plot_ees_analysis_results(results, save_dir="frequency_analysis", seed=seed)
-        return results
+
         
 
-    def analyze_intensity_effects(self, intensity_range, base_ees_params, n_iterations=20, time_step=0.1, seed=42):
+    def analyze_intensity_effects(self, intensity_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
         Analyze the effects of varying stimulation intensity.
         
@@ -95,7 +95,7 @@ class Analyzer:
         )
         
         plot_ees_analysis_results(results, save_dir="intensity_analysis", seed=seed)
-        return results
+        
       
     def analyse_unbalanced_recruitment_effects(self, b_range, base_ees_params, n_iterations=20, time_step=0.1*ms, seed=42):
         """
@@ -124,7 +124,7 @@ class Analyzer:
             'values': b_range,
             'label': 'Afferent Fiber Unbalanced Recruitment'
         }
-
+        
         # Compute parameter sweep
         results = self._compute_ees_parameter_sweep(
             base_ees_params,
@@ -136,7 +136,7 @@ class Analyzer:
         
         plot_ees_analysis_results(results, save_dir="balance_analysis", seed=seed)    
 
-    def _compute_ees_parameter_sweep(self, param_dict, vary_param, n_iterations, time_step=0.1, seed=42):
+    def _compute_ees_parameter_sweep(self, param_dict, vary_param, n_iterations, time_step=0.1*ms, seed=42):
         """
         Compute EES stimulation analysis by varying a parameter of interest.
         
@@ -180,7 +180,7 @@ class Analyzer:
         activities = None
         
         print(f"Running parameter sweep for {param_label}...")
-        
+        print('time_step ', time_step)
         # Run simulations for each parameter value
         for i, value in enumerate(param_values):
             print(f"  Computing {param_label} = {value} ({i+1}/{len(param_values)})")
@@ -198,8 +198,7 @@ class Analyzer:
                 ees_stimulation_params=current_params,
                 torque_profile=None,
                 seed=seed, 
-                base_output_path=None,
-                plot=False)
+                base_output_path=None)
             
             # Store results
             simulation_data.append(main_data)
@@ -220,14 +219,12 @@ class Analyzer:
             'spikes_data': spikes_data,
             'muscle_names': self.original_system.muscles_names,
             'associated_joint': self.original_system.associated_joint,
-            'num_muscles': self.original_system.num_muscles
+            'num_muscles': self.original_system.number_muscles
         }
         
         return results
       
-
-    
-        
+     
     def clonus_analysis(self, torque_profile, delay_values=None, 
                     threshold_values=None, duration=1, 
                     time_step=0.1, fast_type_mu=True, seed=41):
