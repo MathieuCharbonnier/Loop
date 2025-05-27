@@ -1,7 +1,6 @@
 from brian2 import *
 from .BiologicalSystem import BiologicalSystem
 
-
 class Monosynaptic(BiologicalSystem):
     """
     Specialized class for monosynaptic reflexes.
@@ -10,8 +9,10 @@ class Monosynaptic(BiologicalSystem):
     to motor neurons (MN) without intermediate interneurons.
     """
     def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None, 
-             associated_joint="ankle_angle_r", custom_neurons=None, custom_connections=None, 
-             custom_spindle=None, ees_recruitment_profile=None, fast_type_mu=True):
+             associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
+             spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
+             initial_state_neurons=None, initial_condition_spike_activation=None, 
+             initial_state_opensim=None, activation_funct=None):
     
         if muscles_names is None:
             muscles_names = ["soleus_r"]
@@ -39,43 +40,42 @@ class Monosynaptic(BiologicalSystem):
                 }
             }
 
+        if neurons_population is None:
+            neurons_population = {
+                "Ia": 410,
+                "MN": 500
+            }
+        if connections is None:
+            connections = {
+                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7}
+            }
+        if spindle_model is None:
+            spindle_model = {
+                "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+            }
+        if initial_state_neurons is None:
+            initial_state_neurons = {
+                "MN":{'v': biophysical_params['Eleaky'],
+                      'gIa': 0*nS}
+            }
+        if initial_condition_spike_activation is None:
+
+            initial_condition_spike_activation = [
+                [{
+                    'u0': [0.0, 0.0],
+                    'c0': [0.0, 0.0],
+                    'P0': 0.0,
+                    'a0': 0.0
+                } for _ in range(neurons_population['MN'])]
+        ]
+
+
         # Initialize base class first
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names, associated_joint, fast_type_mu)
-
-        # Now safely set subclass-specific fields
-        self.neurons_population = {
-            "Ia": 410,
-            "MN": 500
-        }
-        if custom_neurons is not None:
-            self.neurons_population.update(custom_neurons)
-
-        self.connections = {
-            ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7}
-        }
-        if custom_connections is not None:
-            self.connections.update(custom_connections)
-
-        self.spindle_model = {
-            "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
-        }
-        if custom_spindle is not None:
-            self.spindle_model.update(custom_spindle)
-
-        self.initial_state_neurons = {
-            "MN":{'v': biophysical_params['Eleaky'],
-                  'gIa': 0*nS}
-        }
-
-        self.initial_condition_spike_activation = [
-            [{
-                'u0': [0.0, 0.0],
-                'c0': [0.0, 0.0],
-                'P0': 0.0,
-                'a0': 0.0
-            } for _ in range(self.neurons_population['MN'])]
-        ]
+                        muscles_names, associated_joint, fast_type_mu,
+                        neurons_population, connections, spindle_model, 
+                        initial_state_neurons, initial_condition_spike_activation, 
+                        initial_state_opensim, activation_funct)
 
         # Validate final configuration
         self.validate_input()
@@ -185,3 +185,7 @@ class Monosynaptic(BiologicalSystem):
             print(f"WARNING: Monosynaptic configuration issues:\n{warning_messages}")
             
         return True
+
+
+
+ 
