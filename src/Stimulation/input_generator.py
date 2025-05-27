@@ -106,12 +106,8 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     # Convert fractions to counts
     counts = {}
     for key, fraction in fractions.items():
-        if "_" in key:
-            fiber_type = key.split("_")[0]
-        else:
-            fiber_type = key
             
-        counts[key] = int(fraction * neurons_population[fiber_type])
+        counts[key] = int(fraction * neurons_population[key])
     
     return {
         "recruitment": counts,
