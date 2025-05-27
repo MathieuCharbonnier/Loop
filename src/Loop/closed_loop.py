@@ -96,7 +96,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         }
         for muscle_name in muscles_names
     }
-    print('spikes_data ', spike_data)
+
 
     # =============================================================================
     # Main Simulation Loop
