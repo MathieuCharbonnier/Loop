@@ -195,8 +195,8 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
     }]
     #Store final state
     final_state_neurons={
-      'MN':{'v' : MN.v,
-      'gIa':MN.gIa}
+      'MN':{'v' : MN.v[:],
+      'gIa':MN.gIa[:]}
     }
                                   
     return [result], final_state_neurons, state_monitors
@@ -459,13 +459,13 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
     }]
                                
     final_state_neurons={
-      'MN': {'v' :MN.v,
-      'gIa' : MN.gIa,
-      'gexc' :MN.gexc
+      'MN': {'v' :MN.v[:],
+      'gIa' : MN.gIa[:],
+      'gexc' :MN.gexc[:]
       },
       'exc':{
-      'v':exc_neurons.v,
-      'gII':exc_neurons.gII
+      'v':exc_neurons.v[:],
+      'gII':exc_neurons.gII[:]
       }
     }
 
@@ -729,20 +729,20 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     print(f"Number of extensor recruited motoneuron: {recruited_MN_extensor}/{n_MN_extensor}")
 
     final_state_neurons = {
-      'inh':{'v':inh.v,
-             'gIa':inh.gIa,
-             'gII':inh.gII,
-             'gi':inh.gi,
-             'ginh':inh.ginh
+      'inh':{'v':inh.v[:].copy(),
+             'gIa':inh.gIa[:].copy(),
+             'gII':inh.gII[:].copy(),
+             'gi':inh.gi[:].copy(),
+             'ginh':inh.ginh[:].copy()
             },
-      'exc':{'v':exc.v,
-             'gII':exc.gII,
+      'exc':{'v':exc.v[:].copy(),
+             'gII':exc.gII[:].copy(),
             },
-      'MN':{'v':inh.v,
-             'gIa':MN.gIa,
-             'gII':MN.gexc,
-             'gi':MN.gi,
-             'ginh':MN.ginh
+      'MN':{'v':MN.v[:].copy(),
+             'gIa':MN.gIa[:].copy(),
+             'gexc':MN.gexc[:].copy(),
+             'gi':MN.gi[:].copy(),
+             'ginh':MN.ginh[:].copy()
             }
     }
       
@@ -1081,26 +1081,26 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
 
     # Store the final state to continue the simulation
     final_state_neurons = {
-      'inh':{'v':inh.v,
-             'gIa':inh.gIa,
-             'gII':inh.gII,
-             'gi':inh.gi,
-             'ginh':inh.ginh
+      'inh':{'v':inh.v[:].copy(),
+             'gIa':inh.gIa[:].copy(),
+             'gII':inh.gII[:].copy(),
+             'gi':inh.gi[:].copy(),
+             'ginh':inh.ginh[:].copy()
             },
-      'inhb':{'v':inhb.v,
-             'gIa':inhb.gIa,
-             'gIb':inh.gIb
+      'inhb':{'v':inhb.v[:].copy(),
+             'gIa':inhb.gIa[:].copy(),
+             'gIb':inh.gIb[:].copy()
             },
-      'exc':{'v': exc.v,
-             'gII':exc.gII,
+      'exc':{'v': exc.v[:].copy(),
+             'gII':exc.gII[:].copy(),
             },
-      'MN':{'v':inh.v,
-             'gIa':MN.gIa,
-             'gII':MN.gexc,
-             'gi_':Mn.gi_,
-             'ginh':Mn.ginh,
-             'gi__':Mn.gi__,
-             'ginhb':Mn.ginhb
+      'MN':{'v':MN.v[:].copy(),
+             'gIa':MN.gIa[:].copy(),
+             'gexc':MN.gexc[:].copy(),
+             'gi_':Mn.gi_[:].copy(),
+             'ginh':Mn.ginh[:].copy(),
+             'gi__':Mn.gi__[:].copy(),
+             'ginhb':Mn.ginhb[:].copy()
             }
     }
     
