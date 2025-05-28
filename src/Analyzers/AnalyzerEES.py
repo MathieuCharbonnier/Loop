@@ -35,7 +35,7 @@ class AnalyzerEES:
         self.original_system = system
         self.results = None
         self._default_ees_params = {
-            'frequency': 50 * hertz,
+            'frequency': 50*hertz,
             'intensity': 0.5
         }
     
@@ -63,7 +63,7 @@ class AnalyzerEES:
             Analysis results containing simulation data and computed metrics
         """
         if freq_range is None:
-            freq_range = [0, 40, 80] * hertz
+            freq_range = [0,40,80] * hertz
         
         if base_ees_params is None:
             base_ees_params = self._default_ees_params.copy()
@@ -238,15 +238,12 @@ class AnalyzerEES:
         for i, value in enumerate(tqdm(param_values, desc=f"Analyzing {param_label}")):
             print(f"  Computing {param_label} = {value} ({i+1}/{len(param_values)})")
             
-            # Create a copy of the base parameters
-            if hasattr(self.original_system, 'copy_brian_dict'):
-                current_params = self.original_system.copy_brian_dict(param_dict)
-            else:
-                current_params = copy.deepcopy(param_dict)
+            current_params = self.original_system.copy_brian_dict(param_dict)
+   
             
             # Update the parameter we're varying
             current_params[param_name] = value
-            
+         
             # Run simulation
             spikes, main_data = self.original_system.run_simulation(
                 n_iterations, 
