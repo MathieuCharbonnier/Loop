@@ -17,7 +17,7 @@ class EESController:
     """
     
     def __init__(self, biological_system, update_iterations, 
-                 initial_ees_params=None, frequency_grid=[30, 70]*hertz, balance_grid=[-0.3, 0.3],
+                 initial_ees_params=None, frequency_grid=[30, 70]*hertz, balance_grid=[-0.8, 0.3],
                   time_step=0.1*ms):
         """
         Initialize the EES controller.
@@ -153,6 +153,7 @@ class EESController:
             print(f"Testing {len(self.frequency_grid)} frequency values")
         
         for i, (freq, balance) in enumerate(param_combinations):
+            print('balance : ', balance)
             # Create test parameters
             test_params =BiologicalSystem.copy_brian_dict(self.current_ees_params)
             test_params['frequency'] = freq
@@ -335,7 +336,7 @@ class EESController:
         ]
         
         # Plot 1: Enhanced trajectory comparison with optimization trajectories
-        axes[0].plot(time_array, desired_traj, color='#000000', linewidth=3, 
+        axes[0].plot(time_array, desired_traj, color='#000000', linewidth=2, 
                     label='Desired trajectory', zorder=10)
         axes[0].plot(time_array, actual_traj, color='#E69F00', linestyle='--', linewidth=2, 
                     label='Actual trajectory (selected)', zorder=9)
@@ -392,7 +393,7 @@ class EESController:
                          fontsize=14, fontweight='bold')
         
         legend = axes[0].legend(bbox_to_anchor=(1.02, 1), loc='upper left', 
-                              fontsize=8, frameon=True, fancybox=True, 
+                              fontsize=11, frameon=True, fancybox=True, 
                               shadow=True, framealpha=0.9)
         legend.get_frame().set_facecolor('white')
         axes[0].grid(True, alpha=0.3)
@@ -403,7 +404,7 @@ class EESController:
         axes[1].set_ylabel('EES Frequency (Hz)')
         axes[1].set_title('EES Frequency Evolution')
         axes[1].grid(True, alpha=0.3)
-        axes[1].set_ylim([self.frequency_range[0] - 5*hertz, self.frequency_range[1] + 5*hertz])
+        axes[1].set_ylim([self.frequency_grid[0] - 5*hertz, self.frequency_grid[-1] + 5*hertz])
         
         # Plot 3: EES Balance evolution (only for multiple muscle systems)
         if self.has_multiple_muscles:
