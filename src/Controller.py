@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from itertools import product
 from copy import deepcopy
 import os
-from .BiologicalSystems.BiologicalSystem import copy_brian_dict
+from .BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 class EESController:
     """
@@ -121,7 +121,7 @@ class EESController:
             Optimal EES parameters
         """
         best_cost = float('inf')
-        best_params = self.copy_brian_dict(self.current_ees_params)
+        best_params = BiologicalSystem.copy_brian_dict(self.current_ees_params)
 
         
         print(f"Optimizing EES parameters at time {current_time:.3f}s...")
@@ -134,7 +134,7 @@ class EESController:
             # Test all combinations of frequency and balance for multiple muscles
             for freq, balance in product(self.frequency_grid, self.balance_grid):
                 # Create test parameters
-                test_params = self.copy_brian_dict(self.current_ees_params)
+                test_params = BiologicalSystem.copy_brian_dict(self.current_ees_params)
                 test_params['frequency'] = freq
                 test_params['balance'] = balance
 
@@ -176,7 +176,7 @@ class EESController:
             # Test only frequency for single muscle systems
             for freq in self.frequency_grid:
                 # Create test parameters
-                test_params = self.copy_brian_dict(self.current_ees_params)
+                test_params = BiologicalSystem.copy_brian_dict(self.current_ees_params)
                 test_params['frequency'] = freq
 
                 # Clone the biological system to avoid modifying the original
