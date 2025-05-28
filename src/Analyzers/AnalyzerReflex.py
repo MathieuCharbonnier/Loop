@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Any, Optional, Callable
 import matplotlib.pyplot as plt
 
-from .BiologicalSystems.BiologicalSystem import BiologicalSystem
+from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 
 class AnalyzerReflex:
