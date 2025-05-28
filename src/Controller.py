@@ -65,7 +65,7 @@ class EESController:
             if self.has_multiple_muscles:
                 self.current_ees_params['balance'] = 0.0
         else:
-            self.current_ees_params = deepcopy(initial_ees_params)
+            self.current_ees_params = BiologicalSystem.copy_brian_dict(initial_ees_params)
             if not self.has_multiple_muscles and 'balance' in self.current_ees_params:
                 del self.current_ees_params['balance']
             
@@ -145,13 +145,13 @@ class EESController:
         
         for i, (freq, balance) in enumerate(param_combinations):
             # Create test parameters
-            test_params = BiologicalSystem.copy_brian_dict(self.current_ees_params)
+            test_params =BiologicalSystem.copy_brian_dict(self.current_ees_params)
             test_params['frequency'] = freq
             if self.has_multiple_muscles:
                 test_params['balance'] = balance
 
             # Clone the biological system for testing
-            test_system = self.biological_system.clone_with()
+            test_system = self.biological_system
                 
             # Run simulation with test parameters
             spikes, time_series = test_system.run_simulation(
@@ -174,7 +174,7 @@ class EESController:
                 optimization_cycle_trajectories.append({
                     'time': prediction_time[:len(actual_trajectory)],
                     'trajectory': actual_trajectory,
-                    'params': deepcopy(test_params),
+                    'params': test_params,
                     'cost': cost
                 })
                     
