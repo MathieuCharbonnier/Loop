@@ -7,7 +7,7 @@ from copy import deepcopy
 from itertools import product
 from typing import Dict, List, Tuple, Any, Optional, Callable
 import warnings
-from .Visualization.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results, plot_ees_analysis_results
+from .Visualization_helpers.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results, plot_ees_analysis_results
 from .BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 class Analyzer:
