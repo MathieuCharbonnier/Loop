@@ -48,12 +48,16 @@ def plot_raster(spikes, base_output_path):
     fig.suptitle('Spikes Raster Plot')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     
-    if base_output_path is not None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fig_path = base_output_path+ f'RASTER_{timestamp}.png'
-        plt.savefig(fig_path)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f'Raster_Plot_{timestamp}.png'
+    if base_output_path:
+        fig_path = os.path.join(base_output_path, filename)
+    else:
+        os.makedirs("Results", exist_ok=True)
+        fig_path = os.path.join("Results", filename)
+    fig.savefig(fig_path)
     plt.show()
-
 
 
 def plot_neural_dynamic(df, muscle_names, base_output_path):
@@ -117,10 +121,14 @@ def plot_neural_dynamic(df, muscle_names, base_output_path):
     fig.suptitle('Neural Dynamics')
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    if base_output_path is not None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fig_path = f"{base_output_path}NEURONS_DYNAMICS_{timestamp}.png"
-        plt.savefig(fig_path)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f'Neurons_Dynamics_{timestamp}.png'
+    if base_output_path:
+        fig_path = os.path.join(base_output_path, filename)
+    else:
+        os.makedirs("Results", exist_ok=True)
+        fig_path = os.path.join("Results", filename)
+    fig.savefig(fig_path)
     plt.show()
 
 
@@ -156,103 +164,93 @@ def plot_activation(df, muscle_names, base_output_path):
     fig.suptitle("Activation Dynamics ")
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    if base_output_path is not None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fig_path = base_output_path+ f'ACTIVATIONS_{timestamp}.png'
-        plt.savefig(fig_path)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f'Activation_{timestamp}.png'
+    if base_output_path:
+        fig_path = os.path.join(base_output_path, filename)
+    else:
+        os.makedirs("Results", exist_ok=True)
+        fig_path = os.path.join("Results", filename)
+    fig.savefig(fig_path)
     plt.show()
 
 
-def plot_mouvement(df, muscle_names, joint_name, base_output_path):
+def plot_mouvement(df, muscle_names, joint_name, base_output_path=None):
     """
-    Plot movement dynamics from a combined dataframe.
+    Plot joint and muscle dynamics from dataframe.
 
     Parameters:
     -----------
     df : pandas.DataFrame
-        Combined dataframe containing data for all muscles with muscle name suffixes
+        Combined dataframe containing time series data.
     muscle_names : list
-        List of muscle names
+        List of muscle names.
     joint_name : str
-        Name of the joint
-    base_output_path : str
-        Path to save the plot
+        Name of the joint (used for column labels).
+    base_output_path : str, optional
+        Path to save the plots.
     """
-    torque_column = f'Torque'
-    has_torque = torque_column in df.columns
-
-    n_subplots = 7 if has_torque else 6
-    fig, axs = plt.subplots(n_subplots, 1, figsize=(12,3*n_subplots ), sharex=True)
+    def save_figure(fig, filename):
+        """Helper to save figures."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'{filename}_{timestamp}.png'
+        if base_output_path:
+            fig_path = os.path.join(base_output_path, filename)
+        else:
+            os.makedirs("Results", exist_ok=True)
+            fig_path = os.path.join("Results", filename)
+        fig.savefig(fig_path)
+        plt.show()
 
     time = df['Time'].values
-    current_axis = 0
+    torque_column = 'Torque'
+    has_torque = torque_column in df.columns
 
-    # Plot torque first, if available
+    # ---------- JOINT PLOT ----------
+    fig_joint, axs_joint = plt.subplots(3 if has_torque else 2, 1, figsize=(12, 9), sharex=True)
+    axs_joint = axs_joint if isinstance(axs_joint, (list, np.ndarray)) else [axs_joint]
+
+    axis_idx = 0
     if has_torque:
-        axs[current_axis].plot(time, df[torque_column], label=f'Torque {joint_name}', color='tab:red')
-        axs[current_axis].set_ylabel("Torque (Nm)")
-        axs[current_axis].legend()
-        current_axis += 1
+        axs_joint[axis_idx].plot(time, df[torque_column], label=f'Torque {joint_name}', color='tab:red')
+        axs_joint[axis_idx].set_ylabel("Torque (Nm)")
+        axs_joint[axis_idx].legend()
+        axis_idx += 1
 
-        # Plot joint angle
-        joint_column = f"Joint_{joint_name}"
-        axs[current_axis].plot(time, df[joint_column], label=joint_name)
-        axs[current_axis].set_ylabel("Joint Angle (°)")
-        axs[current_axis].set_xlabel('Time (s)')
-        axs[current_axis].legend()
-        current_axis += 1
+    axs_joint[axis_idx].plot(time, df[f"Joint_{joint_name}"], label=f"{joint_name} angle")
+    axs_joint[axis_idx].set_ylabel("Joint Angle (°)")
+    axs_joint[axis_idx].legend()
+    axis_idx += 1
 
-        # Plot joint Velocity
-        joint_column = f"Joint_Velocity_{joint_name}"
-        axs[current_axis].plot(time, df[joint_column], label=joint_name+ " velocity")
-        axs[current_axis].set_ylabel("Joint Velocity (°/s)")
-        axs[current_axis].set_xlabel('Time (s)')
-        axs[current_axis].legend()
-        current_axis += 1
+    axs_joint[axis_idx].plot(time, df[f"Joint_Velocity_{joint_name}"], label=f"{joint_name} velocity")
+    axs_joint[axis_idx].set_ylabel("Joint Velocity (°/s)")
+    axs_joint[axis_idx].set_xlabel("Time (s)")
+    axs_joint[axis_idx].legend()
 
+    fig_joint.suptitle("Joint Dynamics")
+    fig_joint.tight_layout(rect=[0, 0.03, 1, 0.95])
+    save_figure(fig_joint, f'Joint_{joint_name}')
 
-    # Plot fiber properties: Fiber_length, Stretch, Velocity
+    # ---------- MUSCLE DYNAMICS PLOT ----------
     props = ['Fiber_length', 'Stretch', 'Stretch_Velocity', 'Normalized_Force']
     ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)', 'Normalized Force (N)']
 
+    fig_muscle, axs_muscle = plt.subplots(len(props), 1, figsize=(12, 3 * len(props)), sharex=True)
+
     for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
         for j, muscle_name in enumerate(muscle_names):
-            column_name = f"{prop}_{muscle_name}"
-            if column_name in df.columns:
-                axs[current_axis].plot(time, df[column_name],
-                                       label=f'{muscle_name}',
-                                       color=colorblind_friendly_colors[color_keys[j % len(color_keys)]])
-        axs[current_axis].set_ylabel(ylabel)
-        axs[current_axis].legend()
-        current_axis+=1
-        
-    if not has_torque:
-        # if there is no torque, plot joint at the end
-        # Plot joint angle
-        joint_column = f"Joint_{joint_name}"
-        axs[current_axis].plot(time, df[joint_column], label=joint_name)
-        axs[current_axis].set_ylabel("Joint Angle (°)")
-        axs[current_axis].set_xlabel('Time (s)')
-        axs[current_axis].legend()
-        current_axis += 1
+            column = f"{prop}_{muscle_name}"
+            if column in df.columns:
+                color = colorblind_friendly_colors[j % len(colorblind_friendly_colors)]
+                axs_muscle[i].plot(time, df[column], label=muscle_name, color=color)
+        axs_muscle[i].set_ylabel(ylabel)
+        axs_muscle[i].legend()
+    axs_muscle[-1].set_xlabel("Time (s)")
 
-        # Plot joint Velocity
-        joint_column = f"Joint_Velocity_{joint_name}"
-        axs[current_axis].plot(time, df[joint_column], label=joint_name+ " velocity")
-        axs[current_axis].set_ylabel("Joint Velocity (°/s)")
-        axs[current_axis].set_xlabel('Time (s)')
-        axs[current_axis].legend()
-        current_axis += 1
+    fig_muscle.suptitle("Muscle Dynamics")
+    fig_muscle.tight_layout(rect=[0, 0.03, 1, 0.95])
+    save_figure(fig_muscle, "Muscle_dynamic")
 
-    
-    fig.suptitle("Movement")
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-
-    if base_output_path is not None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fig_path = base_output_path+ f'MOUVEMENT_{timestamp}.png'
-        plt.savefig(fig_path)
-    plt.show()
 
 def plot_recruitment_curves(ees_recruitment_params, current_current, base_output_path, balance=0, num_muscles=1):
     """
@@ -326,11 +324,16 @@ def plot_recruitment_curves(ees_recruitment_params, current_current, base_output
     plt.xlim(0, 1)
     plt.ylim(0, 1)
 
-    if base_output_path is not None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fig_path = base_output_path+ f'RECUITMENT_CURVES_{timestamp}.png'
-        plt.savefig(fig_path)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f'Recruitment_Curve_{timestamp}.png'
+    if base_output_path:
+        fig_path = os.path.join(base_output_path, filename)
+    else:
+        os.makedirs("Results", exist_ok=True)
+        fig_path = os.path.join("Results", filename)
+    fig.savefig(fig_path)
     plt.show()
+
 
 
 def read_sto(filepath, columns):
