@@ -60,9 +60,9 @@ class Disynaptic(BiologicalSystem):
         
         if connections is None:
             connections = {
-                ("Ia", "MN"): {"w": 2*2.1*nS, "p": 0.9},
-                ("II", "exc"): {"w": 2*3.64*nS, "p": 0.9},
-                ("exc", "MN"): {"w": 2*2.1*nS, "p": 0.9}
+                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.9},
+                ("II", "exc"): {"w": 3.64*nS, "p": 0.9},
+                ("exc", "MN"): {"w": 2.1*nS, "p": 0.9}
             }
 
         if spindle_model is None:
