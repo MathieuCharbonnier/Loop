@@ -713,14 +713,14 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     
     # Extract motoneuron spikes
     MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN_flexor)} 
-    MN_extensor_spikes = {i%n_MN_flexor: mon_MN.spike_trains()[i] for i in range(n_MN_flexor, n_MN_flexor+n_MN_extensor)} 
+    MN_extensor_spikes = {i: mon_MN.spike_trains()[i+n_MN_flexor] for i in range(n_MN_extensor)} 
 
     if ees_freq > 0 :
         ees_spikes = mon_ees_MN.spike_trains()
         MN_flexor_spikes = process_motoneuron_spikes(
             neuron_pop, MN_flexor_spikes, {i: ees_spikes[i] for i in range(MN_flexor_recruited)}, T_refr)
         MN_extensor_spikes = process_motoneuron_spikes(
-            neuron_pop, MN_extensor_spikes, {i%MN_extensor_recruited: ees_spikes[i+MN_extensor_recruited] for i in range(MN_extensor_recruited)}, T_refr)
+            neuron_pop, MN_extensor_spikes, {i%MN_flexor_recruited: ees_spikes[i+MN_flexor_recruited] for i in range(MN_extensor_recruited)}, T_refr)
     
     # Count spiking neurons
     recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
@@ -1071,7 +1071,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
             {i: ees_spikes[i] for i in range(MN_flexor_recruited)}, T_refr)
         MN_extensor_spikes = process_motoneuron_spikes(
             neuron_pop, MN_extensor_spikes, 
-            {i%MN_extensor_recruited: ees_spikes[i + MN_flexor_recruited] for i in range(MN_extensor_recruited)}, T_refr)
+            {i: ees_spikes[i + MN_flexor_recruited] for i in range(MN_extensor_recruited)}, T_refr)
     
     # Count spiking neurons
     recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
