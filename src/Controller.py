@@ -413,7 +413,7 @@ class EESController:
             axes[2].set_ylabel('EES Balance')
             axes[2].set_title('EES Balance Evolution (Flexor-Extensor)')
             axes[2].grid(True, alpha=0.3)
-            axes[2].set_ylim([self.balance_range[0] - 0.1, self.balance_range[1] + 0.1])
+            axes[2].set_ylim([self.balance_grid[0] - 0.1, self.balance_grid[-1] + 0.1])
         
         plt.tight_layout()
         
