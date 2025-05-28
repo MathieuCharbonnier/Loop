@@ -12,7 +12,7 @@ from typing import Dict, List, Tuple, Any, Optional, Callable
 import warnings
 
 
-from .BiologicalSystems.BiologicalSystem import BiologicalSystem
+from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 
 class AnalyzerEES:
