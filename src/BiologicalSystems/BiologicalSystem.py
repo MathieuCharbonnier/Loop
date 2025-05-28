@@ -570,7 +570,18 @@ class BiologicalSystem(ABC):
         fig.savefig(fig_path)
         plt.show()
 
-
+    def get_system_state(self):
+        """Return the current state of the biological system for transfer"""
+        return BiologicalSystem.copy_brian_dict(self.final_state)
+        
+    def set_system_state(self, state):
+        """Set the biological system to a specific state"""
+        state_=BiologicalSystem.copy_brian_dict(state)  
+        self.initial_state_neurons = state_['neurons']
+        self.initial_condition_spike_activation = state_['spikes_activations']
+        self.initial_state_opensim = state_['opensim']
+        self.activation_function = state_['last_activations']
+        
     def update_system_state(self):
         """
         Update the system state with the results from the last simulation.
@@ -579,7 +590,7 @@ class BiologicalSystem(ABC):
         if self.final_state is None:
             raise ValueError("You should first launch a simulation!")
         
-        self.initial_state_neurons = self.final_state['neurons']
+        self.initial_state_neurons = BiologicalSystem.copy_brian_dict(self.final_state['neurons'])
         self.initial_condition_spike_activation = self.final_state['spikes_activations']
         self.initial_state_opensim = self.final_state['opensim']
         self.activation_function = self.final_state['last_activations']
@@ -610,7 +621,7 @@ class BiologicalSystem(ABC):
                 # Use deep copy or custom logic for specific types
                 if isinstance(attr, dict):
                     # Safe copy for Brian2 quantities
-                    kwargs[name] = self.copy_brian_dict(attr)
+                    kwargs[name] = BiologicalSystem.copy_brian_dict(attr)
                 else:
                     kwargs[name] = deepcopy(attr)
             elif param.default is not inspect.Parameter.empty:
