@@ -8,7 +8,7 @@ from itertools import product
 from typing import Dict, List, Tuple, Any, Optional, Callable
 import warnings
 from .Visualization.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results, plot_ees_analysis_results
-from .BiologicalSystems.BiologicalSystem import copy_brian_dict
+from .BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 class Analyzer:
   
@@ -185,7 +185,7 @@ class Analyzer:
             print(f"  Computing {param_label} = {value} ({i+1}/{len(param_values)})")
             
             # Create a copy of the base parameters
-            current_params = copy_brian_dict(param_dict)
+            current_params = BiologicalSystem.copy_brian_dict(param_dict)
             
             # Update the parameter we're varying
             current_params[param_name] = value
@@ -303,12 +303,12 @@ class Analyzer:
             
             fast_twitch_results.append((fast, spikes, time_series))
             
-        plot_twitch_result(fast_twitch_results, self.original_system.muscles_names, self.original_system.associated_joint)
+        plot_twitch_results(fast_twitch_results, self.original_system.muscles_names, self.original_system.associated_joint)
                         
         # 3. Vary threshold voltage
         print("Running threshold variation analysis...")
         for threshold in tqdm(threshold_values, desc="Varying threshold voltage"):
-            bio_phys=copy_brian_dict(self.original_system.biohysical_params)
+            bio_phys=BiologicalSystem.copy_brian_dict(self.original_system.biohysical_params)
             bio_phys['v_threshold'] = threshold
             new_system = self.original_system.clone_with(biophysical_params=bio_phys)
            
