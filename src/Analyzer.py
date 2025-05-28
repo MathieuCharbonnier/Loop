@@ -8,7 +8,7 @@ from itertools import product
 from typing import Dict, List, Tuple, Any, Optional, Callable
 import warnings
 from .Visualization.plot_parameters_variations import plot_delay_results, plot_excitability_results, plot_twitch_results, plot_ees_analysis_results
-
+from .BiologicalSystems.BiologicalSystem import copy_brian_dict
 
 class Analyzer:
   
@@ -39,7 +39,7 @@ class Analyzer:
             Analysis results containing simulation data and computed metrics
         """
         vary_param = {
-            'param_name': 'ees_freq',
+            'param_name': 'frequency',
             'values': freq_range,
             'label': 'EES Frequency (Hz)'
         }
@@ -180,13 +180,12 @@ class Analyzer:
         activities = None
         
         print(f"Running parameter sweep for {param_label}...")
-        print('time_step ', time_step)
         # Run simulations for each parameter value
         for i, value in enumerate(param_values):
             print(f"  Computing {param_label} = {value} ({i+1}/{len(param_values)})")
             
             # Create a copy of the base parameters
-            current_params = param_dict.copy()
+            current_params = copy_brian_dict(param_dict)
             
             # Update the parameter we're varying
             current_params[param_name] = value
@@ -268,11 +267,10 @@ class Analyzer:
         # 1. Vary delay (reaction time)
         print("Running delay variation analysis...")
         for delay in tqdm(delay_values, desc="Varying delay"):
-            delay_seconds = delay / 1000.0  # Convert ms to seconds
+       
             n_iterations = int(duration / delay_seconds)
            
-            new_system = self.original_system.deepcopy()
-            new_system.reaction_time = delay_seconds
+            new_system = self.original_system.clone_with(reaction_time=delay)
             spikes, time_series = new_system.run_simulation(
                 n_iterations, 
                 time_step,
@@ -287,16 +285,13 @@ class Analyzer:
         plot_delay_results(delay_results, delay_values, self.original_system.muscles_names, self.original_system.associated_joint)
                         
         n_iterations = int(duration / self.original_system.reaction_time)
-        time_points = np.arange(0, self.original_system.reaction_time * n_iterations, time_step / 1000.0)
-        torque_array = transform_torque_params_in_array(time_points, torque_profile)
                         
         # 2. Vary fast twitch parameter
         print("Running fast twitch variation analysis...")
         fast_twitch_values = [False, True]
         
         for fast in tqdm(fast_twitch_values, desc="Varying fast twitch parameter"):
-            new_system = self.original_system.deepcopy()
-            new_system.fast = fast
+            new_system = self.original_system.clone_with(fast_type_mu=fast)
             spikes, time_series = new_system.run_simulation(
                 n_iterations, 
                 time_step,
@@ -313,8 +308,10 @@ class Analyzer:
         # 3. Vary threshold voltage
         print("Running threshold variation analysis...")
         for threshold in tqdm(threshold_values, desc="Varying threshold voltage"):
-            new_system = self.original_system.deepcopy()
-            new_system.biophysical_params['v_threshold'] = threshold / 1000.0  # Convert mV to V
+            bio_phys=copy_brian_dict(self.original_system.biohysical_params)
+            bio_phys['v_threshold'] = threshold
+            new_system = self.original_system.clone_with(biophysical_params=bio_phys)
+           
             spikes, time_series = new_system.run_simulation(
                 n_iterations, 
                 time_step,
