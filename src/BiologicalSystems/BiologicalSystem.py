@@ -8,7 +8,7 @@ import inspect
 from scipy.signal import find_peaks
 
 from ..Loop.closed_loop import closed_loop
-from ..Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
+from ..Visualization_helpers.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
 from ..Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
 
 
