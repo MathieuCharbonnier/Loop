@@ -5,6 +5,7 @@ import os
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import inspect
+from scipy.signal import find_peaks
 
 from ..Loop.closed_loop import closed_loop
 from ..Visualization.plots import plot_mouvement, plot_neural_dynamic, plot_raster, plot_activation, plot_recruitment_curves
@@ -149,6 +150,37 @@ class BiologicalSystem(ABC):
         plot_neural_dynamic(self.time_series, self.muscles_names, base_output_path)
         plot_raster(self.spikes, base_output_path)
         plot_activation(self.time_series, self.muscles_names, base_output_path)
+        
+
+
+    def plot_frequency_spectrum(self, col_name):
+        
+        time_serie=self.time_series[col_name]
+        dt=self.times_series.iloc[2,'Time']-self.times_series.iloc[1,'Time']
+        n = len(time_serie)
+        freqs = np.fft.fftfreq(n, d=dt)
+        fft_values = np.fft.fft(time_serie)
+    
+        # Keep only positive frequencies
+        pos_mask = freqs > 0
+        freqs = freqs[pos_mask]
+        magnitudes = np.abs(fft_values[pos_mask])
+        plt.plot(freqs, mags)
+        plt.xlabel("Frequency (Hz)")
+        plt.ylabel("Amplitude")
+        plt.title("Frequency Spectrum of Ankle Joint Movement")
+        plt.grid()
+        plt.show()
+
+    def compute_period_from_peaks(self, col_name):
+        time_serie=self.time_series[col_name]
+        dt=self.times_series.iloc[2,'Time']-self.times_series.iloc[1,'Time']
+        peaks, _ = find_peaks(time_serie)
+        if len(peaks) < 2:
+            return 0.0  # Not enough peaks to estimate frequency
+        peak_times = peaks * dt
+        periods = np.diff(peak_times)
+        return  np.mean(periods)
 
     def update_system_state(self):
         """
