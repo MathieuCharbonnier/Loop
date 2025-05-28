@@ -30,7 +30,7 @@ class Disynaptic(BiologicalSystem):
                 'Cm': 0.3*nF,
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
-                'threshold_v': -50*mV
+                'threshold_v': -45*mV
             }
             
         if ees_recruitment_profile is None:
@@ -60,9 +60,9 @@ class Disynaptic(BiologicalSystem):
         
         if connections is None:
             connections = {
-                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.9},
-                ("II", "exc"): {"w": 3.64*nS, "p": 0.9},
-                ("exc", "MN"): {"w": 2.1*nS, "p": 0.9}
+                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.5},
+                ("II", "exc"): {"w": 3.64*nS, "p": 0.5},
+                ("exc", "MN"): {"w": 2.1*nS, "p": 0.5}
             }
 
         if spindle_model is None:
