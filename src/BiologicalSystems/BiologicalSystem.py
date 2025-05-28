@@ -638,7 +638,6 @@ class BiologicalSystem(ABC):
         kwargs.update(params)
         return cls(**kwargs)
 
-
     @staticmethod 
     def copy_brian_dict(d):
         """
@@ -657,9 +656,9 @@ class BiologicalSystem(ABC):
         if isinstance(d, dict):
             # If d is a dictionary, apply the function to each value
             return {k: BiologicalSystem.copy_brian_dict(v) for k, v in d.items()}
-        elif hasattr(d, 'copy'):
-            # If the object has a `.copy()` method (e.g., Brian2 Quantity), use it
+        elif hasattr(d, 'copy') and callable(getattr(d, 'copy', None)):
+            # If the object has a callable `.copy()` method (e.g., Brian2 Quantity), use it
             return d.copy()
         else:
-            # Otherwise, return the value as-is (int, float, string, etc.)
+            # Otherwise, return the value as-is (int, float, string, bool, etc.)
             return d
