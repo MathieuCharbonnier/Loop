@@ -106,10 +106,7 @@ def plot_excitability_results(threshold_results, threshold_values, muscles_names
     fig3.tight_layout(rect=[0, 0, 1, 0.95])
     fig3.savefig(os.path.join(output_dir, f'threshold_variation_{timestamp}.png'))
     
-import os
-import matplotlib.pyplot as plt
-from datetime import datetime
-import numpy as np
+
 
 def plot_ees_analysis_results(results, save_dir="stimulation_analysis", seed=42):
     """
@@ -239,7 +236,7 @@ def plot_ees_analysis_results(results, save_dir="stimulation_analysis", seed=42)
     print("All plots saved to", save_dir)
 
     # Coactivation analysis for 2-muscle systems
-    if num_muscles == 2 and activities is not None:
+    if num_muscles == 2: 
         plot_coactivation_analysis(results, save_dir, timestamp, seed)
     
     plt.show()
@@ -267,9 +264,10 @@ def plot_coactivation_analysis(results, save_dir, timestamp, seed):
     param_values = results['param_values']
     param_name = results['param_name']
     param_label = results['param_label']
-    activities = results['activities']
+    simulation_data = results['simulation_data']
     time_data = results['time_data']
-    
+    muscles_names = results['muscle_names']
+    activities=np.array(simulation_data[f'activition_{muscle_name}].values for muscle_name in muscles_names)
     # Define activation threshold
     activation_threshold = 0.1
     
