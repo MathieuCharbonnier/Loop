@@ -267,7 +267,7 @@ def plot_coactivation_analysis(results, save_dir, timestamp, seed):
     simulation_data = results['simulation_data']
     time_data = results['time_data']
     muscles_names = results['muscle_names']
-    activities=np.array(simulation_data[f'activition_{muscle_name}].values for muscle_name in muscles_names)
+    activities=np.array(simulation_data[f'activition_{muscle_name}'].values for muscle_name in muscles_names)
     # Define activation threshold
     activation_threshold = 0.1
     
