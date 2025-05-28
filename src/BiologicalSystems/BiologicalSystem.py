@@ -572,7 +572,14 @@ class BiologicalSystem(ABC):
 
     def get_system_state(self):
         """Return the current state of the biological system for transfer"""
-        return BiologicalSystem.copy_brian_dict(self.final_state)
+        if self.final_state is not None:
+            return BiologicalSystem.copy_brian_dict(self.final_state)
+        else:
+            return {'neurons': BiologicalSystem.copy_brian_dict(self.nitial_state_neurons),
+                    'spikes_activations':self.initial_condition_spike_activation,
+                    'opensim': self.initial_state_opensim ,
+                    'last_activations': self.activation_function}
+                    
         
     def set_system_state(self, state):
         """Set the biological system to a specific state"""
@@ -595,7 +602,7 @@ class BiologicalSystem(ABC):
         self.activation_function = self.final_state['last_activations']
 
 
-    def clone_with(self, **params):
+    def clone_with(self, **params): 
         """
         Create a clone of the system with modified parameters.
         
