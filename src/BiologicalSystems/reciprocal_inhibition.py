@@ -125,7 +125,7 @@ class ReciprocalInhibition(BiologicalSystem):
             spindle_model = {
                 "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
                 "II": "20 + 13.5*stretch",
-                "II_Ia_delta_delay": 15*ms
+                "Ia_II_delta_delay": 15*ms
             }
             
         if initial_condition_spike_activation is None:
