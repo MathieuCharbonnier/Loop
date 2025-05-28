@@ -576,11 +576,10 @@ class BiologicalSystem(ABC):
         
     def set_system_state(self, state):
         """Set the biological system to a specific state"""
-        state_=BiologicalSystem.copy_brian_dict(state)  
-        self.initial_state_neurons = state_['neurons']
-        self.initial_condition_spike_activation = state_['spikes_activations']
-        self.initial_state_opensim = state_['opensim']
-        self.activation_function = state_['last_activations']
+        self.initial_state_neurons = state['neurons']
+        self.initial_condition_spike_activation = state['spikes_activations']
+        self.initial_state_opensim = state['opensim']
+        self.activation_function = state['last_activations']
         
     def update_system_state(self):
         """
