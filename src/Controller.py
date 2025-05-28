@@ -150,11 +150,9 @@ class EESController:
             if self.has_multiple_muscles:
                 test_params['balance'] = balance
 
-            # Clone the biological system for testing
-            test_system = self.biological_system
                 
             # Run simulation with test parameters
-            spikes, time_series = test_system.run_simulation(
+            spikes, time_series = self.biological_system.run_simulation(
                 n_iterations=self.update_iterations,
                 time_step=self.time_step,
                 ees_stimulation_params=test_params
@@ -185,7 +183,7 @@ class EESController:
                     best_spikes = spikes
                     best_time_series = time_series
                     # Save the system state after the best simulation
-                    best_system_state = test_system.get_system_state()
+                    best_system_state = self.biological_system.get_system_state()
         
         print(f"Best cost: {best_cost:.6f}")
         if self.has_multiple_muscles:
