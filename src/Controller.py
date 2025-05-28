@@ -1,9 +1,11 @@
 from brian2 import *
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from itertools import product
 from copy import deepcopy
 import os
+from scipy.interpolate import interp1d
 from .BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 class EESController:
@@ -14,7 +16,7 @@ class EESController:
     combinations and selects the one that best matches the desired trajectory.
     """
     
-    def __init__(self, biological_system, desired_trajectory_func, update_iterations, 
+    def __init__(self, biological_system, update_iterations, 
                  initial_ees_params=None, frequency_range=(0, 80)*hertz, balance_range=(-1.0, 1.0),
                  frequency_step=40*hertz, balance_step=0.6, time_step=0.1*ms):
         """
@@ -40,12 +42,22 @@ class EESController:
             Step size for balance optimization (ignored for single muscle)
         """
         self.biological_system = biological_system.clone_with()
-        self.desired_trajectory_func = desired_trajectory_func
         self.update_iterations = update_iterations
         self.time_step=time_step
         # Check if system has multiple muscles
         self.has_multiple_muscles = self.biological_system.number_muscles > 1
         
+        # Path to your .mot file
+        mot_file = 'data/subject01_walk1.mot'
+        # Read .mot file, skipping the header (first 6 lines)
+        df = pd.read_csv(mot_file, sep='\t', skiprows=6)
+        # Clean column names (strip leading/trailing spaces)
+        df.columns = df.columns.str.strip()
+        # Extract time and ankle angles
+        time = df['time'].values
+        data = df[self.associated_joint].values
+        self.desired_trajectory_function=interp1d(time, data, kind='cubic', fill_value="extrapolate")
+
         # Default EES parameters
         if initial_ees_params is None:
             self.current_ees_params = {
@@ -223,7 +235,7 @@ class EESController:
         
         return best_params, best_cost
     
-    def run_control(self, total_iterations, time_step=0.1*ms, base_output_path=None):
+    def run (self, total_iterations, time_step=0.1*ms, base_output_path=None):
         """
         Run the complete control simulation.
         
@@ -534,55 +546,4 @@ class EESController:
         return metrics
 
 
-# Example usage and utility functions
-def create_sinusoidal_trajectory(amplitude=30, frequency=0.5, offset=0):
-    """
-    Create a sinusoidal desired trajectory function.
-    
-    Parameters:
-    -----------
-    amplitude : float
-        Amplitude of the sinusoid (degrees)
-    frequency : float
-        Frequency of the sinusoid (Hz)
-    offset : float
-        Vertical offset (degrees)
-        
-    Returns:
-    --------
-    callable
-        Function that takes time array and returns trajectory
-    """
-    def trajectory_func(time_array):
-        return amplitude * np.sin(2 * np.pi * frequency * time_array) + offset
-    
-    return trajectory_func
 
-
-def create_step_trajectory(step_times, step_values, initial_value=0):
-    """
-    Create a step function trajectory.
-    
-    Parameters:
-    -----------
-    step_times : list
-        Times at which steps occur
-    step_values : list
-        Values after each step
-    initial_value : float
-        Initial value before first step
-        
-    Returns:
-    --------
-    callable
-        Function that takes time array and returns trajectory
-    """
-    def trajectory_func(time_array):
-        trajectory = np.full_like(time_array, initial_value)
-        
-        for step_time, step_value in zip(step_times, step_values):
-            trajectory[time_array >= step_time] = step_value
-            
-        return trajectory
-    
-    return trajectory_func
