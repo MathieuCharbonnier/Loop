@@ -93,32 +93,32 @@ class ReciprocalInhibition(BiologicalSystem):
         if connections is None:
             connections = {
                 # Direct pathways
-                ("Ia_flexor", "MN_flexor"): {"w": 2*2.1*nS, "p": 0.9},
-                ("Ia_extensor", "MN_extensor"): {"w": 2*2.1*nS, "p": 0.9},
+                ("Ia_flexor", "MN_flexor"): {"w": 2.1*nS, "p": 0.9},
+                ("Ia_extensor", "MN_extensor"): {"w": 2.1*nS, "p": 0.9},
                 
                 # Ia inhibition pathways
-                ("Ia_flexor", "inh_flexor"): {"w": 2*3.64*nS, "p": 0.9},
-                ("Ia_extensor", "inh_extensor"): {"w": 2*3.64*nS, "p": 0.9},
+                ("Ia_flexor", "inh_flexor"): {"w": 3.64*nS, "p": 0.9},
+                ("Ia_extensor", "inh_extensor"): {"w": 3.64*nS, "p": 0.9},
                 
                 # Type II excitation pathways
-                ("II_flexor", "exc_flexor"): {"w": 2*1.65*nS, "p": 0.9},
-                ("II_extensor", "exc_extensor"): {"w": 2*1.65*nS, "p": 0.9},
+                ("II_flexor", "exc_flexor"): {"w": 1.65*nS, "p": 0.9},
+                ("II_extensor", "exc_extensor"): {"w": 1.65*nS, "p": 0.9},
                 
                 # Type II inhibition pathways
-                ("II_flexor", "inh_flexor"): {"w": 2*2.19*nS, "p": 0.9},
-                ("II_extensor", "inh_extensor"): {"w": 2*2.19*nS, "p": 0.9},
+                ("II_flexor", "inh_flexor"): {"w": 2.19*nS, "p": 0.9},
+                ("II_extensor", "inh_extensor"): {"w": 2.19*nS, "p": 0.9},
                 
                 # Excitatory interneuron to motoneuron pathways
-                ("exc_flexor", "MN_flexor"): {"w": 2*0.7*nS, "p": 0.6},
-                ("exc_extensor", "MN_extensor"): {"w": 2*0.7*nS, "p": 0.6},
+                ("exc_flexor", "MN_flexor"): {"w": 0.7*nS, "p": 0.6},
+                ("exc_extensor", "MN_extensor"): {"w": 0.7*nS, "p": 0.6},
                 
                 # Reciprocal inhibition pathways
-                ("inh_flexor", "MN_extensor"): {"w": 2*0.2*nS, "p": 0.8},
-                ("inh_extensor", "MN_flexor"): {"w": 2*0.2*nS, "p": 0.8},
+                ("inh_flexor", "MN_extensor"): {"w": 0.2*nS, "p": 0.8},
+                ("inh_extensor", "MN_flexor"): {"w": 0.2*nS, "p": 0.8},
                 
                 # Inhibitory interneuron interactions
-                ("inh_flexor", "inh_extensor"): {"w": 2*0.76*nS, "p": 0.3},
-                ("inh_extensor", "inh_flexor"): {"w": 2*0.76*nS, "p": 0.3}
+                ("inh_flexor", "inh_extensor"): {"w": 0.76*nS, "p": 0.3},
+                ("inh_extensor", "inh_flexor"): {"w": 0.76*nS, "p": 0.3}
             }
             
         if spindle_model is None:
