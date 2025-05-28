@@ -17,8 +17,8 @@ class EESController:
     """
     
     def __init__(self, biological_system, update_iterations, 
-                 initial_ees_params=None, frequency_range=(0, 80)*hertz, balance_range=(-1.0, 1.0),
-                 frequency_step=40*hertz, balance_step=0.6, time_step=0.1*ms):
+                 initial_ees_params=None, frequency_grid=[30, 70]*hertz, balance_grid=[-0.3, 0.3],
+                  time_step=0.1*ms):
         """
         Initialize the EES controller.
         
@@ -49,11 +49,27 @@ class EESController:
         self.has_multiple_muscles = self.biological_system.number_muscles > 1
         
         # Load trajectory data
-        mot_file = 'data/subject01_walk1.mot'
+        mot_file = 'data/BothLegsWalk.mot'
+
+        # Use tab separator instead of space separator
         df = pd.read_csv(mot_file, sep='\t', skiprows=6)
+        # Clean column names (remove extra whitespace)
         df.columns = df.columns.str.strip()
+
+        def move_side_to_suffix(col):
+            if col.startswith('r_'):
+                return col[2:] + '_r'
+            elif col.startswith('l_'):
+                return col[2:] + '_l'
+            else:
+                return col
+
+        df.columns = [move_side_to_suffix(col) for col in df.columns]
+
+        # Extract time and joint data
         time = df['time'].values
-        data = df[self.biological_system.associated_joint].values  # Fixed reference
+        data = df[self.biological_system.associated_joint].values
+
         self.desired_trajectory_function = interp1d(time, data, kind='cubic', fill_value="extrapolate")
 
         # Default EES parameters
@@ -70,16 +86,9 @@ class EESController:
                 del self.current_ees_params['balance']
             
         # Optimization ranges
-        self.frequency_range = frequency_range
-        self.balance_range = balance_range
-        self.frequency_step = frequency_step
-        self.balance_step = balance_step
-        
-        # Generate parameter grids for optimization
-        self.frequency_grid = np.arange(frequency_range[0], frequency_range[1], frequency_step) * hertz
-        
+        self.frequency_grid = frequency_grid
         if self.has_multiple_muscles:
-            self.balance_grid = np.arange(balance_range[0], balance_range[1], balance_step)
+            self.balance_grid = balance_grid
         else:
             self.balance_grid = []
         
