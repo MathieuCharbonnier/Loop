@@ -2,6 +2,7 @@ from brian2 import *
 import numpy as np
 import os
 from typing import Dict, List, Union, Tuple, Optional
+import time
 
 def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,  
                                 neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
@@ -251,6 +252,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
         a dictionary with final membrane potentials and post_synaptic current recorded in motoneurons.
     """
     # Set up random seeds for reproducibility
+  
     np.random.seed(seed_run)
     seed(seed_run)
     defaultclock.dt = dt_run
@@ -320,7 +322,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
             n_II, 
             equation_baseline + f'''
             is_ees = (i < {II_recruited}): boolean
-            rate = ({equation_II})*hertz + {freq} * int(is_ees): Hz
+            rate = ({equation_II})*hertz + freq * int(is_ees): Hz
             ''', 
             threshold='rand() < rate*dt', 
             refractory=T_refr, 
@@ -525,6 +527,10 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         Tuple containing a list of dictionaries with spike train data for flexor and extensor pathways,
         a dictionary with final membrane potentials and post_synapstic current recorded in interesting neurons type.
     """
+
+
+    start_build = time.time()
+
     # Set up random seeds for reproducibility
     np.random.seed(seed_run)
     seed(seed_run)
@@ -708,20 +714,51 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         mon_ees_MN = SpikeMonitor(ees_MN)
         net.add([ees_MN, mon_ees_MN])
 
+    end_build = time.time()
+
+    start_run=time.time()
     # Run simulation
     net.run(T)
     
+    end_run = time.time()
+
+    print(f"Network build time: {end_build - start_build:.2f} s")
+    print(f"Simulation run time: {end_run - start_run:.2f} s")
     # Extract motoneuron spikes
     MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN_flexor)} 
-    MN_extensor_spikes = {i: mon_MN.spike_trains()[i+n_MN_flexor] for i in range(n_MN_extensor)} 
-
-    if ees_freq > 0 :
-        ees_spikes = mon_ees_MN.spike_trains()
-        MN_flexor_spikes = process_motoneuron_spikes(
-            neuron_pop, MN_flexor_spikes, {i: ees_spikes[i] for i in range(MN_flexor_recruited)}, T_refr)
-        MN_extensor_spikes = process_motoneuron_spikes(
-            neuron_pop, MN_extensor_spikes, {i%MN_flexor_recruited: ees_spikes[i+MN_flexor_recruited] for i in range(MN_extensor_recruited)}, T_refr)
+    MN_extensor_spikes = {i: mon_MN.spike_trains()[i + n_MN_flexor] for i in range(n_MN_extensor)} 
     
+    if ees_freq > 0:
+        ees_spikes = mon_ees_MN.spike_trains()
+    
+        if MN_flexor_recruited > 0:
+            MN_flexor_spikes = process_motoneuron_spikes(
+                neuron_pop,
+                MN_flexor_spikes,
+                {i: ees_spikes[i] for i in range(MN_flexor_recruited)},
+                T_refr
+            )
+    
+            # Only map if MN_flexor_recruited > 0 to avoid modulo error
+            MN_extensor_spikes = process_motoneuron_spikes(
+                neuron_pop,
+                MN_extensor_spikes,
+                {
+                    i % MN_flexor_recruited: ees_spikes[i + MN_flexor_recruited]
+                    for i in range(MN_extensor_recruited)
+                },
+                T_refr
+            )
+    
+        elif MN_extensor_recruited > 0:
+            MN_extensor_spikes = process_motoneuron_spikes(
+                neuron_pop,
+                MN_extensor_spikes,
+                {i: ees_spikes[i] for i in range(MN_extensor_recruited)},
+                T_refr
+            )
+
+  
     # Count spiking neurons
     recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
     print(f"Number of flexor recruited motoneuron: {recruited_MN_flexor}/{n_MN_flexor}")
@@ -729,20 +766,20 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     print(f"Number of extensor recruited motoneuron: {recruited_MN_extensor}/{n_MN_extensor}")
 
     final_state_neurons = {
-      'inh':{'v':inh.v[:].copy(),
-             'gIa':inh.gIa[:].copy(),
-             'gII':inh.gII[:].copy(),
-             'gi':inh.gi[:].copy(),
-             'ginh':inh.ginh[:].copy()
+      'inh':{'v':inh.v[:],
+             'gIa':inh.gIa[:],
+             'gII':inh.gII[:],
+             'gi':inh.gi[:],
+             'ginh':inh.ginh[:]
             },
-      'exc':{'v':exc.v[:].copy(),
-             'gII':exc.gII[:].copy(),
+      'exc':{'v':exc.v[:],
+             'gII':exc.gII[:],
             },
-      'MN':{'v':MN.v[:].copy(),
-             'gIa':MN.gIa[:].copy(),
-             'gexc':MN.gexc[:].copy(),
-             'gi':MN.gi[:].copy(),
-             'ginh':MN.ginh[:].copy()
+      'MN':{'v':MN.v[:],
+             'gIa':MN.gIa[:],
+             'gexc':MN.gexc[:],
+             'gi':MN.gi[:],
+             'ginh':MN.ginh[:]
             }
     }
       
@@ -1061,17 +1098,38 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
     
     # Extract motoneuron spikes
     MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN_flexor)} 
-    MN_extensor_spikes = {i%n_MN_flexor: mon_MN.spike_trains()[i] for i in range(n_MN_flexor, n_MN_flexor + n_MN_extensor)} 
-
-    # Process EES effects if enabled
+    MN_extensor_spikes = {i: mon_MN.spike_trains()[i + n_MN_flexor] for i in range(n_MN_extensor)} 
+    
     if ees_freq > 0:
         ees_spikes = mon_ees_MN.spike_trains()
-        MN_flexor_spikes = process_motoneuron_spikes(
-            neuron_pop, MN_flexor_spikes, 
-            {i: ees_spikes[i] for i in range(MN_flexor_recruited)}, T_refr)
-        MN_extensor_spikes = process_motoneuron_spikes(
-            neuron_pop, MN_extensor_spikes, 
-            {i: ees_spikes[i + MN_flexor_recruited] for i in range(MN_extensor_recruited)}, T_refr)
+    
+        if MN_flexor_recruited > 0:
+            MN_flexor_spikes = process_motoneuron_spikes(
+                neuron_pop,
+                MN_flexor_spikes,
+                {i: ees_spikes[i] for i in range(MN_flexor_recruited)},
+                T_refr
+            )
+    
+            # Only map if MN_flexor_recruited > 0 to avoid modulo error
+            MN_extensor_spikes = process_motoneuron_spikes(
+                neuron_pop,
+                MN_extensor_spikes,
+                {
+                    i % MN_flexor_recruited: ees_spikes[i + MN_flexor_recruited]
+                    for i in range(MN_extensor_recruited)
+                },
+                T_refr
+            )
+    
+        elif MN_extensor_recruited > 0:
+            MN_extensor_spikes = process_motoneuron_spikes(
+                neuron_pop,
+                MN_extensor_spikes,
+                {i: ees_spikes[i] for i in range(MN_extensor_recruited)},
+                T_refr
+            )
+
     
     # Count spiking neurons
     recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
@@ -1081,26 +1139,26 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
 
     # Store the final state to continue the simulation
     final_state_neurons = {
-      'inh':{'v':inh.v[:].copy(),
-             'gIa':inh.gIa[:].copy(),
-             'gII':inh.gII[:].copy(),
-             'gi':inh.gi[:].copy(),
-             'ginh':inh.ginh[:].copy()
+      'inh':{'v':inh.v[:],
+             'gIa':inh.gIa[:],
+             'gII':inh.gII[:],
+             'gi':inh.gi[:],
+             'ginh':inh.ginh[:]
             },
-      'inhb':{'v':inhb.v[:].copy(),
-             'gIa':inhb.gIa[:].copy(),
-             'gIb':inh.gIb[:].copy()
+      'inhb':{'v':inhb.v[:],
+             'gIa':inhb.gIa[:],
+             'gIb':inh.gIb[:]
             },
-      'exc':{'v': exc.v[:].copy(),
-             'gII':exc.gII[:].copy(),
+      'exc':{'v': exc.v[:],
+             'gII':exc.gII[:],
             },
-      'MN':{'v':MN.v[:].copy(),
-             'gIa':MN.gIa[:].copy(),
-             'gexc':MN.gexc[:].copy(),
-             'gi_':Mn.gi_[:].copy(),
-             'ginh':Mn.ginh[:].copy(),
-             'gi__':Mn.gi__[:].copy(),
-             'ginhb':Mn.ginhb[:].copy()
+      'MN':{'v':MN.v[:],
+             'gIa':MN.gIa[:],
+             'gexc':MN.gexc[:],
+             'gi_':Mn.gi_[:],
+             'ginh':Mn.ginh[:],
+             'gi__':Mn.gi__[:],
+             'ginhb':Mn.ginhb[:]
             }
     }
     
