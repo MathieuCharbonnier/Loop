@@ -125,8 +125,12 @@ class BiologicalSystem(ABC):
         tuple
             (spikes, time_series) containing simulation results
         """
-        if not time_step.dim == second.dim:
-            raise ValueError(f"Time step has incorrect unit! ")
+
+        if not isinstance(time_step, Quantity):
+            raise TypeError("time_step must be a Quantity with physical units.")
+
+        if not time_step.dimensions == second.dimensions:
+            raise ValueError(f"Time step has incorrect unit! Got {time_step.unit}, expected a time unit.")
 
         torque_array = None
         if torque_profile is not None:
