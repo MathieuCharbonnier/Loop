@@ -8,7 +8,7 @@ import os
 from scipy.interpolate import interp1d
 from .BiologicalSystems.BiologicalSystem import BiologicalSystem
 
-class ControllerEESBase:
+class BaseEESController:
     """
     Model Predictive Controller for EES parameters to achieve desired joint trajectories.
     
