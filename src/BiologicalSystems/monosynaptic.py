@@ -35,8 +35,8 @@ class Monosynaptic(BiologicalSystem):
                     'saturation_90pct': 0.7
                 },
                 'MN': {
-                    'threshold_10pct': 0.7,
-                    'saturation_90pct': 0.9
+                    'threshold_10pct': 0.9,
+                    'saturation_90pct': 1
                 }
             }
 
