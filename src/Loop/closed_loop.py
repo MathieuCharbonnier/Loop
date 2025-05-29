@@ -89,7 +89,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     muscle_data = [[] for _ in range(num_muscles)]
     resting_lengths = [None] * num_muscles
 
-    neuron_types = set(k.split('_')[0] for k in neurons_population.keys())
+    neuron_types = list(dict.fromkeys(k.split('_')[0] for k in neurons_population.keys()))
+    #neuron_types = set(k.split('_')[0] for k in neurons_population.keys())
     spike_data = {
         muscle_name: {
             neuron_type: defaultdict(list)
@@ -312,7 +313,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         stretch_values = df[f'Stretch_{muscle_name}'].values
         stretch_velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
 
-        time = df['Time'].values
+        time_values = df['Time'].values
         
         # Compute Ia firing rate using spindle model
         Ia_rate = eval(spindle_model['Ia'], 
@@ -349,7 +350,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     firing_rate = np.zeros_like(time)
                     if len(all_spike_times) > 1:
                         kde = gaussian_kde(all_spike_times, bw_method=0.3)
-                        firing_rate = kde(time) * len(all_spike_times) / max(len(fiber_spikes), 1)
+                        firing_rate = kde(time_values) * len(all_spike_times) / max(len(fiber_spikes), 1)
                         
                     df[f'{fiber_name}_rate_{muscle_name}'] = firing_rate
         except Exception as e:
