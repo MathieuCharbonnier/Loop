@@ -68,8 +68,8 @@ class SpinalCircuitWithIb(BiologicalSystem):
                     'saturation_90pct': 0.8  # and higher saturation point
                 },
                 'MN': {
-                    'threshold_10pct': 0.7,  # Motoneurons are recruited at high intensity
-                    'saturation_90pct': 0.9  
+                    'threshold_10pct': 0.9,  # Motoneurons are recruited at high intensity
+                    'saturation_90pct': 1  
                 }  
             }
         
@@ -78,12 +78,12 @@ class SpinalCircuitWithIb(BiologicalSystem):
         if neurons_population is None:
             neurons_population = {
                 # Afferents for each muscle
-                "Ia_flexor": 280,
-                "II_flexor": 280,
-                "Ib_flexor": 280,
-                "Ia_extensor": 160,
-                "II_extensor": 160,
-                "Ib_extensor": 160,
+                "Ia_flexor": 200,#280,
+                "II_flexor": 200,#280,
+                "Ib_flexor":200, #280,
+                "Ia_extensor":200, #160,
+                "II_extensor": 200,#160,
+                "Ib_extensor": 200,#160,
           
                 # Interneurons
                 "exc_flexor": 500,
@@ -94,8 +94,8 @@ class SpinalCircuitWithIb(BiologicalSystem):
                 "inhb_extensor": 300,
                 
                 # Motor neurons
-                "MN_flexor": 450,
-                "MN_extensor": 580
+                "MN_flexor":400, #450,
+                "MN_extensor":400,# 580
             }
              
 
