@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 
-class AnalyzerReflex:
+class ReflexAnalyzer:
     """
     Analyzer for reflex behavior under different parameter variations.
     
