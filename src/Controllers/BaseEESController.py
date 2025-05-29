@@ -6,7 +6,7 @@ from itertools import product
 from copy import deepcopy
 import os
 from scipy.interpolate import interp1d
-from .BiologicalSystems.BiologicalSystem import BiologicalSystem
+from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 class BaseEESController:
     """
