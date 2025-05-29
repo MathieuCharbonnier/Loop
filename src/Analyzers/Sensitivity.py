@@ -10,18 +10,19 @@ import warnings
 
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
+
 class Sensitivity:
   
     def __init__(self, system: BiologicalSystem):
-        self.original_system = system
+        self.biological_system = system
     
           
-    def perform_sensitivity_analysis(self, 
+    def run (self, 
                                    biophysical_variations: Optional[Dict[str, Dict[str, List]]] = None,
                                    connection_variations: Optional[Dict[str, Dict[str, List]]] = None,
                                    neuron_count_variations: Optional[Dict[str, List[int]]] = None,
                                    n_iterations: int = 10,
-                                   time_step=0.1e-3,  # 0.1 ms in seconds
+                                   time_step=0.1*ms,
                                    ees_stimulation_params: Optional[Dict] = None,
                                    torque_profile: Optional[Dict] = None,
                                    seed: int = 42,
@@ -87,7 +88,7 @@ class Sensitivity:
         }
         
         # Store original system state
-        original_system = deepcopy(self.biological_system)
+        original_system = self.biological_system.clone_with()
         
         try:
             # 1. Biophysical parameter sensitivity
@@ -114,9 +115,6 @@ class Sensitivity:
                     ees_stimulation_params, torque_profile, seed, metrics)
                 results['neuron_counts'] = neuron_results
             
-            # Generate summary statistics
-            results['summary'] = self._generate_sensitivity_summary(results)
-            
             # Save results if path provided
             if base_output_path:
                 self._save_sensitivity_results(results, base_output_path)
@@ -142,39 +140,39 @@ class Sensitivity:
             # Handle the flat dictionary structure of biophysical_params
             for value in values_list:
                 # Create modified biophysical parameters
-                modified_params = deepcopy(self.biological_system.biophysical_params)
+                modified_params = BiologicalSystem.copy_brian_dict(self.biological_system.biophysical_params)
                 
                 # Apply parameter modification directly
                 modified_params[param_name] = value
-                
+                print('modified_params ', modified_params)
                 # Run simulation with modified parameters
-                try:
-                    modified_system = self.biological_system.clone_with(
-                        biophysical_params=modified_params)
+
+                modified_system = self.biological_system.clone_with(
+                    biophysical_params=modified_params)
                     
-                    spikes, time_series = modified_system.run_simulation(
+                spikes, time_series = modified_system.run_simulation(
                         n_iterations=n_iterations,
                         time_step=time_step,
                         ees_stimulation_params=ees_params,
                         torque_profile=torque_profile,
                         seed=seed
-                    )
+                )
                     
-                    # Calculate metrics
-                    metric_values = self._calculate_metrics(spikes, time_series, metrics)
+                # Calculate metrics
+                metric_values = self._calculate_metrics(spikes, time_series, metrics)
                     
-                    # Store results
-                    result_row = {
+                # Store results
+                result_row = {
                         'parameter_type': 'biophysical',
                         'parameter_name': param_name,
                         'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
                         **metric_values
                     }
-                    results_list.append(result_row)
+                results_list.append(result_row)
                     
-                except Exception as e:
-                    warnings.warn(f"Simulation failed for {param_name} = {value}: {e}")
-                    continue
+                #except Exception as e:
+                #    warnings.warn(f"Simulation failed for {param_name} = {value}: {e}")
+                #    continue
         
         return pd.DataFrame(results_list)
     
@@ -340,67 +338,9 @@ class Sensitivity:
         
         return metric_values
     
-    def _generate_sensitivity_summary(self, results: Dict) -> Dict:
-        """Generate summary statistics for sensitivity analysis."""
-        
-        summary = {}
-        
-        for analysis_type, df in results.items():
-            if analysis_type == 'summary' or df.empty:
-                continue
-                
-            summary[analysis_type] = {}
-            
-            # Get numeric columns (metrics)
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            metric_cols = [col for col in numeric_cols if col not in 
-                          ['parameter_type', 'parameter_name']]
-            
-            for metric in metric_cols:
-                if metric in df.columns:
-                    summary[analysis_type][metric] = {
-                        'mean': df[metric].mean(),
-                        'std': df[metric].std(),
-                        'min': df[metric].min(),
-                        'max': df[metric].max(),
-                        'coefficient_of_variation': df[metric].std() / df[metric].mean() 
-                                                  if df[metric].mean() != 0 else np.inf
-                    }
-        
-        return summary
+
     
-    def _save_sensitivity_results(self, results: Dict, base_path: str):
-        """Save sensitivity analysis results to files."""
-        
-        import os
-        os.makedirs(base_path, exist_ok=True)
-        
-        # Save DataFrames
-        for analysis_type, df in results.items():
-            if analysis_type != 'summary' and not df.empty:
-                df.to_csv(os.path.join(base_path, f'sensitivity_{analysis_type}.csv'), 
-                         index=False)
-        
-        # Save summary as JSON
-        import json
-        summary_path = os.path.join(base_path, 'sensitivity_summary.json')
-        
-        # Convert numpy types to native Python types for JSON serialization
-        def convert_numpy(obj):
-            if isinstance(obj, np.integer):
-                return int(obj)
-            elif isinstance(obj, np.floating):
-                return float(obj)
-            elif isinstance(obj, np.ndarray):
-                return obj.tolist()
-            return obj
-        
-        summary_serializable = json.loads(json.dumps(results['summary'], default=convert_numpy))
-        
-        with open(summary_path, 'w') as f:
-            json.dump(summary_serializable, f, indent=2)
-    
-    def plot_sensitivity_results(self, analysis_type: str = 'all', 
+    def plot (self, analysis_type: str = 'all', 
                                metrics: Optional[List[str]] = None,
                                save_path: Optional[str] = None):
         """
