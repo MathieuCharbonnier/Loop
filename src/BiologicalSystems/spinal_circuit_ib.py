@@ -86,16 +86,16 @@ class SpinalCircuitWithIb(BiologicalSystem):
                 "Ib_extensor": 200,#160,
           
                 # Interneurons
-                "exc_flexor": 500,
-                "exc_extensor": 500,
-                "inh_flexor": 500,
-                "inh_extensor": 500,
-                "inhb_flexor": 300,  # Ib interneurons
-                "inhb_extensor": 300,
+                "exc_flexor": 400,
+                "exc_extensor": 400,
+                "inh_flexor": 400,
+                "inh_extensor": 400,
+                "inhb_flexor": 400,  # Ib interneurons
+                "inhb_extensor": 400,
                 
                 # Motor neurons
-                "MN_flexor":400, #450,
-                "MN_extensor":400,# 580
+                "MN_flexor":300, #450,
+                "MN_extensor":300,# 580
             }
              
 
