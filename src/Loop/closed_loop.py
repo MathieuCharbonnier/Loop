@@ -2,6 +2,7 @@ from brian2 import *
 import numpy as np
 import pandas as pd
 import os
+import time
 import subprocess
 import tempfile
 import json
@@ -97,7 +98,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         for muscle_name in muscles_names
     }
 
-
+    print('spike_data', spike_data)
     # =============================================================================
     # Main Simulation Loop
     # =============================================================================
@@ -124,7 +125,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                        
     for iteration in range(n_iterations):
             print(f"--- Iteration {iteration+1} of {n_iterations} ---")
-
+            start_opensim=time.time()
             # Prepare torque if provided
             current_torque = None
             if torque_array is not None:
@@ -161,7 +162,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 stretch[muscle_idx] = fiber_lengths[muscle_idx] / resting_lengths[muscle_idx] - 1
                 stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_points[iteration*nb_points:(iteration+1)*nb_points])
 
-
+            end_opensim=time.time()
+            start_neuron=time.time()
             # Run neural simulation based on muscle count
             if num_muscles == 1:
             
@@ -219,7 +221,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                         # Adjust spike times by iteration offset
                         adjusted_spikes = spikes/second + iteration * reaction_time/second
                         spike_data[muscle_name][fiber_type][neuron_id].extend(adjusted_spikes)
-
+            end_neuron=time.time()
+            start_activation=time.time()
             # Initialize arrays for mean values of all neurons per muscle
             mean_e, mean_u, mean_c, mean_P, mean_activation = [
                 np.zeros((num_muscles, nb_points)) for _ in range(5)
@@ -256,7 +259,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     
                     # Save final state for next iteration
                     initial_condition_spike_activation[muscle_idx] = final_values
-
+                    end_activation=time.time()
+                    start_storage=time.time()
                     # Create batch data for current iteration
                     batch_data = {
                         'Time': time_points[iteration*nb_points:(iteration+1)*nb_points],
@@ -277,6 +281,12 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
                     # Store batch data for this muscle
                     muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
+                    end_storage=time.time()
+    
+    print(f"Opensim time: {end_opensim - start_opensim:.2f} s")
+    print(f"Neuron time: {end_neuron - start_neuron:.2f} s")
+    print(f"Activation time: {end_activation - start_neuron:.2f} s")
+    print(f"Storage time: {end_storage - start_storage:.2f} s")
 
     final_state={
       "opensim": simulator.recover_final_state(),
