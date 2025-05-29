@@ -724,6 +724,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
 
     print(f"Network build time: {end_build - start_build:.2f} s")
     print(f"Simulation run time: {end_run - start_run:.2f} s")
+
+    start_postprocessing=time.time()
     # Extract motoneuron spikes
     MN_flexor_spikes = {i: mon_MN.spike_trains()[i] for i in range(n_MN_flexor)} 
     MN_extensor_spikes = {i: mon_MN.spike_trains()[i + n_MN_flexor] for i in range(n_MN_extensor)} 
@@ -808,7 +810,9 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
 
     result_flexor["MN"] = MN_flexor_spikes
     result_extensor["MN"] = MN_extensor_spikes
-
+    end_postprocessing=time.time()
+    print(f"Simulation run time: {end_postprocessing - start_postprocessing:.2f} s")
+    
     return [result_flexor, result_extensor], final_state_neurons, state_monitors
 
 
