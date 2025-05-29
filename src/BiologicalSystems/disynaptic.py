@@ -44,18 +44,18 @@ class Disynaptic(BiologicalSystem):
                     'saturation_90pct': 0.8
                 },
                 'MN': {
-                    'threshold_10pct': 0.7,
-                    'saturation_90pct': 0.9  
+                    'threshold_10pct': 0.9,
+                    'saturation_90pct': 1.0  
                 }
             }
             
         if neurons_population is None:
             # Set default neuron populations
             neurons_population = {
-                "Ia": 280,       # Type Ia afferent neurons
-                "II": 280,       # Type II afferent neurons
-                "exc": 500,      # Excitatory interneurons
-                "MN": 450        # Motor neurons
+                "Ia": 200,#280,       # Type Ia afferent neurons
+                "II":200,# 280,       # Type II afferent neurons
+                "exc": 400,      # Excitatory interneurons
+                "MN": 300,#450        # Motor neurons
             }
         
         if connections is None:
