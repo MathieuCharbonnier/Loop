@@ -227,18 +227,32 @@ def validate_torque(torque):
         print(f"WARNING: Configuration issues detected:\n{warning_messages}")
 
 def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, neurons_population):
+        
         issues = {"warnings": [], "errors": []}
         if ees_stimulation_params is not None:
             # Check if freq has hertz unit
             if 'frequency' in ees_stimulation_params:
-                if not str(ees_stimulation_params['frequency']).endswith('Hz'):
-                    issues["errors"].append("The frequency of EES must have hertz as unit")
-                if not (0*hertz <= ees_stimulation_params['frequency'] ):
-                    issues["errors"].append(f"ees frequency must be positive, , got {val}")
-                # Check if freq is a tuple and if so, ensure we have exactly two muscles
-                if isinstance(ees_stimulation_params['frequency'], tuple):
+
+                # Check if frequency is a tuple (i.e., different EES frequencies for two muscles)
+                frequency = ees_stimulation_params['frequency']
+             
+                if isinstance(frequency, tuple):
                     if number_muscle != 2:
-                        issues["errors"].append("When EES frequency is a tuple, exactly two muscles must be defined")
+                        issues["errors"].append("When EES frequency is a tuple, exactly two muscles must be defined.")
+
+                    for i, f in enumerate(frequency):
+                        if not str(f).endswith('Hz'):
+                            issues["errors"].append(f"The frequency of EES for muscle {i+1} must have 'Hz' as unit.")
+                        if not (0 * hertz <= f):
+                            issues["errors"].append(f"EES frequency for muscle {i+1} must be positive, got {f}.")
+
+                else:
+                    if not str(frequency).endswith('Hz'):
+                        issues["errors"].append("The frequency of EES must have 'Hz' as unit.")
+                    if not (0 * hertz <= frequency):
+                        issues["errors"].append(f"EES frequency must be positive, got {frequency}.")
+
+
             else:
                 issues["errors"].append("EES parameters must contain 'frequency' parameter")
             
