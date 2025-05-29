@@ -15,7 +15,7 @@ import warnings
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 
-class AnalyzerEES:
+class EESAnalyzer:
     """
     A class for analyzing Epidural Electrical Stimulation (EES) effects on biological systems.
     
