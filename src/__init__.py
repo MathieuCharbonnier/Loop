@@ -2,11 +2,11 @@ from .BiologicalSystems.monosynaptic import Monosynaptic
 from .BiologicalSystems.disynaptic import Disynaptic
 from .BiologicalSystems.reciprocal_inhibition import ReciprocalInhibition
 from .BiologicalSystems.spinal_circuit_ib import SpinalCircuitWithIb
-from .Analyzers.AnalyzerEES import AnalyzerEES
-from .Analyzers.AnalyzerReflex import AnalyzerReflex
+from .Analyzers.EESAnalyzer import EESAnalyzer
+from .Analyzers.ReflexAnalyzer import ReflexAnalyzer
 from .Analyzers.Sensitivity import Sensitivity
-from .Controllers.ControllerEESBase import ControllerEESBase
-from .Controllers.ControllerEESBase import ControllerEESIntelligent
+from .Controllers.BaseEESController import BaseEESController
+from .Controllers.IntelligentEESController import IntelligentEESController
 __all__ = [
     "Monosynaptic",
     "Disynaptic",
@@ -15,6 +15,6 @@ __all__ = [
     "EESAnalyzer",
     "ReflexAnalyzer",
     "Sensitivity",
-    "ControllerEESBase",
-    "ControllerEESIntelligent
+    "BaseEESController",
+    "IntelligentEESController
 ]
