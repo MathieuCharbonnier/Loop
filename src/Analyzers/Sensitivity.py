@@ -7,6 +7,7 @@ from copy import deepcopy
 from itertools import product
 from typing import Dict, List, Tuple, Any, Optional, Callable
 import warnings
+import matplotlib.pyplot as plt
 
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
@@ -17,17 +18,16 @@ class Sensitivity:
         self.biological_system = system
     
           
-    def run (self, 
-                                   biophysical_variations: Optional[Dict[str, Dict[str, List]]] = None,
-                                   connection_variations: Optional[Dict[str, Dict[str, List]]] = None,
-                                   neuron_count_variations: Optional[Dict[str, List[int]]] = None,
-                                   n_iterations: int = 10,
-                                   time_step=0.1*ms,
-                                   ees_stimulation_params: Optional[Dict] = None,
-                                   torque_profile: Optional[Dict] = None,
-                                   seed: int = 42,
-                                   metrics: Optional[List[str]] = None,
-                                   base_output_path: Optional[str] = None) -> Dict[str, pd.DataFrame]:
+    def run(self, 
+            biophysical_variations: Optional[Dict[str, List]] = None,
+            connection_variations: Optional[Dict[str, Dict[str, List]]] = None,
+            neuron_count_variations: Optional[Dict[str, List[int]]] = None,
+            n_iterations: int = 10,
+            time_step=0.1*ms,
+            ees_stimulation_params: Optional[Dict] = None,
+            torque_profile: Optional[Dict] = None,
+            seed: int = 42,
+            base_output_path: Optional[str] = None) -> Dict[str, pd.DataFrame]:
         """
         Perform comprehensive sensitivity analysis on the biological system.
         
@@ -35,18 +35,18 @@ class Sensitivity:
         -----------
         biophysical_variations : dict, optional
             Dictionary specifying variations in biophysical parameters
-            Format: {param_name: {sub_param: [values_list]}}
-            Example: {'leak_conductance': {'value': [0.1, 0.2, 0.3]}}
+            Format: {param_name: [values_list]}
+            Example: {'gL': [5*nS, 10*nS, 15*nS]}
             
         connection_variations : dict, optional
             Dictionary specifying variations in connection parameters
             Format: {connection_name: {param: [values_list]}}
-            Example: {'excitatory_weight': {'weight': [0.5, 1.0, 1.5]}}
+            Example: {'Ia_flexor_to_MN_flexor': {'w': [1.0*nS, 2.1*nS, 3.0*nS]}}
             
         neuron_count_variations : dict, optional
             Dictionary specifying variations in neuron population sizes
             Format: {population_name: [count_list]}
-            Example: {'motor_neurons': [50, 100, 150]}
+            Example: {'MN_flexor': [200, 300, 400]}
             
         n_iterations : int
             Number of simulation iterations for each parameter combination
@@ -63,9 +63,6 @@ class Sensitivity:
         seed : int
             Random seed for reproducibility
             
-        metrics : list, optional
-            List of metrics to calculate. If None, uses default metrics
-            
         base_output_path : str, optional
             Base path for saving results
             
@@ -75,10 +72,8 @@ class Sensitivity:
             Dictionary containing sensitivity analysis results for each parameter type
         """
         
-        # Default metrics if not specified
-        if metrics is None:
-            metrics = ['mean_spike_rate', 'max_activation', 'joint_angle_range', 
-                      'muscle_force_variance', 'neural_synchrony']
+        # Define the specific metrics we want
+        metrics = ['max_joint_angle', 'min_joint_angle', 'joint_velocity_l2', 'joint_acceleration_l2']
         
         results = {
             'biophysical': pd.DataFrame(),
@@ -128,7 +123,7 @@ class Sensitivity:
         
         return results
     
-    def _analyze_biophysical_sensitivity(self, variations: Dict, n_iterations: int, 
+    def _analyze_biophysical_sensitivity(self, variations: Dict[str, List], n_iterations: int, 
                                        time_step: float, ees_params: Optional[Dict],
                                        torque_profile: Optional[Dict], seed: int,
                                        metrics: List[str]) -> pd.DataFrame:
@@ -137,42 +132,39 @@ class Sensitivity:
         results_list = []
         
         for param_name, values_list in variations.items():
-            # Handle the flat dictionary structure of biophysical_params
             for value in values_list:
-                # Create modified biophysical parameters
-                modified_params = BiologicalSystem.copy_brian_dict(self.biological_system.biophysical_params)
-                
-                # Apply parameter modification directly
-                modified_params[param_name] = value
-                print('modified_params ', modified_params)
-                # Run simulation with modified parameters
-
-                modified_system = self.biological_system.clone_with(
-                    biophysical_params=modified_params)
+                try:
+                    # Create modified biophysical parameters
+                    modified_params = BiologicalSystem.copy_brian_dict(self.biological_system.biophysical_params)
+                    modified_params[param_name] = value
                     
-                spikes, time_series = modified_system.run_simulation(
-                        n_iterations=n_iterations,
-                        time_step=time_step,
-                        ees_stimulation_params=ees_params,
-                        torque_profile=torque_profile,
-                        seed=seed
-                )
-                    
-                # Calculate metrics
-                metric_values = self._calculate_metrics(spikes, time_series, metrics)
-                    
-                # Store results
-                result_row = {
-                        'parameter_type': 'biophysical',
-                        'parameter_name': param_name,
-                        'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
-                        **metric_values
-                    }
-                results_list.append(result_row)
-                    
-                #except Exception as e:
-                #    warnings.warn(f"Simulation failed for {param_name} = {value}: {e}")
-                #    continue
+                    # Run simulation with modified parameters
+                    modified_system = self.biological_system.clone_with(
+                        biophysical_params=modified_params)
+                        
+                    spikes, time_series = modified_system.run_simulation(
+                            n_iterations=n_iterations,
+                            time_step=time_step,
+                            ees_stimulation_params=ees_params,
+                            torque_profile=torque_profile,
+                            seed=seed
+                    )
+                        
+                    # Calculate metrics
+                    metric_values = self._calculate_joint_metrics(time_series, metrics)
+                        
+                    # Store results
+                    result_row = {
+                            'parameter_type': 'biophysical',
+                            'parameter_name': param_name,
+                            'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
+                            **metric_values
+                        }
+                    results_list.append(result_row)
+                        
+                except Exception as e:
+                    warnings.warn(f"Simulation failed for {param_name} = {value}: {e}")
+                    continue
         
         return pd.DataFrame(results_list)
     
@@ -185,30 +177,28 @@ class Sensitivity:
         results_list = []
         
         for connection_key, param_variations in variations.items():
-            # connection_key should be a tuple like ("Ia", "MN") or string representation
+            # Parse connection key
             if isinstance(connection_key, str):
-                # Try to parse string representation like "Ia_to_MN"
                 parts = connection_key.split('_to_')
                 if len(parts) == 2:
                     connection_tuple = (parts[0], parts[1])
                 else:
-                    # If not parseable, use as is
                     connection_tuple = connection_key
             else:
                 connection_tuple = connection_key
             
             for param_name, values_list in param_variations.items():
                 for value in values_list:
-                    # Create modified connections
-                    modified_connections = deepcopy(self.biological_system.connections)
-                    
-                    # Apply connection modification
-                    if connection_tuple not in modified_connections:
-                        modified_connections[connection_tuple] = {}
-                    
-                    modified_connections[connection_tuple][param_name] = value
-                    
                     try:
+                        # Create modified connections
+                        modified_connections = BiologicalSystem.copy_brain_dict(self.biological_system.connections)
+                        
+                        # Apply connection modification
+                        if connection_tuple not in modified_connections:
+                            modified_connections[connection_tuple] = {}
+                        
+                        modified_connections[connection_tuple][param_name] = value
+                        
                         modified_system = self.biological_system.clone_with(
                             connections=modified_connections)
                         
@@ -220,12 +210,12 @@ class Sensitivity:
                             seed=seed
                         )
                         
-                        metric_values = self._calculate_metrics(spikes, time_series, metrics)
+                        metric_values = self._calculate_joint_metrics(time_series, metrics)
                         
                         result_row = {
                             'parameter_type': 'connection',
                             'connection': str(connection_tuple),
-                            'parameter_name': param_name,
+                            'parameter_name': f"{connection_key}_{param_name}",
                             'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
                             **metric_values
                         }
@@ -247,13 +237,11 @@ class Sensitivity:
         
         for population_name, count_list in variations.items():
             for count in count_list:
-                # Create modified neuron populations
-                modified_populations = deepcopy(self.biological_system.neurons_population)
-                
-                # Modify neuron count directly (integers in the dict)
-                modified_populations[population_name] = count
-                
                 try:
+                    # Create modified neuron populations
+                    modified_populations = BiologicalSystem.copy_brian_dict(self.biological_system.neurons_population)
+                    modified_populations[population_name] = count
+                    
                     modified_system = self.biological_system.clone_with(
                         neurons_population=modified_populations)
                     
@@ -265,12 +253,13 @@ class Sensitivity:
                         seed=seed
                     )
                     
-                    metric_values = self._calculate_metrics(spikes, time_series, metrics)
+                    metric_values = self._calculate_joint_metrics(time_series, metrics)
                     
                     result_row = {
                         'parameter_type': 'neuron_count',
-                        'population_name': population_name,
+                        'parameter_name': population_name,
                         'neuron_count': count,
+                        'parameter_value': count,
                         **metric_values
                     }
                     results_list.append(result_row)
@@ -281,83 +270,384 @@ class Sensitivity:
         
         return pd.DataFrame(results_list)
     
-    def _calculate_metrics(self, spikes: Dict, time_series: Dict, 
-                          metrics: List[str]) -> Dict[str, float]:
-        """Calculate specified metrics from simulation results."""
+    def _calculate_joint_metrics(self, time_series: Dict, metrics: List[str]) -> Dict[str, float]:
+        """Calculate joint-specific metrics from simulation results."""
         
         metric_values = {}
         
         try:
+            # Get joint angle data
+            joint_angle_key = f'{self.biological_system.associated_joint}'
+            joint_angles = time_series.get(joint_angle_key, [])
+            
+            # Get time data for derivatives
+            time_data = time_series.get('Time', [])
+            
+            if len(joint_angles) == 0 or len(time_data) == 0:
+                # Return NaN values if no data
+                for metric in metrics:
+                    metric_values[metric] = np.nan
+                return metric_values
+            
+            joint_angles = np.array(joint_angles)
+            time_data = np.array(time_data)
+            
             for metric in metrics:
-                if metric == 'mean_spike_rate':
-                    # Calculate average spike rate across all populations
-                    total_spikes = sum(len(spike_times) for spike_times in spikes.values())
-                    total_neurons = sum(len(np.unique(spike_indices)) 
-                                      for spike_indices in spikes.values())
-                    simulation_time = max(max(times) for times in spikes.values() if len(times) > 0)
-                    metric_values[metric] = total_spikes / (total_neurons * simulation_time) if simulation_time > 0 else 0
+                if metric == 'max_joint_angle':
+                    metric_values[metric] = np.max(joint_angles)
                 
-                elif metric == 'max_activation':
-                    # Maximum muscle activation achieved
-                    activations = [time_series.get(f'{muscle}_activation', [0]) 
-                                 for muscle in self.biological_system.muscles_names]
-                    metric_values[metric] = max(max(act) for act in activations if len(act) > 0)
+                elif metric == 'min_joint_angle':
+                    metric_values[metric] = np.min(joint_angles)
                 
-                elif metric == 'joint_angle_range':
-                    # Range of joint angles
-                    joint_angles = time_series.get(f'{self.biological_system.associated_joint}_angle', [0])
-                    metric_values[metric] = max(joint_angles) - min(joint_angles) if len(joint_angles) > 0 else 0
-                
-                elif metric == 'muscle_force_variance':
-                    # Variance in muscle forces
-                    forces = []
-                    for muscle in self.biological_system.muscles_names:
-                        muscle_force = time_series.get(f'{muscle}_force', [0])
-                        if len(muscle_force) > 0:
-                            forces.extend(muscle_force)
-                    metric_values[metric] = np.var(forces) if forces else 0
-                
-                elif metric == 'neural_synchrony':
-                    # Measure of neural synchrony (simplified)
-                    # This is a placeholder - would need more sophisticated analysis
-                    spike_times_list = [times for times in spikes.values() if len(times) > 0]
-                    if spike_times_list:
-                        all_spike_times = np.concatenate(spike_times_list)
-                        metric_values[metric] = np.std(np.diff(np.sort(all_spike_times)))
+                elif metric == 'joint_velocity_l2':
+                    # Calculate joint velocity from angle and time
+                    if len(joint_angles) > 1:
+                        velocity = np.gradient(joint_angles, time_data)
+                        metric_values[metric] = np.linalg.norm(velocity)
                     else:
-                        metric_values[metric] = 0
+                        metric_values[metric] = 0.0
+                
+                elif metric == 'joint_acceleration_l2':
+                    # Calculate joint acceleration from velocity
+                    if len(joint_angles) > 2:
+                        velocity = np.gradient(joint_angles, time_data)
+                        acceleration = np.gradient(velocity, time_data)
+                        metric_values[metric] = np.linalg.norm(acceleration)
+                    else:
+                        metric_values[metric] = 0.0
                 
                 else:
-                    # Unknown metric
                     metric_values[metric] = np.nan
                     
         except Exception as e:
-            warnings.warn(f"Error calculating metrics: {e}")
+            warnings.warn(f"Error calculating joint metrics: {e}")
             for metric in metrics:
                 metric_values[metric] = np.nan
         
         return metric_values
     
+    def _get_parameter_variations(self, param_name: str, param_value: Any, param_type: str) -> List[Any]:
+        """
+        Get appropriate parameter variations based on parameter type and name.
+        
+        Parameters:
+        -----------
+        param_name : str
+            Name of the parameter
+        param_value : Any
+            Original parameter value
+        param_type : str
+            Type of parameter ('biophysical', 'connection', 'neuron_population')
+            
+        Returns:
+        --------
+        List[Any]
+            List of parameter variations
+        """
+        
+        # Define the multiplicative factors for regular parameters
+        multiplicative_factors = [1/2, 1/np.sqrt(2), 10/11, 1, 11/10, np.sqrt(2), 2]
+        
+        # Define explicit values for voltage potentials (in mV)
+        voltage_variations = {
+            'Eleaky': [-80, -75, -70, -65, -60],  # Typical resting potentials
+            'E_ex': [-10, -5, 0, 5, 10],          # Excitatory reversal potentials
+            'E_inh': [-85, -80, -75, -70, -65],   # Inhibitory reversal potentials  
+            'threshold_v': [-60, -55, -50, -45, -40]  # Action potential thresholds
+        }
+        
+        # Define explicit values for probability parameters
+        probability_values = [0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95]
+        
+        variations = []
+        
+        if param_type == 'biophysical':
+            # Handle voltage parameters (potentials and thresholds)
+            if param_name in voltage_variations:
+                # Use predefined biologically realistic voltage values
+                for val in voltage_variations[param_name]:
+                    if hasattr(param_value, 'dim'):  # Brian2 quantity
+                        variations.append(val * mV)
+                    else:
+                        variations.append(val)
+            else:
+                # For other biophysical parameters (conductances, capacitances, time constants), use multiplicative factors
+                for factor in multiplicative_factors:
+                    if hasattr(param_value, 'magnitude'):  # Brian2 quantity
+                        new_val = param_value.magnitude * factor
+                        variations.append(new_val * param_value.dim)
+                    else:
+                        variations.append(param_value * factor)
+        
+        elif param_type == 'connection':
+            if param_name == 'p':
+                # This is a probability parameter, use explicit probability values
+                # Filter to only include values that make biological sense
+                original_p = float(param_value) if hasattr(param_value, 'magnitude') else param_value
+                
+                # Create variations around the original probability
+                if original_p >= 0.8:  # High probability connections
+                    variations = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+                elif original_p >= 0.5:  # Medium probability connections  
+                    variations = [0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9]
+                else:  # Low probability connections
+                    variations = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+                    
+                # Ensure we don't exceed probability bounds
+                variations = [p for p in variations if 0 < p <= 1]
+                
+            else:
+                # For weight parameters, use multiplicative factors
+                for factor in multiplicative_factors:
+                    if hasattr(param_value, 'magnitude'):  # Brian2 quantity
+                        new_val = param_value.magnitude * factor
+                        variations.append(new_val * param_value.dim)
+                    else:
+                        variations.append(param_value * factor)
+        
+        elif param_type == 'neuron_population':
+            # For neuron counts, use multiplicative factors but ensure integer values >= 1
+            for factor in multiplicative_factors:
+                new_count = int(param_value * factor)
+                new_count = max(1, new_count)  # Ensure at least 1 neuron
+                variations.append(new_count)
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            variations = [x for x in variations if not (x in seen or seen.add(x))]
+        
+        return variations
 
     
-    def plot (self, analysis_type: str = 'all', 
-                               metrics: Optional[List[str]] = None,
-                               save_path: Optional[str] = None):
+    def global_variance_analysis(self, 
+                               n_iterations: int = 10,
+                               time_step=0.1*ms,
+                               ees_stimulation_params: Optional[Dict] = None,
+                               torque_profile: Optional[Dict] = None,
+                               seed: int = 42) -> Dict[str, pd.DataFrame]:
         """
-        Plot sensitivity analysis results.
+        Perform global variance analysis by varying all parameters using specific variation factors.
+        
+        Parameters:
+        -----------
+        n_iterations : int
+            Number of iterations per parameter variation
+        time_step : float
+            Time step for simulation
+        ees_stimulation_params : dict, optional
+            EES stimulation parameters
+        torque_profile : dict, optional
+            External torque profile
+        seed : int
+            Random seed for reproducibility
+            
+        Returns:
+        --------
+        dict
+            Dictionary containing variance analysis results and top impactful parameters
+        """
+        
+        metrics = ['max_joint_angle', 'min_joint_angle', 'joint_velocity_l2', 'joint_acceleration_l2']
+        parameter_variances = []
+        
+        # Store original system
+        original_system = self.biological_system.clone_with()
+        
+        try:
+            # Get baseline metrics
+            print("Calculating baseline metrics...")
+            spikes_base, time_series_base = original_system.run_simulation(
+                n_iterations=n_iterations,
+                time_step=time_step,
+                ees_stimulation_params=ees_stimulation_params,
+                torque_profile=torque_profile,
+                seed=seed
+            )
+            baseline_metrics = self._calculate_joint_metrics(time_series_base, metrics)
+            
+            # 1. Analyze biophysical parameters
+            print("Analyzing biophysical parameter variances...")
+            for param_name, param_value in self.biological_system.biophysical_params.items():
+                try:
+                    # Get appropriate variations for this parameter
+                    variations = self._get_parameter_variations(param_name, param_value, 'biophysical')
+                    
+                    metric_values_list = []
+                    
+                    for variation in variations:
+                        modified_params = BiologicalSystem.copy_brian_dict(self.biological_system.biophysical_params)
+                        modified_params[param_name] = variation
+                        
+                        modified_system = self.biological_system.clone_with(
+                            biophysical_params=modified_params)
+                        
+                        spikes, time_series = modified_system.run_simulation(
+                            n_iterations=n_iterations,
+                            time_step=time_step,
+                            ees_stimulation_params=ees_stimulation_params,
+                            torque_profile=torque_profile,
+                            seed=seed
+                        )
+                        
+                        metric_values = self._calculate_joint_metrics(time_series, metrics)
+                        metric_values_list.append(metric_values)
+                    
+                    # Calculate variance for each metric
+                    for metric in metrics:
+                        values = [mv[metric] for mv in metric_values_list if not np.isnan(mv[metric])]
+                        if len(values) > 1:
+                            variance = np.var(values)
+                            parameter_variances.append({
+                                'parameter_type': 'biophysical',
+                                'parameter_name': param_name,
+                                'metric': metric,
+                                'variance': variance,
+                                'baseline_value': baseline_metrics[metric],
+                                'coefficient_of_variation': np.sqrt(variance) / abs(baseline_metrics[metric]) if baseline_metrics[metric] != 0 else np.inf
+                            })
+                
+                except Exception as e:
+                    warnings.warn(f"Failed to analyze biophysical parameter {param_name}: {e}")
+                    continue
+            
+            # 2. Analyze connection parameters
+            print("Analyzing connection parameter variances...")
+            for connection_key, connection_params in self.biological_system.connections.items():
+                for param_name, param_value in connection_params.items():
+                    try:
+                        # Get appropriate variations for this parameter
+                        variations = self._get_parameter_variations(param_name, param_value, 'connection')
+                        
+                        metric_values_list = []
+                        
+                        for variation in variations:
+                            modified_connections = BiologicalSystem.copy_brian_dict(self.biological_system.connections)
+                            modified_connections[connection_key][param_name] = variation
+                            
+                            modified_system = self.biological_system.clone_with(
+                                connections=modified_connections)
+                            
+                            spikes, time_series = modified_system.run_simulation(
+                                n_iterations=n_iterations,
+                                time_step=time_step,
+                                ees_stimulation_params=ees_stimulation_params,
+                                torque_profile=torque_profile,
+                                seed=seed
+                            )
+                            
+                            metric_values = self._calculate_joint_metrics(time_series, metrics)
+                            metric_values_list.append(metric_values)
+                        
+                        # Calculate variance for each metric
+                        for metric in metrics:
+                            values = [mv[metric] for mv in metric_values_list if not np.isnan(mv[metric])]
+                            if len(values) > 1:
+                                variance = np.var(values)
+                                parameter_variances.append({
+                                    'parameter_type': 'connection',
+                                    'parameter_name': f"{connection_key}_{param_name}",
+                                    'metric': metric,
+                                    'variance': variance,
+                                    'baseline_value': baseline_metrics[metric],
+                                    'coefficient_of_variation': np.sqrt(variance) / abs(baseline_metrics[metric]) if baseline_metrics[metric] != 0 else np.inf
+                                })
+                    
+                    except Exception as e:
+                        warnings.warn(f"Failed to analyze connection parameter {connection_key}_{param_name}: {e}")
+                        continue
+            
+            # 3. Analyze neuron population parameters
+            print("Analyzing neuron population variances...")
+            for pop_name, pop_count in self.biological_system.neurons_population.items():
+                try:
+                    # Get appropriate variations for this parameter
+                    variations = self._get_parameter_variations(pop_name, pop_count, 'neuron_population')
+                    
+                    metric_values_list = []
+                    
+                    for variation in variations:
+                        modified_populations = deepcopy(self.biological_system.neurons_population)
+                        modified_populations[pop_name] = variation
+                        
+                        modified_system = self.biological_system.clone_with(
+                            neurons_population=modified_populations)
+                        
+                        spikes, time_series = modified_system.run_simulation(
+                            n_iterations=n_iterations,
+                            time_step=time_step,
+                            ees_stimulation_params=ees_stimulation_params,
+                            torque_profile=torque_profile,
+                            seed=seed
+                        )
+                        
+                        metric_values = self._calculate_joint_metrics(time_series, metrics)
+                        metric_values_list.append(metric_values)
+                    
+                    # Calculate variance for each metric
+                    for metric in metrics:
+                        values = [mv[metric] for mv in metric_values_list if not np.isnan(mv[metric])]
+                        if len(values) > 1:
+                            variance = np.var(values)
+                            parameter_variances.append({
+                                'parameter_type': 'neuron_population',
+                                'parameter_name': pop_name,
+                                'metric': metric,
+                                'variance': variance,
+                                'baseline_value': baseline_metrics[metric],
+                                'coefficient_of_variation': np.sqrt(variance) / abs(baseline_metrics[metric]) if baseline_metrics[metric] != 0 else np.inf
+                            })
+                
+                except Exception as e:
+                    warnings.warn(f"Failed to analyze neuron population {pop_name}: {e}")
+                    continue
+            
+            # Convert to DataFrame and find top impactful parameters
+            variance_df = pd.DataFrame(parameter_variances)
+            
+            # Get top 15 most impactful parameters for each metric
+            top_parameters = {}
+            for metric in metrics:
+                metric_data = variance_df[variance_df['metric'] == metric].copy()
+                metric_data = metric_data.sort_values('variance', ascending=False)
+                top_parameters[metric] = metric_data.head(15)
+            
+            results = {
+                'all_variances': variance_df,
+                'top_parameters': top_parameters,
+                'baseline_metrics': baseline_metrics
+            }
+            
+            # Store results
+            self.global_variance_results = results
+            
+            return results
+            
+        finally:
+            # Restore original system
+            self.biological_system = original_system
+    
+    def plot(self, analysis_type: str = 'all', save_path: Optional[str] = None):
+        """
+        Plot sensitivity analysis results with joint-specific metrics.
         
         Parameters:
         -----------
         analysis_type : str
             Type of analysis to plot ('biophysical', 'connections', 'neuron_counts', or 'all')
-        metrics : list, optional
-            Specific metrics to plot
         save_path : str, optional
             Path to save plots
         """
         
-        if not self.sensitivity_results:
-            raise ValueError("No sensitivity analysis results available. Run perform_sensitivity_analysis first.")
+        if not hasattr(self, 'sensitivity_results') or not self.sensitivity_results:
+            raise ValueError("No sensitivity analysis results available. Run run() method first.")
+        
+        metrics = ['max_joint_angle', 'min_joint_angle', 'joint_velocity_l2', 'joint_acceleration_l2']
+        metric_labels = {
+            'max_joint_angle': 'Max Joint Angle (degree)',
+            'min_joint_angle': 'Min Joint Angle (degree)', 
+            'joint_velocity_l2': 'Joint Velocity L2 Norm (degree/s)',
+            'joint_acceleration_l2': 'Joint Acceleration L2 Norm (degree/s²)'
+        }
         
         types_to_plot = (['biophysical', 'connections', 'neuron_counts'] 
                         if analysis_type == 'all' else [analysis_type])
@@ -366,51 +656,133 @@ class Sensitivity:
             df = self.sensitivity_results.get(analysis, pd.DataFrame())
             if df.empty:
                 continue
-                
-            # Get metric columns
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            metric_cols = [col for col in numeric_cols 
-                          if col not in ['parameter_type', 'parameter_name']]
             
-            if metrics:
-                metric_cols = [col for col in metric_cols if col in metrics]
+            # Get unique parameters
+            unique_params = df['parameter_name'].unique()
             
-            # Create subplots
-            n_metrics = len(metric_cols)
-            if n_metrics == 0:
-                continue
+            for param in unique_params:
+                param_data = df[df['parameter_name'] == param].copy()
+                if param_data.empty:
+                    continue
                 
-            fig, axes = plt.subplots(n_metrics, 1, figsize=(12, 4*n_metrics))
-            if n_metrics == 1:
-                axes = [axes]
-            
-            for i, metric in enumerate(metric_cols):
-                ax = axes[i]
+                # Create subplots for each metric
+                fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+                axes = axes.flatten()
                 
-                # Group by parameter name and plot
-                for param_name in df['parameter_name'].unique():
-                    param_data = df[df['parameter_name'] == param_name]
+                for i, metric in enumerate(metrics):
+                    ax = axes[i]
                     
-                    # Find the parameter column for x-axis
-                    param_cols = [col for col in param_data.columns 
-                                 if col.startswith(param_name) and col != 'parameter_name']
-                    
-                    if param_cols:
-                        x_col = param_cols[0]
-                        ax.plot(param_data[x_col], param_data[metric], 
-                               'o-', label=param_name, alpha=0.7)
+                    if metric in param_data.columns:
+                        # Sort by parameter value for smooth plotting
+                        param_data_sorted = param_data.sort_values('parameter_value')
+                        
+                        ax.plot(param_data_sorted['parameter_value'], 
+                               param_data_sorted[metric], 
+                               'o-', linewidth=2, markersize=6, alpha=0.8)
+                        
+                        ax.set_xlabel('Parameter Value')
+                        ax.set_ylabel(metric_labels[metric])
+                        ax.set_title(f'{metric_labels[metric]} vs {param}')
+                        ax.grid(True, alpha=0.3)
+                        
+                        # Add some styling
+                        ax.spines['top'].set_visible(False)
+                        ax.spines['right'].set_visible(False)
                 
-                ax.set_xlabel('Parameter Value')
-                ax.set_ylabel(metric.replace('_', ' ').title())
-                ax.set_title(f'{metric.replace("_", " ").title()} Sensitivity - {analysis.title()}')
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-            
-            plt.tight_layout()
-            
-            if save_path:
-                plt.savefig(f"{save_path}/sensitivity_{analysis}.png", dpi=300, bbox_inches='tight')
-            
-            plt.show()
+                plt.suptitle(f'Sensitivity Analysis: {param} ({analysis.title()})', fontsize=16)
+                plt.tight_layout()
+                
+                if save_path:
+                    plt.savefig(f"{save_path}/sensitivity_{analysis}_{param.replace(' ', '_')}.png", 
+                               dpi=300, bbox_inches='tight')
+                
+                plt.show()
     
-  
+    
+    def plot_global_variance(self, save_path: Optional[str] = None):
+        """
+        Plot global variance analysis results as bar plots showing top 15 most impactful parameters.
+        
+        Parameters:
+        -----------
+        save_path : str, optional
+            Path to save plots
+        """
+        
+        if not hasattr(self, 'global_variance_results'):
+            raise ValueError("No global variance analysis results available. Run global_variance_analysis() first.")
+        
+        top_parameters = self.global_variance_results['top_parameters']
+        metrics = ['max_joint_angle', 'min_joint_angle', 'joint_velocity_l2', 'joint_acceleration_l2']
+        metric_labels = {
+            'max_joint_angle': 'Max Joint Angle Variance',
+            'min_joint_angle': 'Min Joint Angle Variance', 
+            'joint_velocity_l2': 'Joint Velocity L2 Variance',
+            'joint_acceleration_l2': 'Joint Acceleration L2 Variance'
+        }
+        
+        # Create subplots for each metric
+        fig, axes = plt.subplots(2, 2, figsize=(20, 15))
+        axes = axes.flatten()
+        
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Different colors for parameter types
+        
+        for i, metric in enumerate(metrics):
+            ax = axes[i]
+            
+            if metric in top_parameters:
+                data = top_parameters[metric]
+                
+                if not data.empty:
+                    # Create colors based on parameter type
+                    color_map = {'biophysical': '#1f77b4', 'connection': '#ff7f0e', 'neuron_population': '#2ca02c'}
+                    bar_colors = [color_map.get(ptype, '#gray') for ptype in data['parameter_type']]
+                    
+                    # Create bar plot
+                    bars = ax.bar(range(len(data)), data['variance'], color=bar_colors, alpha=0.7)
+                    
+                    # Customize plot
+                    ax.set_xlabel('Parameters (Ranked by Impact)')
+                    ax.set_ylabel('Variance')
+                    ax.set_title(f'Top 15 Most Impactful Parameters\n{metric_labels[metric]}')
+                    
+                    # Set x-tick labels (rotated for readability)
+                    ax.set_xticks(range(len(data)))
+                    ax.set_xticklabels(data['parameter_name'], rotation=45, ha='right')
+                    
+                    # Add grid
+                    ax.grid(True, alpha=0.3, axis='y')
+                    
+                    # Remove top and right spines
+                    ax.spines['top'].set_visible(False)
+                    ax.spines['right'].set_visible(False)
+                    
+                    # Add value labels on bars
+                    for j, (bar, value) in enumerate(zip(bars, data['variance'])):
+                        if not np.isnan(value):
+                            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(data['variance'])*0.01,
+                                   f'{value:.2e}', ha='center', va='bottom', fontsize=8, rotation=90)
+        
+        # Add legend
+        legend_elements = [plt.Rectangle((0,0),1,1, facecolor='#1f77b4', alpha=0.7, label='Biophysical'),
+                          plt.Rectangle((0,0),1,1, facecolor='#ff7f0e', alpha=0.7, label='Connection'),
+                          plt.Rectangle((0,0),1,1, facecolor='#2ca02c', alpha=0.7, label='Neuron Population')]
+        fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.98, 0.98))
+        
+        plt.suptitle('Global Parameter Impact Analysis - Top 15 Most Influential Parameters', 
+                     fontsize=16, y=0.95)
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(f"{save_path}/global_variance_analysis.png", dpi=300, bbox_inches='tight')
+        
+        plt.show()
+    
+    def _save_sensitivity_results(self, results: Dict, base_path: str):
+        """Save sensitivity analysis results to files."""
+        import os
+        os.makedirs(base_path, exist_ok=True)
+        
+        for analysis_type, df in results.items():
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df.to_csv(f"{base_path}/sensitivity_{analysis_type}.csv", index=False)
