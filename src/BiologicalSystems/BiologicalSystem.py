@@ -33,7 +33,7 @@ class BiologicalSystem(ABC):
     def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, 
                  associated_joint, fast_type_mu, neurons_population, connections, spindle_model, 
                  initial_state_neurons, initial_condition_spike_activation, initial_state_opensim,
-                 activation_func):
+                 activation_func, stretch_history_func):
         """
         Initialize the biological system with common parameters.
         
@@ -83,6 +83,8 @@ class BiologicalSystem(ABC):
         self.initial_state_opensim = initial_state_opensim
         self.initial_condition_spike_activation = initial_condition_spike_activation
         self.activation_function = activation_func
+        self.stretch_history_function=stretch_history_func
+
                      
         # Store the results:
         self.spikes = None
@@ -144,14 +146,26 @@ class BiologicalSystem(ABC):
                 self.neurons_population, self.number_muscles)
         
         self.spikes, self.time_series, self.final_state = closed_loop(
-            n_iterations, self.reaction_time, time_step, self.neurons_population, self.connections,
-            self.spindle_model, self.biophysical_params, self.muscles_names, self.number_muscles, 
-            self.associated_joint, self.fast_type_mu,
+            n_iterations, 
+            self.reaction_time, 
+            time_step,
+            self.neurons_population,
+            self.connections,
+            self.spindle_model, 
+            self.biophysical_params, 
+            self.muscles_names, 
+            self.number_muscles, 
+            self.associated_joint, 
+            self.fast_type_mu,
             BiologicalSystem.copy_brian_dict(self.initial_state_neurons), 
             deepcopy(self.initial_condition_spike_activation), 
             deepcopy(self.initial_state_opensim),
-            self.activation_function, torque_array=torque_array, ees_params=ees_params,
-            seed=seed, base_output_path=base_output_path)
+            self.activation_function, 
+            self.stretch_history,
+            torque_array=torque_array, 
+            ees_params=ees_params,
+            seed=seed, 
+            base_output_path=base_output_path)
         
         return self.spikes, self.time_series
 
