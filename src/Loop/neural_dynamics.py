@@ -203,7 +203,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
     return [result], final_state_neurons, state_monitors
 
 
-def run_disynaptic_simulation(stretch_input, stretch_velocity_input,  
+def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_delay_input,  
                              neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
                              initial_state_neurons, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                              ees_params=None):
@@ -264,7 +264,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
     # Create TimedArray inputs
     stretch_array = TimedArray(stretch_input[0], dt=dt_run)
     stretch_velocity_array = TimedArray(stretch_velocity_input[0], dt=dt_run)
-
+    stretch_delay_array=TimedArray(stretch_delay_input[0], dt=dt_run)
   
     # Extract EES parameters
     Ia_recruited = 0
@@ -280,6 +280,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input,
     equation_baseline = """
         stretch = stretch_array(t): 1
         stretch_velocity = stretch_velocity_array(t): 1
+        stretch_delay=stretch_delay_array(t):1
         """
     
     # Create Ia afferent neurons
