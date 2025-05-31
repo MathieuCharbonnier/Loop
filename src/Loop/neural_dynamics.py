@@ -264,7 +264,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     # Create TimedArray inputs
     stretch_array = TimedArray(stretch_input[0], dt=dt_run)
     stretch_velocity_array = TimedArray(stretch_velocity_input[0], dt=dt_run)
-    stretch_delay_array=TimedArray(stretch_delay_input[0], dt=dt_run)
+    
   
     # Extract EES parameters
     Ia_recruited = 0
@@ -316,6 +316,8 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     equation_II = spindle_model['II']
       
     if "Ia_II_delta_delay" in spindle_model:
+      
+        stretch_delay_array=TimedArray(stretch_delay_input[0], dt=dt_run)
         equation_baseline_II = """
             stretch_delay=stretch_delay_array(t):1
             """
@@ -417,10 +419,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
         syn.connect(p=p)
         noise=0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        if pre_base=='II':
-            syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
-        else:
-            syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
+        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         net.add(syn)
         synapses[key] = syn
     
@@ -699,10 +698,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         syn.connect(p=p)
         noise=0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        if 'II' in pre_name:
-            syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
-        else:
-            syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
+        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         net.add(syn)
         synapses[key] = syn
           
@@ -1086,10 +1082,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         
         # Determine the appropriate conductance variable based on presynaptic neuron type
         pre_type = pre_name.split('_')[0]
-        if pre_type in ['Ia', 'Ib', 'II']:
-            conductance_var = f"g{pre_type}"
-        else:
-            conductance_var = f"g{pre_type}"
+        conductance_var = f"g{pre_type}"
         
         syn = Synapses(pre, post, model="w : siemens", 
                       on_pre=f"{conductance_var}_post += w", method='exact')
@@ -1098,10 +1091,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         # Add noise to weights and delays
         noise = 0.2
         syn.w = np.clip(weight + noise * weight * randn(len(syn.w)), 0*nS, np.inf*nS)
-        if 'II' in pre_name:
-            syn.delay=np.clip(1*ms + Ia_II_delta_delay + 0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
-        else:
-            syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
+        syn.delay=np.clip(1*ms+0.25*ms*noise*randn(len(syn.delay)), 0*ms, np.inf*ms)
         
         net.add(syn)
         synapses[key] = syn
