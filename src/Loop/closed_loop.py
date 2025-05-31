@@ -80,10 +80,11 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     nb_points = int(reaction_time / time_step)
     time_ = np.linspace(0, reaction_time, nb_points)
 
-    
-    time_points = np.linspace(0, reaction_time * n_iterations, nb_points * n_iterations)
-    joint_all = np.zeros(len(time_points))
-    activations_all = np.zeros((num_muscles, len(time_points)))
+    total_points = n_iterations * nb_points
+    total_time=reaction_time * n_iterations
+    time_points = np.linspace(0, total_time, total_points)
+    joint_all = np.zeros(total_points)
+    activations_all = np.zeros((num_muscles, total_points))
 
     activation_history = np.zeros((num_muscles, nb_points))
     if activation_function is not None:
@@ -99,13 +100,11 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     delay = spindle_model.get("Ia_II_delay", 0)  
     delay_points = int(delay / time_step)
-  
-    buffer_size = delay_points + nb_points
-    stretch_buffer = np.zeros((num_muscles, buffer_size))
-    
+    stretch_global_buffer = np.zeros((num_muscles, delay_points + total_points))
+
     # Initialize delay buffer with historical data if available
     if delay_points > 0:
-        stretch_history_function = None  
+      
         if stretch_history_func is not None:
             time_delay = np.linspace(-delay, 0, delay_points)
             try:
@@ -197,11 +196,15 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             # Shift existing data left (remove oldest, keep recent)
             stretch_buffer[:, :delay_points] = stretch_buffer[:, nb_points:delay_points + nb_points]
         
-        # Add current stretch data to buffer
-        stretch_buffer[:, delay_points:delay_points + nb_points] = stretch
         
-        # Extract delayed stretch for II afferents (stretch at time t-delay)
-        stretch_II = stretch_buffer[:, :nb_points] if delay_points > 0 else stretch
+        buffer_start = delay_points + iteration * nb_points
+        buffer_end = delay_points + (iteration + 1) * nb_points
+        stretch_global_buffer[:, buffer_start:buffer_end] = stretch
+        
+        # Extract delayed stretch for neural simulation (DIRECT INDEXING)
+        delayed_start = iteration * nb_points
+        delayed_end = (iteration + 1) * nb_points
+        stretch_II = stretch_global_buffer[:, delayed_start:delayed_end]
         
         end_opensim = time.time()
         start_neuron = time.time()
@@ -341,7 +344,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     stretch_history_interp = None
     if delay_points > 0:
         # Extract the last delay_points from the buffer (most recent history)
-        recent_stretch_history = stretch_buffer[:, -delay_points:]
+        recent_stretch_history = stretch_global_buffer[:, total_points:total_points + delay_points]
         time_history = np.linspace(-delay, 0, delay_points)
         
         stretch_history_interp = interp1d(
@@ -377,7 +380,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         # Extract stretch and velocity values for this muscle
         stretch_values = df[f'Stretch_{muscle_name}'].values
         stretch_velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
-
+        stretch_delay_values = stretch_global_buffer[muscle_idx, :len(time_values)]
+      
         time_values = df['Time'].values
         
         # Compute Ia firing rate using spindle model
@@ -392,7 +396,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         if "II" in neurons_population and "II" in spindle_model:
             II_rate = eval(spindle_model['II'], 
                           {"__builtins__": {}}, 
-                          {"stretch": stretch_values}
+                          {"stretch": stretch_values,
+                          "stretch_delay": stretch_delay_values }
                            )
 
             df[f'II_rate_baseline_{muscle_name}'] = II_rate
