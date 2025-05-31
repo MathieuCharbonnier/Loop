@@ -274,23 +274,20 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
         freq = ees_params['frequency']
         Ia_recruited = ees_params['recruitment']['Ia']
         II_recruited = ees_params['recruitment']['II']
-                            
-    
-    # Create common equation baseline for afferent neurons
-    equation_baseline = """
-        stretch = stretch_array(t): 1
-        stretch_velocity = stretch_velocity_array(t): 1
-        stretch_delay=stretch_delay_array(t):1
-        """
-    
+      
+      
     # Create Ia afferent neurons
     n_Ia = neuron_pop['Ia']
     equation_Ia = spindle_model['Ia']
 
+    equation_baseline_Ia=f"""
+        stretch = stretch_array(t): 1
+        stretch_velocity = stretch_velocity_array(t): 1
+        """
     if freq > 0 and Ia_recruited > 0:
         Ia_neurons = NeuronGroup(
             n_Ia, 
-            equation_baseline + f'''
+            equation_baseline_Ia+f'''
             is_ees = (i < {Ia_recruited}): boolean
             rate = ({equation_Ia})*hertz + freq * int(is_ees): Hz
             ''', 
@@ -301,7 +298,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     else:
         Ia_neurons = NeuronGroup(
             n_Ia, 
-            equation_baseline + f'''
+            equation_baseline_Ia+f'''
             rate = ({equation_Ia})*hertz: Hz
             ''', 
             threshold='rand() < rate*dt', 
@@ -317,11 +314,20 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     # Create II afferent neurons
     n_II = neuron_pop['II']
     equation_II = spindle_model['II']
+      
+    if "Ia_II_delta_delay" in spindle_model:
+        equation_baseline_II = """
+            stretch_delay=stretch_delay_array(t):1
+            """
+    else:
+        equation_baseline_II = """
+            stretch = stretch_array(t): 1
+            """
 
     if freq > 0 and II_recruited > 0:
         II_neurons = NeuronGroup(
             n_II, 
-            equation_baseline + f'''
+            equation_baseline_II+f'''
             is_ees = (i < {II_recruited}): boolean
             rate = ({equation_II})*hertz + freq * int(is_ees): Hz
             ''', 
@@ -332,7 +338,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     else:
         II_neurons = NeuronGroup(
             n_II, 
-            equation_baseline + f'''
+            equation_baseline_II+f'''
             rate = ({equation_II})*hertz: Hz
             ''', 
             threshold='rand() < rate*dt', 
@@ -477,7 +483,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
 
  
     
-def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input, neuron_pop, connections, dt_run, T,
+def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input, stretch_delay_input, neuron_pop, connections, dt_run, T,
                                           spindle_model, seed_run, initial_state_neurons, 
                                           Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
                                           ees_params):
@@ -486,10 +492,12 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     
     Parameters:
     ----------
-    stretch : list of arrays
+    stretch_input : list of arrays
         Stretch inputs for flexor [0] and extensor [1].
-    velocity : list of arrays
+    stretch_velocity_input : list of arrays
         Velocity inputs for flexor [0] and extensor [1].
+    stretch_delay_input: list of arrays
+        Stretch(t-delay) inputs for flexor [0] and extensor [1], with delay defined in the spindle model.
     neuron_pop : dict
         Dictionary with counts of different neuron populations ('Ia', 'II', 'MN', 'exc', 'inh').
     connections: dict
@@ -541,10 +549,11 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
 
     # Input arrays
     stretch_flexor_array = TimedArray(stretch_input[0], dt=dt_run)
-    velocity_flexor_array = TimedArray(stretch_velocity_input[0], dt=dt_run)
+    velocity_flexor_array = TimedArray(stretch_velocity_input[0], dt=dt_run) 
     stretch_extensor_array = TimedArray(stretch_input[1], dt=dt_run)
     velocity_extensor_array = TimedArray(stretch_velocity_input[1], dt=dt_run)
-
+                                      
+      
     # Extract neuron counts from dictionary
     n_Ia_flexor = neuron_pop['Ia_flexor']
     n_II_flexor = neuron_pop['II_flexor']
@@ -585,13 +594,26 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     is_ees = ((is_flexor and i < Ia_flexor_recruited) or (not is_flexor and i < n_Ia_flexor + Ia_extensor_recruited)) : boolean
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
-    equation_II = spindle_model['II']
-    ii_eq = f'''
-    is_flexor = (i < n_II_flexor) : boolean
-    stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
-    is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean
-    rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
-    '''
+                                            
+   equation_II = spindle_model['II']
+    if 'Ia_II_delta_delay' in spindle_model:
+        stretch_delay_flexor_array = TimedArray(stretch_delay_input[0], dt=dt_run)
+        stretch_delay_extensor_array = TimedArray(stretch_delay_input[1], dt=dt_run)
+        ii_eq = f'''
+        is_flexor = (i < n_II_flexor) : boolean
+        stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
+        stretch_delay = stretch_delay_flexor_array(t) * int(is_flexor) + stretch_delay_extensor_array(t) * int(not is_flexor) : 1
+        is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean
+        rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
+        '''
+    else:
+        ii_eq = f'''
+        is_flexor = (i < n_II_flexor) : boolean
+        stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
+        is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean  
+        rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
+        '''
+    
     
     # Create afferent neurons
     Ia = NeuronGroup(n_Ia_flexor+ n_Ia_extensor, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
@@ -818,7 +840,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
 
 
 
-def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_force_input, neuron_pop, connections, dt_run, T,
+def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_delay_input, normalized_force_input, neuron_pop, connections, dt_run, T,
                                          spindle_model, seed_run, initial_state_neurons, 
                                          Eleaky, gL, Cm, E_ex, E_inh, tau_e, tau_i, threshold_v, T_refr,
                                          ees_params):
@@ -936,14 +958,26 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,normalized_
     is_ees = ((is_flexor and i < Ib_flexor_recruited) or (not is_flexor and i < n_Ib_flexor + Ib_extensor_recruited)) : boolean
     rate = ({equation_Ib})*hertz + ees_freq * int(is_ees) : Hz
     '''
-    
+                                           
     equation_II = spindle_model['II']
-    ii_eq = f'''
-    is_flexor = (i < n_II_flexor) : boolean
-    stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
-    is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean
-    rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
-    '''
+    if 'Ia_II_delta_delay' in spindle_model:
+        stretch_delay_flexor_array = TimedArray(stretch_delay_input[0], dt=dt_run)
+        stretch_delay_extensor_array = TimedArray(stretch_delay_input[1], dt=dt_run)
+        ii_eq = f'''
+        is_flexor = (i < n_II_flexor) : boolean
+        stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
+        stretch_delay = stretch_delay_flexor_array(t) * int(is_flexor) + stretch_delay_extensor_array(t) * int(not is_flexor) : 1
+        is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean
+        rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
+        '''
+    else:
+        ii_eq = f'''
+        is_flexor = (i < n_II_flexor) : boolean
+        stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
+        is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean  
+        rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
+        '''
+
     
     # Create afferent neurons
     Ia = NeuronGroup(n_Ia_flexor + n_Ia_extensor, ia_eq, threshold='rand() < rate*dt', refractory=T_refr, method='euler')
