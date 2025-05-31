@@ -124,7 +124,7 @@ class ReciprocalInhibition(BiologicalSystem):
         if spindle_model is None:
             spindle_model = {
                 "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
-                "II": "20 + 13.5*stretch",
+                "II": "20 + 13.5*stretch_delay",
                 "Ia_II_delta_delay": 15*ms
             }
             
