@@ -184,7 +184,7 @@ class SpinalCircuitWithIb(BiologicalSystem):
                 for i in range(2)  # two muscles
             ]
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names, associated_joint, fast_type_mu,
+                        muscles_names, resting_lengths, associated_joint, fast_type_mu,
                         neurons_population, connections, spindle_model, 
                         initial_state_neurons, initial_condition_spike_activation, 
                         initial_state_opensim, activation_funct)
