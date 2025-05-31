@@ -10,7 +10,7 @@ class Disynaptic(BiologicalSystem):
     to motor neurons (MN) through excitatory interneurons.
     """
     
-    def __init__(self, reaction_time=40*ms,biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=40*ms,biophysical_params=None, muscles_names=None, resting_lengths=None,
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -91,7 +91,7 @@ class Disynaptic(BiologicalSystem):
                 } for _ in range(neurons_population['MN'])]
             ]
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names, associated_joint, fast_type_mu,
+                        muscles_names, resting_lengths, associated_joint, fast_type_mu,
                         neurons_population, connections, spindle_model, 
                         initial_state_neurons, initial_condition_spike_activation, 
                         initial_state_opensim, activation_funct, stretch_history_func)
@@ -137,7 +137,10 @@ class Disynaptic(BiologicalSystem):
         for eq in required_spindle_equations:
             if eq not in self.spindle_model:
                 issues["errors"].append(f"Missing {eq} equation in spindle model for disynaptic reflex")
-        
+        if "Ia_II_delta_delay" in spindle_model and "stretch" in spindle_model.get("II"):
+             issues["warnings"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model dealyed II pathway! ")    
+            
+                
         # Check EES recruitment parameters
         for neuron_type in ["Ia", "II", "MN"]:
             if neuron_type not in self.ees_recruitment_profile:
