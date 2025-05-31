@@ -7,7 +7,7 @@ class SpinalCircuitWithIb(BiologicalSystem):
     between two antagonistic muscle systems. We only consider known di-synaptic pathways.
     """
     
-    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None,resting_lengths=None, 
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -294,6 +294,8 @@ class SpinalCircuitWithIb(BiologicalSystem):
         for eq in required_spindle_equations:
             if eq not in self.spindle_model:
                 issues["errors"].append(f"Missing {eq} equation in spindle model for Ib circuit")
+        if "Ia_II_delta_delay" in spindle_model and "stretch" in spindle_model.get("II"):
+            issues["errors"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model dealyed II pathway! Otherwise don't specify delay! ") 
         
         # Validate Ib equation includes force dependency
         if "Ib" in self.spindle_model:
