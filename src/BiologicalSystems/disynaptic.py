@@ -138,7 +138,7 @@ class Disynaptic(BiologicalSystem):
             if eq not in self.spindle_model:
                 issues["errors"].append(f"Missing {eq} equation in spindle model for disynaptic reflex")
         if "Ia_II_delta_delay" in spindle_model and "stretch" in spindle_model.get("II"):
-             issues["warnings"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model dealyed II pathway! ")    
+             issues["errors"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model delayed II pathway! Otherwise, don't specify a delay! ")    
             
                 
         # Check EES recruitment parameters
