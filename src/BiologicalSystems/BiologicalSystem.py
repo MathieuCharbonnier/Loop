@@ -33,7 +33,7 @@ class BiologicalSystem(ABC):
     def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, 
                  associated_joint, fast_type_mu, neurons_population, connections, spindle_model, 
                  initial_state_neurons, initial_condition_spike_activation, initial_state_opensim,
-                 activation_func, stretch_history_func):
+                 activation_func, stretch_history_func=None):
         """
         Initialize the biological system with common parameters.
         
@@ -596,7 +596,8 @@ class BiologicalSystem(ABC):
             return {'neurons': BiologicalSystem.copy_brian_dict(self.nitial_state_neurons),
                     'spikes_activations':self.initial_condition_spike_activation,
                     'opensim': self.initial_state_opensim ,
-                    'last_activations': self.activation_function}
+                    'last_activations': self.activation_function,
+                    'stretch_history' : self.stretch_history}
                     
         
     def set_system_state(self, state):
@@ -605,6 +606,7 @@ class BiologicalSystem(ABC):
         self.initial_condition_spike_activation = state['spikes_activations']
         self.initial_state_opensim = state['opensim']
         self.activation_function = state['last_activations']
+        self.stretch_history_func=self.final.get("stretch_history", None)
         self.final_state=None
         
     def update_system_state(self):
@@ -619,6 +621,7 @@ class BiologicalSystem(ABC):
         self.initial_condition_spike_activation = self.final_state['spikes_activations']
         self.initial_state_opensim = self.final_state['opensim']
         self.activation_function = self.final_state['last_activations']
+        self.stretch_history_func=self.final.get("stretch_history", None)
         self.final_state=None
 
 
