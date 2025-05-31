@@ -600,7 +600,6 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         stretch_delay_extensor_array = TimedArray(stretch_delay_input[1], dt=dt_run)
         ii_eq = f'''
         is_flexor = (i < n_II_flexor) : boolean
-        stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
         stretch_delay = stretch_delay_flexor_array(t) * int(is_flexor) + stretch_delay_extensor_array(t) * int(not is_flexor) : 1
         is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean
         rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
@@ -961,7 +960,6 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         stretch_delay_extensor_array = TimedArray(stretch_delay_input[1], dt=dt_run)
         ii_eq = f'''
         is_flexor = (i < n_II_flexor) : boolean
-        stretch = stretch_flexor_array(t) * int(is_flexor) + stretch_extensor_array(t) * int(not is_flexor) : 1
         stretch_delay = stretch_delay_flexor_array(t) * int(is_flexor) + stretch_delay_extensor_array(t) * int(not is_flexor) : 1
         is_ees = ((is_flexor and i < II_flexor_recruited) or (not is_flexor and i < n_II_flexor + II_extensor_recruited)) : boolean
         rate = ({equation_II})*hertz + ees_freq * int(is_ees) : Hz
