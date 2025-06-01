@@ -128,7 +128,7 @@ class ReciprocalInhibition(BiologicalSystem):
                 "Ia_II_delta_delay": 15*ms
             }
             
-        if initial_condition_spike_activation is None:
+        if initial_state_neurons is None:
             initial_state_neurons = {
                 "inh":{'v': biophysical_params['Eleaky'],
                       'gIa':0*nS,
@@ -174,12 +174,12 @@ class ReciprocalInhibition(BiologicalSystem):
             ValueError: If critical errors are found in the configuration
         """
         issues = {"warnings": [], "errors": []}
-        
+                
         # Check muscle count (should be exactly 2 for reciprocal inhibition)
         if self.number_muscles != 2:
             issues["errors"].append("Reciprocal inhibition reflex should have exactly 2 muscles")
         if len(self.resting_lengths)!=2:
-            issues["errors"].append("Your should specify the resting length for the muscles {self.muscles_names}, got an array of size {len(self.resting_lengths)}")
+            issues["errors"].append("Your should specify the resting length for the muscles {self.muscles_names[0]} and {self.muscles_names[1]}, incorrect input")
         # Check required neuron types for reciprocal inhibition
         required_neurons = {
             "Ia_flexor", "II_flexor", "Ia_extensor", "II_extensor",
