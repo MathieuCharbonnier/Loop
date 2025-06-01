@@ -1,12 +1,10 @@
-
-
 import opensim as osim
-import pandas as pd
+import json
 import os
 
 def extract_muscle_resting_lengths(model_path):
     """
-    Extract optimal fiber lengths from an OpenSim model.
+    Extract resting fiber lengths from an OpenSim model and return a dictionary.
     
     Parameters:
     -----------
@@ -15,91 +13,56 @@ def extract_muscle_resting_lengths(model_path):
         
     Returns:
     --------
-    pandas.DataFrame
-        DataFrame containing muscle names and their optimal fiber lengths
+    dict
+        Dictionary mapping muscle names to their resting fiber lengths
     """
-    
     try:
         # Load the model
         model = osim.Model(model_path)
         print(f"Model loaded successfully: {model.getName()}")
-        
-        # Get all muscles from the model
+        state = model.initSystem()
+        model.equilibrateMuscles(state)
+
         muscles = model.getMuscles()
         print(f"Found {muscles.getSize()} muscles in the model")
-        
-        # Extract muscle data
-        muscle_data = []
-        
+
+        # Extract and store as dictionary
+        muscle_data = {}
+
         for i in range(muscles.getSize()):
             muscle = muscles.get(i)
-            muscle_name = muscle.getName()
-            optimal_fiber_length = muscle.getOptimalFiberLength()
-            
-            muscle_data.append({
-                'Muscle Name': muscle_name,
-                'Optimal Fiber Length (m)': optimal_fiber_length
-            })
-        
-        # Create DataFrame
-        df = pd.DataFrame(muscle_data)
-        
-        # Sort by muscle name for better readability
-        df = df.sort_values('Muscle Name').reset_index(drop=True)
-        
-        return df
-        
+            name = muscle.getName()
+            fiber_length = round(muscle.getFiberLength(state), 4)
+            muscle_data[name] = fiber_length
+
+        return muscle_data
+
     except Exception as e:
         print(f"Error loading model: {str(e)}")
         raise
 
-def save_results(df, output_csv="muscle_resting_lengths.csv"):
+def save_results_to_json(data, output_json="muscle_resting_lengths.json"):
     """
-    Save results to CSV file and display formatted table.
+    Save muscle data to a JSON file.
     
     Parameters:
     -----------
-    df : pandas.DataFrame
-        DataFrame containing muscle data
-    output_csv : str
-        Output CSV filename
+    data : dict
+        Dictionary containing muscle names and resting fiber lengths
+    output_json : str
+        Output JSON filename
     """
+    with open(output_json, "w") as f:
+        json.dump(data, f, indent=4)
     
-    # Save to CSV
-    df.to_csv(output_csv, index=False)
-    print(f"\nResults saved to: {output_csv}")
-    
-    # Display formatted table
-    print("\n" + "="*80)
-    print("MUSCLE RESTING LENGTHS (OPTIMAL FIBER LENGTHS)")
-    print("="*80)
-    
-    
-    # Display summary statistics
-    print("\n" + "="*80)
-    print("SUMMARY STATISTICS")
-    print("="*80)
-    print(f"Total number of muscles: {len(df)}")
-    print(f"Mean optimal fiber length: {df['Optimal Fiber Length (m)'].mean():.4f} m")
-    print(f"Median optimal fiber length: {df['Optimal Fiber Length (m)'].median():.4f} m")
-    print(f"Min optimal fiber length: {df['Optimal Fiber Length (m)'].min():.4f} m")
-    print(f"Max optimal fiber length: {df['Optimal Fiber Length (m)'].max():.4f} m")
-    print(f"Standard deviation: {df['Optimal Fiber Length (m)'].std():.4f} m")
+    print(f"\nResults saved to: {output_json}")
+    print(f"Total muscles saved: {len(data)}")
 
 def main():
-    """Main function to execute the muscle length extraction."""
-    
-    # Model path
     model_path = "data/gait2392_millard2012_pelvislocked.osim"
     
-
-    # Extract muscle resting lengths
-    df = extract_muscle_resting_lengths(model_path)
-        
-    # Save and display results
-    save_results(df)
-        
-       
+    muscle_lengths = extract_muscle_resting_lengths(model_path)
+    save_results_to_json(muscle_lengths)
 
 if __name__ == "__main__":
     main()
