@@ -9,7 +9,7 @@ class ReciprocalInhibition(BiologicalSystem):
     muscle systems, with both excitatory and inhibitory connections.
     """
     
-    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, resting_lengths=None
+    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None,
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -158,7 +158,7 @@ class ReciprocalInhibition(BiologicalSystem):
             ]
 
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names,resting_lengths, associated_joint, fast_type_mu,
+                        muscles_names, associated_joint, fast_type_mu,
                         neurons_population, connections, spindle_model, 
                         initial_state_neurons, initial_condition_spike_activation, 
                         initial_state_opensim, activation_funct, stretch_history_func)  
