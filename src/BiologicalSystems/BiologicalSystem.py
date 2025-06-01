@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+import json
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import inspect
@@ -30,7 +31,7 @@ class BiologicalSystem(ABC):
     }
     color_keys = list(colorblind_friendly_colors.keys())
     
-    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names, resting_lengths,
+    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names,
                  associated_joint, fast_type_mu, neurons_population, connections, spindle_model, 
                  initial_state_neurons, initial_condition_spike_activation, initial_state_opensim,
                  activation_func, stretch_history_func=None):
@@ -71,7 +72,17 @@ class BiologicalSystem(ABC):
         self.biophysical_params = biophysical_params
         self.muscles_names = muscles_names
         self.number_muscles = len(muscles_names)
-        self.resting_lengths=resting_lengths
+        
+        with open("data/muscle_resting_lengths.json", "r") as f:
+            fiber_length_dict = json.load(f)
+        
+        self.resting_lengths = []
+        
+        for muscle_name in self.muscles_names:
+            if muscle_name not in fiber_length_dict:
+                raise ValueError(f"The muscle '{muscle_name}' does not exist")
+            self.resting_lengths.append(fiber_length_dict[muscle_name])
+      
         self.associated_joint = associated_joint
         self.fast_type_mu = fast_type_mu
         
