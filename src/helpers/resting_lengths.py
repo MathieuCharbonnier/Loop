@@ -1,22 +1,7 @@
 
-OpenSim Muscle Resting Lengths Extractor
-=========================================
-
-This script extracts the optimal fiber lengths (resting lengths) from an OpenSim model
-and saves them to both a CSV file and displays them in a formatted table.
-
-Requirements:
-- opensim-core package: pip install opensim
-- pandas package: pip install pandas
-- tabulate package: pip install tabulate
-
-Usage:
-    python extract_muscle_lengths.py
-"""
 
 import opensim as osim
 import pandas as pd
-from tabulate import tabulate
 import os
 
 def extract_muscle_resting_lengths(model_path):
@@ -53,9 +38,7 @@ def extract_muscle_resting_lengths(model_path):
             
             muscle_data.append({
                 'Muscle Name': muscle_name,
-                'Optimal Fiber Length (m)': optimal_fiber_length,
-                'Optimal Fiber Length (cm)': optimal_fiber_length * 100,
-                'Optimal Fiber Length (mm)': optimal_fiber_length * 1000
+                'Optimal Fiber Length (m)': optimal_fiber_length
             })
         
         # Create DataFrame
@@ -90,7 +73,7 @@ def save_results(df, output_csv="muscle_resting_lengths.csv"):
     print("\n" + "="*80)
     print("MUSCLE RESTING LENGTHS (OPTIMAL FIBER LENGTHS)")
     print("="*80)
-    print(tabulate(df, headers='keys', tablefmt='grid', floatfmt='.4f', showindex=False))
+    
     
     # Display summary statistics
     print("\n" + "="*80)
@@ -109,28 +92,14 @@ def main():
     # Model path
     model_path = "data/gait2392_millard2012_pelvislocked.osim"
     
-    try:
-        # Extract muscle resting lengths
-        df = extract_muscle_resting_lengths(model_path)
+
+    # Extract muscle resting lengths
+    df = extract_muscle_resting_lengths(model_path)
         
-        # Save and display results
-        save_results(df)
+    # Save and display results
+    save_results(df)
         
-        print(f"\n✅ Extraction completed successfully!")
-        print(f"📊 Found {len(df)} muscles")
-        print(f"💾 Data saved to: muscle_resting_lengths.csv")
-        
-    except FileNotFoundError as e:
-        print(f"❌ Error: {str(e)}")
-        print(f"💡 Make sure the model file exists at: {model_path}")
-        
-    except ImportError as e:
-        print(f"❌ Import Error: {str(e)}")
-        print("💡 Make sure you have installed the required packages:")
-        print("   pip install opensim pandas tabulate")
-        
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
+       
 
 if __name__ == "__main__":
     main()
