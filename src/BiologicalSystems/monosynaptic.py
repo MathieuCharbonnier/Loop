@@ -93,7 +93,8 @@ class Monosynaptic(BiologicalSystem):
         # Check muscle count (should be 1 for monosynaptic)
         if self.number_muscles != 1:
             issues["errors"].append("Monosynaptic reflex should have exactly 1 muscle")
-  
+        if len(self.resting_lengths)!=1:
+            issues["errors"].append("Your should specify the resting length for the muscle {self.muscles_names}, got an array of size {len(self.resting_lengths)}")
         # Check required neuron types
         required_neurons = {"Ia", "MN"}
         defined_neurons = set(self.neurons_population.keys())
