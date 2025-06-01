@@ -34,12 +34,6 @@ def extract_muscle_resting_lengths(model_path):
         DataFrame containing muscle names and their optimal fiber lengths
     """
     
-    # Check if model file exists
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model file not found: {model_path}")
-    
-    print(f"Loading OpenSim model: {model_path}")
-    
     try:
         # Load the model
         model = osim.Model(model_path)
