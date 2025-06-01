@@ -91,8 +91,33 @@ class BiologicalSystem(ABC):
         self.spikes = None
         self.time_series = None
         self.final_state = None
-        
 
+        #rapid check of type:
+        type_checks = {
+            "resting_lengths": (list, "Resting lengths should be a list."),
+            "biophysical_params": (dict, "Biophysical parameters should be a dict."),
+            "muscles_names": (list, "Muscle names should be in a list."),
+            "associated_joint": (str, "Joint name should be a string."),
+            "neurons_population": (dict, "Neuron population must be a dict."),
+            "connections": (dict, "Connections should be a dict."),
+            "spindle_model": (dict, "Spindle model should be a dict."),
+            "ees_recruitment_profile": (dict, "EES recruitment parameters should be a dict."),
+            "fast_type_mu": (bool, "The 'fast_type_mu' flag must be a boolean (True for fast, False for slow)."),
+            "initial_state_neurons": (dict, "Initial state of neurons should be a dict."),
+            "initial_condition_spike_activation": (list, "Initial conditions for activation dynamics should be a list."),
+            "initial_state_opensim": ((dict, type(None)), "Initial state of the musculoskeletal model should be a dict or None."),
+        }
+        for attr, (expected_type, error_msg) in type_checks.items():
+            value = getattr(self, attr)
+            if not isinstance(value, expected_type):
+                raise TypeError(f"Invalid type for '{attr}': {error_msg} Got {type(value).__name__} instead.")
+    
+        if self.activation_func is not None and not callable(self.activation_func):
+            raise TypeError("Activation function must be callable.")
+        if self.stretch_history_func is not None and not callable(self.stretch_history_func):
+            raise TypeError("Stretch history function must be callable.")
+
+        
     @abstractmethod
     def validate_input(self):
         """
