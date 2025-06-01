@@ -178,7 +178,8 @@ class ReciprocalInhibition(BiologicalSystem):
         # Check muscle count (should be exactly 2 for reciprocal inhibition)
         if self.number_muscles != 2:
             issues["errors"].append("Reciprocal inhibition reflex should have exactly 2 muscles")
-        
+        if len(self.resting_lengths)!=2:
+            issues["errors"].append("Your should specify the resting length for the muscles {self.muscles_names}, got an array of size {len(self.resting_lengths)}")
         # Check required neuron types for reciprocal inhibition
         required_neurons = {
             "Ia_flexor", "II_flexor", "Ia_extensor", "II_extensor",
