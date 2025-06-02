@@ -125,9 +125,31 @@ def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruit
 def sigmoid_recruitment(current_amplitude, threshold, saturation, slope):
     """
     Calculate recruitment fraction using a sigmoid function with user-defined parameters.
+
+    Parameters:
+    -----------
+    current_amplitude : float
+        Normalized stimulation amplitude [0–1]
+    threshold : float
+        Activation threshold [0–1]
+    saturation : float
+        Maximum recruitment level [0–1]
+    slope : float
+        Slope of the sigmoid curve
+
+    Returns:
+    --------
+    float
+        Recruitment fraction (0 to saturation)
     """
-    recruitment_fraction = saturation / (1 + np.exp(-slope * (current_amplitude - threshold)))
-    return recruitment_fraction
+    if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
+        raise ValueError(f"saturation and threshold must be between 0 and 1. "
+                         f"Got: threshold={threshold}, saturation={saturation}")
+    if not isinstance(slope, (int, float)) or slope <= 0:
+        raise ValueError(f"Slope must be a positive number. Got: slope={slope}")
+    
+    return saturation / (1 + np.exp(-slope * (current_amplitude - threshold)))
+
 
 
 def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stimulation_params, neurons_population, muscles_names):
@@ -140,13 +162,14 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
             ees_stimulation_params['intensity'],
             ees_stimulation_params['site'],
             ees_recruitment_profile,
-            muscles_cleaned           
+            muscles_cleaned         
     )   
 
     # Convert fractions to counts
     counts = {}
     for key, fraction in fractions.items():
-        counts[key] = int(fraction * neurons_population[key])
+        if key in neurons_population:
+            counts[key] = int(fraction * neurons_population[key])
     
     return {
         "recruitment": counts,
@@ -154,29 +177,54 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     }
 
 
-def calculate_full_recruitment(normalized_current, site, ees_recruitment_profile, muscles_names):
+def calculate_full_recruitment(normalized_current, site, ees_recruitment_profile, muscle_names):
     """
-    Calculate recruitment fractions for all fiber types based on normalized current and balance.
+    Calculate recruitment fractions for all fiber types based on normalized current and site.
+
+    Parameters
+    ----------
+    normalized_current : float
+        The current intensity (0 to 1) for which to calculate fiber recruitment.
+    site : str
+        Stimulation site (e.g. 'L4', 'S1', etc.)
+    ees_recruitment_profile : dict
+        Recruitment profile from the JSON.
+    muscle_names : list of str
+        List of muscle names to include (e.g. ["tib_ant_r", "med_gas_r"]).
+        
+    Returns
+    -------
+    dict
+        Recruitment fractions per fiber type and muscle group.
     """
+    if site not in ees_recruitment_profile:
+        raise ValueError(f"The stimulation site '{site}' does not exist in the EES recruitment profile. "
+                         f"Please add it to the EES recruitment JSON.")
+
+    # Optional: auto-assign flexor/extensor suffix if exactly two muscles are provided
+    label_suffixes = ['_flexor', '_extensor'] if len(muscle_names) == 2 else ['']
+
     fractions = {}
 
-    for fiber_type in ees_recruitment_profile.keys():
-        for muscle_name in muscles_names :
-            key = f"{fiber_type}_{muscle_name}"
-            if site not in ees_recruitment_profile:
-                raise ValueError(f"The stimulation site '{site}' does not exist in the EES recruitment profile. You should add it in the ees recruitment json!")
+    for muscle_name, suffix in zip(muscle_names, label_suffixes):
+        if muscle_name not in ees_recruitment_profile[site]:
+            raise ValueError(f"Recruitment profile for muscle '{muscle_name}' is missing at site '{site}'. "
+                             f"Add it to the EES profile.")
 
+        for neuron_type, neuron_params in ees_recruitment_profile[site][muscle_name].items():
             try:
-                slope = ees_recruitment_profile[site][muscle_name][fiber_type]['slope']
-                threshold = ees_recruitment_profile[site][muscle_name][fiber_type]['threshold'] 
-                saturation = ees_recruitment_profile[site][muscle_name][fiber_type]['saturation'] 
-            except Exception as e:
-                raise ValueError(f"Error when loading the saturation, threshold, or slope of the recruitment curves: {e}")
-                
+                slope = neuron_params['slope']
+                threshold = neuron_params['threshold']
+                saturation = neuron_params['saturation']
+            except KeyError as e:
+                raise ValueError(f"Missing parameter {e} in recruitment profile for '{neuron_type}' at site '{site}', "
+                                 f"muscle '{muscle_name}'.")
+
+            key = f"{neuron_type}{suffix}"
             fractions[key] = sigmoid_recruitment(normalized_current, threshold, saturation, slope)
 
-
     return fractions
+
 
 
 def validate_torque(torque):
