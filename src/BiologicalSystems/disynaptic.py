@@ -36,28 +36,8 @@ class Disynaptic(BiologicalSystem):
             }
             
         if ees_recruitment_profile is None:
-            ees_recruitment_profile = {
-                'Ia': {
-                    'threshold': 0.3,  # Normalized current for 50% of the maximum recruitment
-                    'saturation': 0.7,
-                    'slope':10
-                },
-                'Ib': {
-                    'threshold': 0.3, 
-                    'saturation': 0.7,
-                    'slope':10
-                },
-                'II': {
-                    'threshold': 0.4,  # Type II fibers have higher threshold
-                    'saturation': 0.7 ,
-                    'slope': 10
-                },
-                'MN': {
-                    'threshold': 0.9,  # Motoneurons are recruited at high intensity
-                    'saturation': 0.3,
-                    'slope': 10
-                }  
-            }
+            with open('data/ees_recruitment.json', 'r') as f:
+                ees_recruitment_profile = json.load(f)
             
         if neurons_population is None:
             # Set default neuron populations
