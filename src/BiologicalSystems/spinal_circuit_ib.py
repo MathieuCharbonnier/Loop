@@ -55,24 +55,49 @@ class SpinalCircuitWithIb(BiologicalSystem):
             
         if ees_recruitment_profile is None:
             ees_recruitment_profile = {
-                'Ia': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                "L4": {
+                    "flexor": {
+                        'Ia': {'threshold': 0.15, 'saturation': 0.9, 'slope': 20},
+                        'II': {'threshold': 0.25, 'saturation': 0.85, 'slope': 22},
+                        'Ib':  {'threshold': 0.15, 'saturation': 0.9, 'slope': 20},
+                        'MN': {'threshold': 0.9, 'saturation': 0.5, 'slope': 28},
+                    },
+                    "extensor": {
+                        'Ia': {'threshold': 0.5, 'saturation': 0.7, 'slope': 20},
+                        'II': {'threshold': 0.55, 'saturation': 0.68, 'slope': 22},
+                        'Ib': {'threshold': 0.5, 'saturation': 0.7, 'slope': 20},
+                        'MN': {'threshold': 0.9, 'saturation': 0.35, 'slope': 26},
+                    }
                 },
-                'Ib': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                "L5": {
+                    "flexor": {
+                        'Ia': {'threshold': 0.25, 'saturation': 0.85, 'slope': 21},
+                        'II': {'threshold': 0.35, 'saturation': 0.8, 'slope': 23},
+                        'Ib':{'threshold': 0.25, 'saturation': 0.85, 'slope': 21},
+                        'MN': {'threshold': 0.9, 'saturation': 0.45, 'slope': 28},
+                    },
+                    "extensor": {
+                        'Ia': {'threshold': 0.26, 'saturation': 0.84, 'slope': 21},
+                        'II': {'threshold': 0.36, 'saturation': 0.79, 'slope': 23},
+                        'Ib':{'threshold': 0.26, 'saturation': 0.84, 'slope': 21},
+                        'MN': {'threshold': 0.9, 'saturation': 0.44, 'slope': 28},
+                    }
                 },
-                'II': {
-                    'threshold_10pct': 0.4,  # Type II fibers have higher threshold
-                    'saturation_90pct': 0.8  # and higher saturation point
-                },
-                'MN': {
-                    'threshold_10pct': 0.9,  # Motoneurons are recruited at high intensity
-                    'saturation_90pct': 1  
-                }  
+                "S1": {
+                    "flexor": {
+                        'Ia': {'threshold': 0.45, 'saturation': 0.7, 'slope': 22},
+                        'II': {'threshold': 0.5, 'saturation': 0.68, 'slope': 24},
+                        'Ib':{'threshold': 0.45, 'saturation': 0.7, 'slope': 22},
+                        'MN': {'threshold': 0.9, 'saturation': 0.38, 'slope': 26},
+                    },
+                    "extensor": {
+                        'Ia': {'threshold': 0.2, 'saturation': 0.9, 'slope': 20},
+                        'II': {'threshold': 0.3, 'saturation': 0.85, 'slope': 22},
+                        'Ib':{'threshold': 0.2, 'saturation': 0.9, 'slope': 20},
+                        'MN': {'threshold': 0.9, 'saturation': 0.5, 'slope': 28},
+                    }
+                }
             }
-        
         
         # Override with custom values if provided
         if neurons_population is None:
@@ -338,24 +363,35 @@ class SpinalCircuitWithIb(BiologicalSystem):
                     )
         
         # Validate EES parameters
-        for neuron_type, params in self.ees_recruitment_profile.items():
-            if neuron_type in ["Ia", "II", "Ib", "MN"]:
-                required_ees_params = ["threshold_10pct", "saturation_90pct"]
-                for param in required_ees_params:
-                    if param not in params:
-                        issues["errors"].append(f"Missing '{param}' in EES recruitment parameters for '{neuron_type}'")
-                
-                if "threshold_10pct" in params and "saturation_90pct" in params:
-                    threshold = params['threshold_10pct']
-                    saturation = params['saturation_90pct']
+        for site, muscles in self.ees_recruitment_profile.items():
+            for muscle_group, afferents in muscles.items():
+                for neuron_type, params in afferents.items():
+                    required_ees_params = ["threshold", "saturation", "slope"]
                     
-                    if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
-                        issues["errors"].append(
-                            f"EES parameters for '{neuron_type}' must be between 0 and 1. "
-                            f"Got: threshold={threshold}, saturation={saturation}"
-                        )
-                    if threshold >= saturation:
-                        issues["errors"].append(f"Threshold must be less than saturation for '{neuron_type}'")
+                    for param in required_ees_params:
+                        if param not in params:
+                            issues["errors"].append(
+                                f"Missing '{param}' in EES recruitment parameters for '{neuron_type}' "
+                                f"at site '{site}', muscle group '{muscle_group}'"
+                            )
+                            
+                    if all(k in params for k in required_ees_params):
+                        threshold = params['threshold']
+                        saturation = params['saturation']
+                        slope = params['slope']
+                        
+                        if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
+                            issues["errors"].append(
+                                f"EES parameters for '{neuron_type}' at site '{site}', muscle group '{muscle_group}' "
+                                f"must be between 0 and 1. Got: threshold={threshold}, saturation={saturation}"
+                            )
+    
+                        if not isinstance(slope, (int, float)) or slope <= 0:
+                            issues["errors"].append(
+                                f"Slope must be a positive number for '{neuron_type}' "
+                                f"at site '{site}', muscle group '{muscle_group}'"
+                            )
+
         
         # Check connection weights and probabilities
         for connection, params in self.connections.items():
