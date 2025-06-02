@@ -47,7 +47,6 @@ def bump(time_array, t_peak, sigma, max_amplitude, sustained_amplitude=0):
     return torque
 
 
-
 def sigmoid_recruitment(current_amplitude, threshold, saturation, slope):
     """
     Calculate recruitment fraction using a sigmoid function with user-defined parameters.
@@ -56,27 +55,19 @@ def sigmoid_recruitment(current_amplitude, threshold, saturation, slope):
     return recruitment_fraction
 
 
-def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stimulation_params, neurons_population, num_muscles):
+def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stimulation_params, neurons_population, muscles_names):
     """
     Transform intensity and balance parameters into recruitment counts
     """
     validate_ees(ees_stimulation_params, ees_recruitment_profile, num_muscles, neurons_population)
-    
-    # Get fractions first
-    if 'site' in ees_stimulation_params:
-        fractions = calculate_full_recruitment(
+
+    fractions = calculate_full_recruitment(
             ees_stimulation_params['intensity'],
-            ees_recruitment_profile,
-            num_muscles,
             ees_stimulation_params['site'] 
-        )   
-    else:
-        fractions = calculate_full_recruitment(
-            ees_stimulation_params['intensity'],
             ees_recruitment_profile,
-            num_muscles
-        ) 
-    
+            muscles_names           
+    )   
+
     # Convert fractions to counts
     counts = {}
     for key, fraction in fractions.items():
@@ -88,40 +79,28 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     }
 
 
-def calculate_full_recruitment(normalized_current, ees_recruitment_profile, num_muscles, site=None):
+def calculate_full_recruitment(normalized_current, site, ees_recruitment_profile, muscles_names):
     """
     Calculate recruitment fractions for all fiber types based on normalized current and balance.
     """
     fractions = {}
 
-    if num_muscles == 2:
-        for fiber_type in ees_recruitment_profile.keys():
-            for muscle_type in ['flexor', 'extensor']:
-                key = f"{fiber_type}_{muscle_type}"
+    for fiber_type in ees_recruitment_profile.keys():
+        for muscle_name in muscles_names :
+            key = f"{fiber_type}_{muscle_name}"
                 
-                if site not in ees_recruitment_profile:
-                    raise ValueError(f"The stimulation site '{site}' does not exist in the EES recruitment profile. You should add it!")
+            if site not in ees_recruitment_profile:
+                raise ValueError(f"The stimulation site '{site}' does not exist in the EES recruitment profile. You should add it in the ees recruitment json!")
 
-                try:
-                    slope = ees_recruitment_profile[site][muscle_type][fiber_type]['slope']
-                    threshold = ees_recruitment_profile[site][muscle_type][fiber_type]['threshold'] 
-                    saturation = ees_recruitment_profile[site][muscle_type][fiber_type]['saturation'] 
-                except Exception as e:
-                    raise ValueError(f"Error when loading the saturation, threshold, or slope of the recruitment curves: {e}")
-                
-                fractions[key] = sigmoid_recruitment(normalized_current, threshold, saturation, slope)
-
-    else:
-        # Single muscle case
-        for fiber_type in ees_recruitment_profile.keys():
             try:
-                slope = ees_recruitment_profile[fiber_type]['slope']
-                threshold = ees_recruitment_profile[fiber_type]['threshold'] 
-                saturation = ees_recruitment_profile[fiber_type]['saturation'] 
+                slope = ees_recruitment_profile[site][muscle_name][fiber_type]['slope']
+                threshold = ees_recruitment_profile[site][muscle_name][fiber_type]['threshold'] 
+                saturation = ees_recruitment_profile[site][muscle_name][fiber_type]['saturation'] 
             except Exception as e:
-                raise ValueError(f"Error when loading recruitment curve values for single muscle model: {e}")
-            
-            fractions[fiber_type] = sigmoid_recruitment(normalized_current, threshold, saturation, slope)
+                raise ValueError(f"Error when loading the saturation, threshold, or slope of the recruitment curves: {e}")
+                
+            fractions[key] = sigmoid_recruitment(normalized_current, threshold, saturation, slope)
+
 
     return fractions
 
@@ -229,12 +208,8 @@ def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, n
             else:
                 issues["errors"].append("EES parameters must contain 'intensity' parameter")
 
-            if 'site' in ees_stimulation_params:
-                    if number_muscle==1:
-                        issues["warnings"].append(f"'site' parameter in ees stimulation is for two muscles simulation only,it will be not be considered, modify the code if you want this functionnality for one muscle ")
-            else:
-                if number_muscle==2:
-                     issues["warnings"].append(f"you should specify the stimulation site  for two muscles simulation with ees stimulation")
+            if not 'site' in ees_stimulation_params:
+                issues["errors"].append(f"you should specify the EES stimulation site! ")
                 
         
 
