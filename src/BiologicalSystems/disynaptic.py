@@ -38,20 +38,24 @@ class Disynaptic(BiologicalSystem):
         if ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                    'threshold': 0.3,  # Normalized current for 50% of the maximum recruitment
+                    'saturation': 0.7,
+                    'slope':10
                 },
                 'Ib': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                    'threshold': 0.3, 
+                    'saturation': 0.7,
+                    'slope':10
                 },
                 'II': {
-                    'threshold_10pct': 0.4,  # Type II fibers have higher threshold
-                    'saturation_90pct': 0.8  # and higher saturation point
+                    'threshold': 0.4,  # Type II fibers have higher threshold
+                    'saturation': 0.7 ,
+                    'slope': 10
                 },
                 'MN': {
-                    'threshold_10pct': 0.9,  # Motoneurons are recruited at high intensity
-                    'saturation_90pct': 1  
+                    'threshold': 0.9,  # Motoneurons are recruited at high intensity
+                    'saturation': 0.3,
+                    'slope: 10
                 }  
             }
             
