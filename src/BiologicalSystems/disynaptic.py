@@ -30,6 +30,8 @@ class Disynaptic(BiologicalSystem):
                 'Cm': 0.3*nF,
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
+                'E_inh': -75*mV,
+                'tau_i':5*ms,
                 'threshold_v': -45*mV
             }
             
@@ -143,9 +145,11 @@ class Disynaptic(BiologicalSystem):
         required_connections = {("Ia", "MN"), ("II", "exc"), ("exc", "MN")}
         defined_connections = set(self.connections.keys())
         
+
         missing_connections = required_connections - defined_connections
         if missing_connections:
             issues["errors"].append(f"Missing required connections for disynaptic reflex: {missing_connections}")
+
         
         # Check spindle model
         required_spindle_equations = ["Ia", "II"]
@@ -154,15 +158,28 @@ class Disynaptic(BiologicalSystem):
                 issues["errors"].append(f"Missing {eq} equation in spindle model for disynaptic reflex")
         if "Ia_II_delta_delay" in spindle_model and "stretch" in spindle_model.get("II"):
              issues["errors"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model delayed II pathway! Otherwise, don't specify a delay! ")    
-            
+                    
+                    
+        #check Ib path
+        if neurons_population.get("Ib", 0)>0 :
+            if neurons_population.get("inhb", 0)==0 :
+                 issues["errors"].append(f"For Ib path, you must add "inhb" neurons ")
+            if not 'Ib' in self.spindle_model:
+                issues["errors"].append(f"For Ib path, you must specify Ib equation ")
+            if not "inhb" in self.connections.keys():
+                issues["errors"].append(f"For Ib path, include connections between Ib, inhb and MN neurons!")
+            if not "Ib" in self.connections.keys():
+                issues["errors"].append(f"For Ib path, include connections between Ib, inhb and MN neurons!")
+        else:   
+            if "inhb" in self.connections.keys():
+                issues["errors"].append(f"inhb neurons are not present in the population, but you include them in connections")
+            if "Ib" in self.connections.keys() :
+                issues["errors"].append(f"Ib neurons are not present in the population, but you include them in connections")
+            if "Ib" in self.spindle_model:
+                issues["warning"].append(f"Ib equations in the spindle model will not be considered!")
                 
-        
-        # Check biophysical parameters (no inhibitory parameters should be present)
-        if "E_inh" in self.biophysical_params or "tau_i" in self.biophysical_params:
-            issues["warnings"].append("Inhibitory parameters present but no inhibitory neurons in disynaptic reflex")
-        
         # Check mandatory biophysical parameters
-        required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e', 'threshold_v']
+        required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e','E_inh', 'tau_i', 'threshold_v']
         for param in required_params:
             if param not in self.biophysical_params:
                 issues["errors"].append(f"Missing mandatory biophysical parameter: '{param}'")
@@ -175,6 +192,8 @@ class Disynaptic(BiologicalSystem):
             'Cm': farad,
             'E_ex': volt,
             'tau_e': second,
+            'E_inh': volt,
+            'tau_i': second,
             'threshold_v': volt
         }
         
