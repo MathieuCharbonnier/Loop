@@ -1,4 +1,5 @@
 from brian2 import *
+import json
 from .BiologicalSystem import BiologicalSystem
 
 class Monosynaptic(BiologicalSystem):
