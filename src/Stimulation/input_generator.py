@@ -1,6 +1,9 @@
 
 import pandas as pd
 import numpy as np
+import json
+from datetime import datetime
+import os
 import matplotlib.pyplot as plt
 from brian2 import*
 
@@ -45,8 +48,80 @@ def bump(time_array, t_peak, sigma, max_amplitude, sustained_amplitude=0):
     torque = np.copy(gaussian)
     torque[i_hold_start:] = sustained_amplitude
     return torque
+    
 
+def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruitment_profile=None,
+                             base_output_path=None):
+    """
+    Plot recruitment curves for all fiber types using the threshold-based sigmoid.
+    Only shows fractions of population, not absolute counts.
 
+    Parameters:
+    -----------
+    site : str
+        Electrode position 
+    muscle_name: str
+        Muscle to consider
+    current_current : float, optional
+        Current intensity value to highlight
+    ees_recruitment_profile : dict, optional
+        Dictionary with threshold and saturation values
+    base_output_path : str, optional
+        Path to save the plot
+    """  
+    if ees_recruitment_profile is None:
+        with open('ees_recruitment.json', 'r') as f:
+            ees_recruitment_profile = json.load(f)
+
+    currents = np.linspace(0, 1, 100)
+    fraction_results = []
+
+    for current in currents:
+        fractions = calculate_full_recruitment(
+            current,
+            site,
+            ees_recruitment_profile, 
+            [muscle_name]
+        )
+        fraction_results.append(fractions[muscle_name])
+
+    df = pd.DataFrame(fraction_results)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    style_map = {'Ia': 'g-', 'II': 'b-', 'Ib': 'c-', 'MN': 'r-'}
+    for col in df.columns:
+        style = style_map.get(col, '-')  # default to '-' if fiber type not in map
+        ax.plot(currents, df[col], style, label=col)
+
+    if current_current is not None:  
+        ax.axvline(x=current_current, color='r', linestyle='--', label='Current')
+
+    ax.set_xlabel('Normalized Current Amplitude')
+    ax.set_ylabel('Fraction of Fibers Recruited')
+    ax.set_title(f'Fiber Recruitment at {site} - {muscle_name}')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    ax.axhline(y=0.1, color='gray', linestyle=':', alpha=0.7)
+    ax.axhline(y=0.9, color='gray', linestyle=':', alpha=0.7)
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f'Recruitment_Curve_{site}_{muscle_name}_{timestamp}.png'
+    
+    if base_output_path:
+        fig_path = os.path.join(base_output_path, filename)
+    else:
+        os.makedirs("Results", exist_ok=True)
+        fig_path = os.path.join("Results", filename)
+
+    fig.savefig(fig_path)
+    plt.show()
+
+        
 def sigmoid_recruitment(current_amplitude, threshold, saturation, slope):
     """
     Calculate recruitment fraction using a sigmoid function with user-defined parameters.
@@ -60,12 +135,12 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     Transform intensity and balance parameters into recruitment counts
     """
     validate_ees(ees_stimulation_params, len(muscles_names))
-
+    muscles_cleaned = [m[:-2] if m.endswith(('_r', '_l')) else m for m in muscles_names]
     fractions = calculate_full_recruitment(
             ees_stimulation_params['intensity'],
             ees_stimulation_params['site'] 
             ees_recruitment_profile,
-            muscles_names           
+            muscles_cleaned           
     )   
 
     # Convert fractions to counts
@@ -88,7 +163,6 @@ def calculate_full_recruitment(normalized_current, site, ees_recruitment_profile
     for fiber_type in ees_recruitment_profile.keys():
         for muscle_name in muscles_names :
             key = f"{fiber_type}_{muscle_name}"
-                
             if site not in ees_recruitment_profile:
                 raise ValueError(f"The stimulation site '{site}' does not exist in the EES recruitment profile. You should add it in the ees recruitment json!")
 
