@@ -113,10 +113,6 @@ class Monosynaptic(BiologicalSystem):
         if "Ia" not in self.spindle_model:
             issues["errors"].append("Missing Ia equation in spindle model for monosynaptic reflex")
         
-        # Check EES recruitment parameters
-        for neuron_type in ["Ia", "MN"]:
-            if neuron_type not in self.ees_recruitment_profile:
-                issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
         
         # Check biophysical parameters (no inhibitory parameters should be present)
         if "E_inh" in self.biophysical_params or "tau_i" in self.biophysical_params:
@@ -148,33 +144,6 @@ class Monosynaptic(BiologicalSystem):
                         f"Expected unit compatible with {expected_unit}, but got {value.unit}"
                     )
         
-         # Validate EES parameters
-        for neuron_type, params in ees_recruitment_profile.items():
-            required_ees_params = ["threshold", "saturation", "slope"]
-                    
-            for param in required_ees_params:
-                if param not in params:
-                    issues["errors"].append(
-                        f"Missing '{param}' in EES recruitment parameters for '{neuron_type}' "
-                            )
-                            
-                    if all(k in params for k in required_ees_params):
-                        threshold = params['threshold']
-                        saturation = params['saturation']
-                        slope = params['slope']
-                        
-                        if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
-                            issues["errors"].append(
-                                f"EES parameters for '{neuron_type}' at site '{site}', muscle group '{muscle_group}' "
-                                f"must be between 0 and 1. Got: threshold={threshold}, saturation={saturation}"
-                            )
-
-                        if not isinstance(slope, (int, float)) or slope <= 0:
-                            issues["errors"].append(
-                                f"Slope must be a positive number for '{neuron_type}' "
-                                f"at site '{site}', muscle group '{muscle_group}'"
-                            )
-
         
         # Raise error if there are critical issues
         if issues["errors"]:
