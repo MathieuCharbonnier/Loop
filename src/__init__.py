@@ -16,5 +16,5 @@ __all__ = [
     "ReflexAnalyzer",
     "Sensitivity",
     "BaseEESController",
-    "IntelligentEESController
+    "IntelligentEESController"
 ]
