@@ -31,12 +31,14 @@ class Monosynaptic(BiologicalSystem):
         if ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
-                    'threshold_10pct': 0.3,
-                    'saturation_90pct': 0.7
+                    'threshold': 0.3,
+                    'saturation': 0.7,
+                    'slope': 10
                 },
                 'MN': {
-                    'threshold_10pct': 0.9,
-                    'saturation_90pct': 1
+                    'threshold': 0.9,
+                    'saturation': 0.2,
+                    'slope': 10
                 }
             }
 
