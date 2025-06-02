@@ -123,10 +123,6 @@ class BiologicalSystem(ABC):
             if not isinstance(value, expected_type):
                 raise TypeError(f"Invalid type for '{attr}': {error_msg} Got {type(value).__name__} instead.")
     
-        if self.activation_func is not None and not callable(self.activation_func):
-            raise TypeError("Activation function must be callable.")
-        if self.stretch_history_func is not None and not callable(self.stretch_history_func):
-            raise TypeError("Stretch history function must be callable.")
 
         
     @abstractmethod
@@ -199,7 +195,7 @@ class BiologicalSystem(ABC):
             deepcopy(self.initial_condition_spike_activation), 
             deepcopy(self.initial_state_opensim),
             self.activation_function, 
-            self.stretch_history,
+            self.stretch_history_function,
             torque_array=torque_array, 
             ees_params=ees_params,
             seed=seed, 
