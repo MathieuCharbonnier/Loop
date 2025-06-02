@@ -98,26 +98,26 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             print(f"Warning: Could not load activation history: {e}")
         
 
-    delay = spindle_model.get("Ia_II_delay", 0)  
+    delay = spindle_model.get("Ia_II_delta_delay", 0)  
     delay_points = int(delay / time_step)
     stretch_global_buffer = np.zeros((num_muscles, delay_points + total_points))
 
     # Initialize delay buffer with historical data if available
     if delay_points > 0:
       
-        if stretch_history_func is not None:
+        if stretch_history_function is not None:
             time_delay = np.linspace(-delay, 0, delay_points)
             try:
-                old_stretch = stretch_history_func(time_delay)
+                old_stretch = stretch_history_function(time_delay)
                 if old_stretch.shape[0] == num_muscles :
-                    stretch_buffer[:, :delay_points] = old_stretch
+                    stretch_global_buffer[:, :delay_points] = old_stretch
                 else:
                     print(f"Warning: stretch_history shape mismatch. Expected ({num_muscles}, {delay_points}), got {old_stretch.shape}")
             except Exception as e:
                 print(f"Warning: Could not load stretch history: {e}")
         else:
             # Initialize delay buffer with resting length (stretch = 0)
-            stretch_buffer[:, :delay_points] = 0.0
+            stretch_global_buffer[:, :delay_points] = 0.0
     
     # Containers for simulation data
     muscle_data = [[] for _ in range(num_muscles)]
@@ -193,7 +193,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         # Update stretch buffer 
         if delay_points > 0:
             # Shift existing data left (remove oldest, keep recent)
-            stretch_buffer[:, :delay_points] = stretch_buffer[:, nb_points:delay_points + nb_points]
+            stretch_global_buffer[:, :delay_points] = stretch_global_buffer[:, nb_points:delay_points + nb_points]
         
         
         buffer_start = delay_points + iteration * nb_points
@@ -317,7 +317,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 initial_condition_spike_activation[muscle_idx] = final_values
                 
                 end_activation = time.time()
-                start_storage = time.time()
+              
                 
                 # Create batch data for current iteration
                 batch_data = {
@@ -339,12 +339,12 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
                 # Store batch data for this muscle
                 muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
-                end_storage = time.time()
+                
 
         print(f"Opensim time: {end_opensim - start_opensim:.2f} s")
         print(f"Neuron time: {end_neuron - start_neuron:.2f} s")
         print(f"Activation time: {end_activation - start_activation:.2f} s")
-        print(f"Storage time: {end_storage - start_storage:.2f} s")
+  
 
     # =============================================================================
     # Prepare Final State 
@@ -402,13 +402,13 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         df[f'Ia_rate_baseline_{muscle_name}'] = Ia_rate
 
         # Compute II firing rate if applicable
-        if "II" in neurons_population and "II" in spindle_model:
+        if "II" in spindle_model:
             II_rate = eval(spindle_model['II'], 
                           {"__builtins__": {}}, 
                           {"stretch": stretch_values,
                           "stretch_delay": stretch_delay_values }
                            )
-
+         
             df[f'II_rate_baseline_{muscle_name}'] = II_rate
 
         # Compute Ib firing rate if applicable
@@ -462,34 +462,36 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         combined_df.to_csv(csv_path, index=False)
         print(f"Saved combined data to {csv_path}")
 
+        get_sto_file(time_step/second,reaction_time/second*n_iterations,
+          muscles_names,associated_joint, torque_array,base_output_path, )
+
+    return spike_data, combined_df, final_state
+
+  
+def get_sto_file(time_step, total_time, muscles_names, associated_joint,activations_all, torque_array, base_output_path):
     # ====================================================================================================
     # Run Complete Muscle Simulation for visualization of the dynamic on opensim
     # ======================================================================================================
-    
+  
     if base_output_path is not None:
 
         sto_path = base_output_path + '.sto'
         # Recreate a simulator since we want to start the simulation from the beginning
+        on_colab = is_running_on_colab()
         simulator = CoLabSimulator() if on_colab else LocalSimulator()
       
         # Run final simulation for visualization
         fiber_lengths, joint=simulator.run_muscle_simulation(
-                time_step/second,
-                reaction_time/second * n_iterations,
+                time_step,
+                total_time,
                 muscles_names,
                 associated_joint,
                 activations_all,
                 torque_array,
                 sto_path
             )
-    """
-    plt.plot(time_points, joint_all, label='loop simulation')
-    plt.plot(time_points, joint[:len(joint_all)], label='final simulation')
-    plt.legend()
-    plt.show()
-    """
 
-    return spike_data, combined_df, final_state
+    
 
 class SimulatorBase:
     """Base class for simulation strategies"""
