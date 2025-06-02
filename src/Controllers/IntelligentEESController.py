@@ -7,7 +7,8 @@ from copy import deepcopy
 import os
 from scipy.interpolate import interp1d
 from scipy.signal import find_peaks, savgol_filter
-from .BiologicalSystems.BiologicalSystem import BiologicalSystem
+from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
+from .BaseEESController import BaseEESController
 
 class IntelligentEESController(BaseEESController):
     """
