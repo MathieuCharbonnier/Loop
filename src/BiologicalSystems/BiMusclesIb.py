@@ -2,7 +2,7 @@ from brian2 import *
 import json
 from .BiologicalSystem import BiologicalSystem
 
-class SpinalCircuitWithIb(BiologicalSystem):
+class BiMusclesIb(BiologicalSystem):
     """
     Specialized class that integrates Ib fibers in the realistic biological neural network 
     between two antagonistic muscle systems. We only consider known di-synaptic pathways.
