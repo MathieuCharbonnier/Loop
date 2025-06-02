@@ -180,7 +180,7 @@ class BiologicalSystem(ABC):
         if ees_stimulation_params is not None:
             ees_params = transform_intensity_balance_in_recruitment(
                 self.ees_recruitment_profile, ees_stimulation_params, 
-                self.neurons_population, self.number_muscles)
+                self.neurons_population, self.muscles_names)
         
         self.spikes, self.time_series, self.final_state = closed_loop(
             n_iterations, 
@@ -221,14 +221,6 @@ class BiologicalSystem(ABC):
         if self.spikes is None or self.time_series is None:
             raise ValueError("You should first launch a simulation!")
         
-        if ees_stimulation_params is not None:
-            self.plot_recruitment_curves(
-                self.ees_recruitment_profile, 
-                current_current=ees_stimulation_params.get('intensity'),
-                base_output_path=base_output_path, 
-                site=ees_stimulation_params.get('site', None), 
-                num_muscles=self.number_muscles
-            )
                 
         self.plot_mouvement(base_output_path)
         self.plot_neural_dynamic(base_output_path)
@@ -531,100 +523,6 @@ class BiologicalSystem(ABC):
         fig_muscle.tight_layout(rect=[0, 0.03, 1, 0.95])
         save_figure(fig_muscle, "Muscle_dynamic")
     
-    
-    def plot_recruitment_curves(self, ees_recruitment_params, current_current, site=None, 
-                               base_output_path=None, num_muscles=None):
-        """
-        Plot recruitment curves for all fiber types using the threshold-based sigmoid.
-        Only shows fractions of population, not absolute counts.
-        
-        Parameters:
-        -----------
-        ees_recruitment_params : dict
-            Dictionary with threshold and saturation values
-        current_current : float
-            Current intensity value to highlight
-        site : str
-            Electrode position 
-        base_output_path : str, optional
-            Path to save the plot
-        num_muscles : int, optional
-            Number of muscles (defaults to self.number_muscles)
-        """
-        if num_muscles is None:
-            num_muscles = self.number_muscles
-            
-        currents = np.linspace(0, 1, 100)
-        
-        # Calculate recruitment fractions at each intensity
-        fraction_results = []
-        
-        for current in currents:
-            # Get fractions directly
-            fractions = calculate_full_recruitment(
-                current, 
-                ees_recruitment_params, 
-                num_muscles,
-                site
-            )
-            fraction_results.append(fractions)
-          
-        # Convert results to DataFrame for easier plotting
-        df = pd.DataFrame(fraction_results)
-        
-        # Plot
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        # Define colors and styles for different fiber types
-        style_map = {
-            'Ia_flexor': 'r-', 'II_flexor': 'r--', 'MN_flexor': 'r-.',
-            'Ia_extensor': 'b-', 'II_extensor': 'b--', 'MN_extensor': 'b-.'
-        }
-        
-        # For non-muscle-specific case
-        single_style_map = {'Ia': 'g-', 'II': 'g--', 'MN': 'g-.'}
-        
-        for col in df.columns:
-            # Choose appropriate style
-            if col in style_map:
-                line_style = style_map[col]
-            elif col in single_style_map:
-                line_style = single_style_map[col]
-            else:
-                # Default styling
-                if "extensor" in col:
-                    line_style = 'b-'  # Blue for extensors
-                else:
-                    line_style = 'r-'  # Red for flexors
-            
-            ax.plot(currents, df[col], line_style, label=col)
-            
-        ax.axvline(x=current_current, color='r', linestyle='--', label='Current current')
-        ax.set_xlabel('Normalized Current Amplitude')
-        ax.set_ylabel('Fraction of Fibers Recruited')
-        if num_muscles == 2:
-            ax.set_title(f'Fiber Recruitment (Balance = {balance})')
-        else:
-            ax.set_title('Fiber Recruitment')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Add horizontal lines at 10% and 90% recruitment
-        ax.axhline(y=0.1, color='gray', linestyle=':', alpha=0.7)
-        ax.axhline(y=0.9, color='gray', linestyle=':', alpha=0.7)
-        
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-    
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'Recruitment_Curve_{timestamp}.png'
-        if base_output_path:
-            fig_path = os.path.join(base_output_path, filename)
-        else:
-            os.makedirs("Results", exist_ok=True)
-            fig_path = os.path.join("Results", filename)
-        fig.savefig(fig_path)
-        plt.show()
 
     def get_system_state(self):
         """Return the current state of the biological system for transfer"""
