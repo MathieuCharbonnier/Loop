@@ -36,17 +36,21 @@ class Disynaptic(BiologicalSystem):
         if ees_recruitment_profile is None:
             ees_recruitment_profile = {
                 'Ia': {
-                    'threshold_10pct': 0.3,
-                    'saturation_90pct': 0.7
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                },
+                'Ib': {
+                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
+                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
                 },
                 'II': {
-                    'threshold_10pct': 0.4,
-                    'saturation_90pct': 0.8
+                    'threshold_10pct': 0.4,  # Type II fibers have higher threshold
+                    'saturation_90pct': 0.8  # and higher saturation point
                 },
                 'MN': {
-                    'threshold_10pct': 0.9,
-                    'saturation_90pct': 1.0  
-                }
+                    'threshold_10pct': 0.9,  # Motoneurons are recruited at high intensity
+                    'saturation_90pct': 1  
+                }  
             }
             
         if neurons_population is None:
@@ -54,7 +58,9 @@ class Disynaptic(BiologicalSystem):
             neurons_population = {
                 "Ia": 200,#280,       # Type Ia afferent neurons
                 "II":200,# 280,       # Type II afferent neurons
+                "Ib": 200,
                 "exc": 400,      # Excitatory interneurons
+                "inhb":400,     #Inhibitory interneurons
                 "MN": 300,#450        # Motor neurons
             }
         
@@ -62,13 +68,16 @@ class Disynaptic(BiologicalSystem):
             connections = {
                 ("Ia", "MN"): {"w": 2.1*nS, "p": 0.5},
                 ("II", "exc"): {"w": 3.64*nS, "p": 0.5},
-                ("exc", "MN"): {"w": 2.1*nS, "p": 0.5}
+                ("exc", "MN"): {"w": 2.1*nS, "p": 0.5},
+                ("Ib", "inhb"): {"w": 3.64*nS, "p": 0.5},
+                ("inhb", "MN"): {"w": 2.1*nS, "p": 0.5}
             }
 
         if spindle_model is None:
             spindle_model = {
                 "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
                 "II": "20 + 13.5*stretch_delay",
+                "Ib": "10 + 1*force_normalized**0.2",
                 "Ia_II_delta_delay": 15*ms
             }
                  
@@ -76,9 +85,13 @@ class Disynaptic(BiologicalSystem):
             initial_state_neurons = {
                 "exc":{'v': biophysical_params['Eleaky'],
                       'gII': 0*nS},
+                "inhb":{'v': biophysical_params['Eleaky'],
+                        'gIb':0*nS
+                      },
                 "MN":{ 'v' :biophysical_params['Eleaky'],
                       'gIa':0*nS,
-                      'gexc':0*nS}
+                      'gexc':0*nS,
+                      'ginhb':0*nS}
             }
         if initial_condition_spike_activation is None:   
             # Initialize parameters for each motoneuron
@@ -114,7 +127,7 @@ class Disynaptic(BiologicalSystem):
             issues["errors"].append("Your should specify the resting length for the muscle {self.muscles_names}, got an array of size {len(self.resting_lengths)}")
         
         # Check required neuron types
-        required_neurons = {"Ia", "II", "exc", "MN"}
+        required_neurons = {"Ia", "II", "Ib","exc","inhb", "MN"}
         defined_neurons = set(self.neurons_population.keys())
         
         missing_neurons = required_neurons - defined_neurons
@@ -143,10 +156,6 @@ class Disynaptic(BiologicalSystem):
              issues["errors"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model delayed II pathway! Otherwise, don't specify a delay! ")    
             
                 
-        # Check EES recruitment parameters
-        for neuron_type in ["Ia", "II", "MN"]:
-            if neuron_type not in self.ees_recruitment_profile:
-                issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
         
         # Check biophysical parameters (no inhibitory parameters should be present)
         if "E_inh" in self.biophysical_params or "tau_i" in self.biophysical_params:
@@ -180,7 +189,7 @@ class Disynaptic(BiologicalSystem):
         
         # Validate EES parameters
         for neuron_type, params in self.ees_recruitment_profile.items():
-            if neuron_type in ["Ia", "II", "MN"]:
+            if neuron_type in ["Ia", "II","Ib", "MN"]:
                 required_ees_params = ["threshold_10pct", "saturation_90pct"]
                 for param in required_ees_params:
                     if param not in params:
