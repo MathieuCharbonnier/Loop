@@ -56,45 +56,9 @@ class ReciprocalInhibition(BiologicalSystem):
             }
             
         if ees_recruitment_profile is None:
-            ees_recruitment_profile = {
-                "L4": {
-                    "flexor": {
-                        'Ia': {'threshold': 0.15, 'saturation': 0.9, 'slope': 20},
-                        'II': {'threshold': 0.25, 'saturation': 0.85, 'slope': 22},
-                        'MN': {'threshold': 0.9, 'saturation': 0.5, 'slope': 28},
-                    },
-                    "extensor": {
-                        'Ia': {'threshold': 0.5, 'saturation': 0.7, 'slope': 20},
-                        'II': {'threshold': 0.55, 'saturation': 0.68, 'slope': 22},
-                        'MN': {'threshold': 0.9, 'saturation': 0.35, 'slope': 26},
-                    }
-                },
-                "L5": {
-                    "flexor": {
-                        'Ia': {'threshold': 0.25, 'saturation': 0.85, 'slope': 21},
-                        'II': {'threshold': 0.35, 'saturation': 0.8, 'slope': 23},
-                        'MN': {'threshold': 0.9, 'saturation': 0.45, 'slope': 28},
-                    },
-                    "extensor": {
-                        'Ia': {'threshold': 0.26, 'saturation': 0.84, 'slope': 21},
-                        'II': {'threshold': 0.36, 'saturation': 0.79, 'slope': 23},
-                        'MN': {'threshold': 0.9, 'saturation': 0.44, 'slope': 28},
-                    }
-                },
-                "S1": {
-                    "flexor": {
-                        'Ia': {'threshold': 0.45, 'saturation': 0.7, 'slope': 22},
-                        'II': {'threshold': 0.5, 'saturation': 0.68, 'slope': 24},
-                        'MN': {'threshold': 0.9, 'saturation': 0.38, 'slope': 26},
-                    },
-                    "extensor": {
-                        'Ia': {'threshold': 0.2, 'saturation': 0.9, 'slope': 20},
-                        'II': {'threshold': 0.3, 'saturation': 0.85, 'slope': 22},
-                        'MN': {'threshold': 0.9, 'saturation': 0.5, 'slope': 28},
-                    }
-                }
-            }
-
+            with open('data/ees_recruitment.json', 'r') as f:
+                ees_recruitment_profile = json.load(f)
+                
         if neurons_population is None:
         
             # Setup specialized neuron populations for reciprocal inhibition
