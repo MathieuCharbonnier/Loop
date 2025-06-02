@@ -23,7 +23,7 @@ class IntelligentEESController(BaseEESController):
     """
     
     def __init__(self, biological_system, update_iterations, 
-                 initial_ees_params=None, frequency_grid=[30, 70]*hertz, balance_grid=[-0.8, 0.3],
+                 initial_ees_params=None, frequency_grid=[30, 70]*hertz, site_grid=['L4', 'L5', 'S1'],
                  time_step=0.1*ms, enable_physiological_feedback=True, 
                  enable_gait_events=True, enable_amplitude_adaptation=True):
         """
@@ -39,7 +39,7 @@ class IntelligentEESController(BaseEESController):
             Enable frequency adaptation based on movement amplitude
         """
         super().__init__(biological_system, update_iterations, initial_ees_params, 
-                        frequency_grid, balance_grid, time_step)
+                        frequency_grid, site_grid, time_step)
         
         # Intelligent controller features
         self.enable_physiological_feedback = enable_physiological_feedback
@@ -48,7 +48,6 @@ class IntelligentEESController(BaseEESController):
         
         # Physiological feedback parameters
         self.error_threshold = 5.0  # degrees
-        self.balance_adaptation_rate = 0.1
         self.frequency_adaptation_rate = 0.15
         
         # Gait event detection parameters
@@ -142,7 +141,7 @@ class IntelligentEESController(BaseEESController):
         """
         if not self.has_multiple_muscles:
             return current_params
-        
+    
         adjusted_params = BiologicalSystem.copy_brian_dict(current_params)
         
         # Calculate recent tracking error
@@ -151,31 +150,39 @@ class IntelligentEESController(BaseEESController):
         adjustment_made = False
         adjustment_reason = ""
         
-        # Rule 1: If ankle is too dorsiflexed (positive error), increase extensor activity
-        if recent_error > self.error_threshold:
-            balance_adjustment = -self.balance_adaptation_rate
-            new_balance = max(adjusted_params['balance'] + balance_adjustment, self.balance_grid[0])
-            adjusted_params['balance'] = new_balance
+        # Define stimulation site order from more flexor-dominant to more extensor-dominant
+        site_order = ["L1","L2","L3","L4", "L5", "S1", "S2"]  # Ordered from flexor-dominant to extensor-dominant
+    
+        current_site = adjusted_params.get("site")  # now a string like "L5"
+        if current_site not in site_order:
+            return adjusted_params  # Invalid site, skip adjustment
+    
+        current_index = site_order.index(current_site)
+    
+        # Rule 1: If ankle is too dorsiflexed (positive error), move to more extensor-dominant site
+        if recent_error > self.error_threshold and current_index < len(site_order) - 1:
+            new_site = site_order[current_index + 1]
+            adjustment_reason = f"Excessive dorsiflexion (error: {recent_error:.1f}°) -> shift to more extensor site: {new_site}"
+            adjusted_params['site'] = new_site
             adjustment_made = True
-            adjustment_reason = f"Excessive dorsiflexion (error: {recent_error:.1f}°) -> increase extensor"
-        
-        # Rule 2: If ankle is too plantarflexed (negative error), increase flexor activity
-        elif recent_error < -self.error_threshold:
-            balance_adjustment = self.balance_adaptation_rate
-            new_balance = min(adjusted_params['balance'] + balance_adjustment, self.balance_grid[-1])
-            adjusted_params['balance'] = new_balance
+    
+        # Rule 2: If ankle is too plantarflexed (negative error), move to more flexor-dominant site
+        elif recent_error < -self.error_threshold and current_index > 0:
+            new_site = site_order[current_index - 1]
+            adjustment_reason = f"Excessive plantarflexion (error: {recent_error:.1f}°) -> shift to more flexor site: {new_site}"
+            adjusted_params['site'] = new_site
             adjustment_made = True
-            adjustment_reason = f"Excessive plantarflexion (error: {recent_error:.1f}°) -> increase flexor"
-        
+    
         if adjustment_made:
             self.physiological_adjustments_history.append({
                 'time': len(self.time_history) * self.time_step if self.time_history else 0,
                 'reason': adjustment_reason,
                 'error': recent_error,
-                'balance_change': adjusted_params['balance'] - current_params['balance']
+                'balance_change': f"{current_site} → {adjusted_params['site']}"
             })
         
         return adjusted_params
+
     
     def _apply_amplitude_adaptation(self, current_params, trajectory, desired_trajectory):
         """
