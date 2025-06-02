@@ -226,7 +226,7 @@ class BiologicalSystem(ABC):
                 self.ees_recruitment_profile, 
                 current_current=ees_stimulation_params.get('intensity'),
                 base_output_path=base_output_path, 
-                balance=ees_stimulation_params.get('balance', 0), 
+                site=ees_stimulation_params.get('site', None), 
                 num_muscles=self.number_muscles
             )
                 
@@ -532,7 +532,7 @@ class BiologicalSystem(ABC):
         save_figure(fig_muscle, "Muscle_dynamic")
     
     
-    def plot_recruitment_curves(self, ees_recruitment_params, current_current, balance=0, 
+    def plot_recruitment_curves(self, ees_recruitment_params, current_current, site=None, 
                                base_output_path=None, num_muscles=None):
         """
         Plot recruitment curves for all fiber types using the threshold-based sigmoid.
@@ -544,8 +544,8 @@ class BiologicalSystem(ABC):
             Dictionary with threshold and saturation values
         current_current : float
             Current intensity value to highlight
-        balance : float
-            Electrode position bias (-1 to 1)
+        site : str
+            Electrode position 
         base_output_path : str, optional
             Path to save the plot
         num_muscles : int, optional
@@ -564,8 +564,8 @@ class BiologicalSystem(ABC):
             fractions = calculate_full_recruitment(
                 current, 
                 ees_recruitment_params, 
-                balance, 
-                num_muscles
+                num_muscles,
+                site
             )
             fraction_results.append(fractions)
           
