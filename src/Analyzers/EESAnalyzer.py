@@ -36,7 +36,8 @@ class EESAnalyzer:
         self.results = None
         self._default_ees_params = {
             'frequency': 50*hertz,
-            'intensity': 0.5
+            'intensity': 0.5,
+            'site': 'L5'
         }
     
     def analyze_frequency_effects(self, freq_range=None, base_ees_params=None, torque_profile=None,
@@ -130,7 +131,7 @@ class EESAnalyzer:
         
         return results
       
-    def analyze_unbalanced_recruitment_effects(self, different_sites=None, base_ees_params=None, torque_profile=None,
+    def analyze_stimulation_sites(self, different_sites=None, base_ees_params=None, torque_profile=None,
                                              n_iterations=20, time_step=0.1*ms, seed=42):
         """
         Analyze the effects of unbalanced afferent recruitment between antagonistic muscles.
@@ -156,11 +157,11 @@ class EESAnalyzer:
         if base_ees_params is None:
             base_ees_params = self._default_ees_params.copy()
         if different_sites is None:
-            different_sites=['L4','L5','S1']
+            different_sites=['L3', 'L4','L5','S1', 'S2']
         vary_param = {
             'param_name': 'site',
-            'values': different_site,
-            'label': 'Afferent Fiber Unbalanced Recruitment'
+            'values': different_sites,
+            'label': 'Stimulation site variations'
         }
         
         # Compute parameter sweep
@@ -334,7 +335,7 @@ class EESAnalyzer:
         figs = {}
         axs_dict = {}
         for var in time_series_to_plot:
-            fig, axs = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True)
+            fig, axs = plt.subplots(n_rows, 1, figsize=(12, 3 * n_rows), sharex=True)
             if n_rows == 1:
                 axs = [axs]
             figs[var] = fig
@@ -345,16 +346,16 @@ class EESAnalyzer:
                 ax.set_title(f"{param_label}: {value}")
                 ax.set_xlabel("Time (s)")
                 ylabel = var.replace('_', ' ').title()
-                ax.set_ylabel(f"{ylabel} (Hz)" if "rate" in var else f"{ylabel} (dimensionless)")
-                ax.grid(True, linestyle='--', alpha=0.3)
-
+                ax.set_ylabel(f"{ylabel} (Hz)" if "rate" in var else f"{ylabel} (dimless)")
+    
                 if 'Time' in main_data:
                     time_data = main_data['Time']
                     for idx, muscle_name in enumerate(muscles_names):
                         col_name = f"{var}_{muscle_name}"
+                
                         if col_name in main_data:
                             ax.plot(time_data, main_data[col_name], label=muscle_name,
-                                    color=muscle_colors[muscle_name], linewidth=2.0, alpha=0.8)
+                                    color=muscle_colors[muscle_name])
                         
             if muscles_names:
                 fig.legend(muscles_names, loc='upper right')
@@ -363,26 +364,25 @@ class EESAnalyzer:
 
         # --- Plot joint angle ---
         if associated_joint != 'Unknown':
-            fig_joint, axs_joint = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True)
+            fig_joint, axs_joint = plt.subplots(n_rows, 1, figsize=(12, 3 * n_rows), sharex=True)
             if n_rows == 1:
                 axs_joint = [axs_joint]
             for i, (value, main_data) in enumerate(zip(param_values, simulation_data)):
                 ax = axs_joint[i]
                 ax.set_title(f"{param_label}: {value}")
                 ax.set_xlabel("Time (s)")
-                ax.set_ylabel(f"{associated_joint} Angle (deg)")
-                ax.grid(True, linestyle='--', alpha=0.3)
+                ax.set_ylabel(f"{associated_joint} (deg)")
                 
                 joint_col = f'Joint_{associated_joint}'
                 if joint_col in main_data and 'Time' in main_data:
                     ax.plot(main_data['Time'], main_data[joint_col],
-                            color='darkred', label='Joint Angle', linewidth=2.5)
+                            color='darkred', label='Joint Angle')
                     ax.legend()
             fig_joint.tight_layout()
             fig_joint.savefig(os.path.join(save_dir, f"joint_angle_{timestamp}.png"))
 
         # --- Raster plot for MN spikes ---
-        fig_raster, axs_raster = plt.subplots(n_rows, 1, figsize=(15, 4 * n_rows), sharex=True)
+        fig_raster, axs_raster = plt.subplots(n_rows, 1, figsize=(12, 3 * n_rows), sharex=True)
         if n_rows == 1:
             axs_raster = [axs_raster]
         for i, (value, spikes) in enumerate(zip(param_values, spikes_data)):
@@ -390,7 +390,6 @@ class EESAnalyzer:
             ax.set_title(f"MN Raster Plot — {param_label}: {value}")
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Neuron ID")
-            ax.grid(True, linestyle='--', alpha=0.3)
 
             for idx, muscle_name in enumerate(muscles_names):
                 if muscle_name in spikes and 'MN' in spikes[muscle_name]:
@@ -453,9 +452,8 @@ class EESAnalyzer:
         param_name = results['param_name']
         param_label = results['param_label']
         simulation_data = results['simulation_data']
-        time_data = results['time_data']
         muscles_names = results['muscle_names']
-        
+        time_data=simulation_data[0]['Time']
         # Extract activities - fix the syntax error from original code
         activities = []
         for muscle_name in muscles_names:
