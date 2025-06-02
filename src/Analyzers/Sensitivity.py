@@ -129,7 +129,7 @@ class Sensitivity:
         
         for param_name, values_list in variations.items():
             for value in values_list:
-                try:
+                #try:
                     # Create modified biophysical parameters
                     modified_params = BiologicalSystem.copy_brian_dict(self.biological_system.biophysical_params)
                     modified_params[param_name] = value
@@ -163,14 +163,15 @@ class Sensitivity:
                         self.simulation_data['biophysical'] = {}
                     if param_name not in self.simulation_data['biophysical']:
                         self.simulation_data['biophysical'][param_name] = {}
-                    self.simulation_data['biophysical'][param_name][value] = {
+                    key = float(value)
+                    self.simulation_data['biophysical'][param_name][key] = {
                       'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
-                      'Joint': time_series[self.biological_system.associated_joint],
+                      'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
                       'Time': time_series['Time']
                     }   
-                except Exception as e:
-                    warnings.warn(f"Simulation failed for {param_name} = {value}: {e}")
-                    continue
+                #except Exception as e:
+                    #warnings.warn(f"Simulation failed for {param_name} = {value}: {e}")
+                    #continue
         
         return pd.DataFrame(results_list)
     
@@ -231,9 +232,9 @@ class Sensitivity:
                             self.simulation_data['connection'] = {}
                         if param_name not in self.simulation_data['connection']:
                             self.simulation_data['connection'][param_name] = {}
-                        self.simulation_data['connection'][param_name][value] = {
+                        self.simulation_data['connection'][param_name][float(value)] = {
                           'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
-                          'Joint': time_series[self.biological_system.associated_joint],
+                          'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
                           'Time': time_series['Time']
                     }   
                     except Exception as e:
@@ -284,10 +285,10 @@ class Sensitivity:
                         self.simulation_data['neuron_count'] = {}
                     if param_name not in self.simulation_data['neuron_count']:
                         self.simulation_data['neuron_count'][param_name] = {}
-                    self.simulation_data['neuron_count'][param_name][value] = {
+                    self.simulation_data['neuron_count'][param_name][float(value)] = {
                       'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                       'Time': time_series['Time'],
-                      'Joint': time_series[self.biological_system.associated_joint],
+                      'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
                     }   
                 except Exception as e:
                     warnings.warn(f"Simulation failed for {population_name} count = {count}: {e}")
