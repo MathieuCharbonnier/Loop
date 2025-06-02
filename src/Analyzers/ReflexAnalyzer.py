@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from datetime import datetime
+
 from tqdm import tqdm
 from brian2 import *
 import pandas as pd
@@ -77,7 +78,7 @@ class ReflexAnalyzer:
         
         # Generate plots
         for plot_type, results, title in plots_to_generate:
-            fig, axs = plt.subplots(len(results), 2, figsize=(15, 4*len(results)), sharex=True)
+            fig, axs = plt.subplots(len(results), 2, figsize=(12, 3*len(results)), sharex=True)
             if len(results) == 1:
                 axs = axs.reshape(1, -1)
             
@@ -121,7 +122,7 @@ class ReflexAnalyzer:
             print(f"Saved {filename}")
           
     def run_delay(self, torque_profile=None, delay_values=None, 
-                  duration=1*second, time_step=0.1, seed=41):
+                  duration=1*second, time_step=0.1*ms, seed=41):
         """
         Analyze reflex behavior by varying delay parameter.
         
@@ -154,7 +155,7 @@ class ReflexAnalyzer:
                 "sustained_amplitude": 10
             }
         if delay_values is None:
-            delay_values = [10, 25, 50, 75, 100] * ms  
+            delay_values = [10, 50, 100] * ms  
         
         # Clear previous results
         self.delay_results = []
@@ -178,7 +179,7 @@ class ReflexAnalyzer:
         return self.delay_results
                       
     def run_mu_type(self, torque_profile=None, duration=1*second, 
-                    time_step=0.1, seed=41):
+                    time_step=0.1*ms, seed=41):
         """
         Analyze reflex behavior by varying motor unit type (fast vs slow twitch).
         
@@ -225,8 +226,7 @@ class ReflexAnalyzer:
                 ees_stimulation_params=None,
                 torque_profile=torque_profile,
                 seed=seed, 
-                base_output_path=None,
-                plot=False
+                base_output_path=None
             )
             
             self.fast_twitch_results.append((fast, spikes, time_series))
@@ -234,7 +234,7 @@ class ReflexAnalyzer:
         return self.fast_twitch_results
 
     def run_excitability(self, torque_profile=None, threshold_values=None, 
-                        duration=1*second, time_step=0.1, seed=41):
+                        duration=1*second, time_step=0.1*ms, seed=41):
         """
         Analyze reflex behavior by varying neuron excitability threshold.
         
@@ -293,9 +293,9 @@ class ReflexAnalyzer:
         
         return self.threshold_results
 
-    def run_comprehensive_analysis(self, torque_profile=None, delay_values=None, 
+    def run(self, torque_profile=None, delay_values=None, 
                                   threshold_values=None, duration=1*second, 
-                                  time_step=0.1, seed=41, output_dir="reflex_analysis"):
+                                  time_step=0.1*ms, seed=41, output_dir="reflex_analysis"):
         """
         Run all analysis methods and generate plots.
         
@@ -322,7 +322,7 @@ class ReflexAnalyzer:
             Dictionary containing all analysis results with keys 'delay', 'twitch', 'threshold'
         """
         
-        print("Starting comprehensive reflex analysis...")
+        print("Starting reflex analysis...")
         
         # Run all analyses and collect results
         results = {}
@@ -332,7 +332,7 @@ class ReflexAnalyzer:
         
         # Generate all plots using the unified plotting function
         print("Generating plots...")
-        self.plot_results("all", output_dir)
+        self.plot("all", output_dir)
         
         print(f"Analysis complete! Results saved to {output_dir}")
         return results
