@@ -203,7 +203,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
     return [result], final_state_neurons, state_monitors
 
 
-def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_delay_input,  
+def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_delay_input, normalized_force_input, 
                              neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
                              initial_state_neurons, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
                              ees_params=None):
@@ -217,7 +217,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     stretch_velocity_input : list of arrays
         Velocity inputs.
     neuron_pop : dict
-        Dictionary with counts of different neuron populations ('Ia', 'II', 'MN', 'exc').
+        Dictionary with counts of different neuron populations ('Ia', 'II','Ib', 'MN', 'exc', 'inhb').
     connections: dict
         Dictionary with the weights and probability of connection all synapse of the network
     dt_run : time
@@ -274,6 +274,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
         freq = ees_params['frequency']
         Ia_recruited = ees_params['recruitment']['Ia']
         II_recruited = ees_params['recruitment']['II']
+        Ib_recruited= ees_params['recruitment']['Ib']
       
       
     # Create Ia afferent neurons
@@ -352,6 +353,52 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     net.add([II_neurons, II_spike_mon])
     group_map['II'] = II_neurons
     monitors.append(II_spike_mon)
+                               
+    if neuron_pop.get('Ib, 0)>0 and neuron.get('inhb', 0)>0:
+        equation_Ib=spindle_model['Ib']
+        force_array=TimedArray(normalized_force_input[0], dt=dt_run)
+        if freq > 0 and Ib_recruited > 0:
+            Ib_neurons = NeuronGroup(
+                n_II, 
+                f'''
+                normalized_force=force_array(t):1
+                is_ees = (i < {II_recruited}): boolean
+                rate = ({equation_Ib})*hertz + freq * int(is_ees): Hz
+                ''', 
+                threshold='rand() < rate*dt', 
+                refractory=T_refr, 
+                method='euler'
+            )
+        else:
+            Ib_neurons = NeuronGroup(
+                n_II, 
+                f'''
+                normalized_force=force_array(t):1
+                rate = ({equation_Ib})*hertz: Hz
+                ''', 
+                threshold='rand() < rate*dt', 
+                refractory=T_refr, 
+                method='euler'
+            )
+          
+        # Create inhibitory interneurons (for Ib pathway)
+        n_inhb = neuron_pop['inhb']
+        inhb_eq = '''
+        dv/dt = (gL*(Eleaky - v) + Isyn)/Cm: volt
+        Isyn = gIb*(E_ex - v): amp
+        dgIb/dt = -gIb / tau_e: siemens
+        '''
+        inhb_neurons = NeuronGroup(n_inhb, inhb_eq, 
+                            threshold='v > threshold_v', 
+                            reset='v = Eleaky', method='euler')
+    
+        inhb_neurons.v = initial_state_neurons['inhb']['v']
+        inhb_neurons.gIb = initial_state_neurons['inhb']['gIb']
+    
+        inhb_spike_mon = SpikeMonitor(inhb_neurons)
+    
+        net.add([inhb_neurons, inhb_spike_mon])
+
     
     # Create excitatory interneurons (for II pathway)
     n_exc = neuron_pop['exc']
@@ -376,21 +423,41 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     
     # Create motoneurons (MN)
     n_MN = neuron_pop['MN']
-    # For disynaptic pathway, MNs receive input from both Ia afferents and excitatory interneurons
-    mn_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm: volt
-    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v): amp
-    dgIa/dt = -gIa / tau_e: siemens 
-    dgexc/dt = -gexc / tau_e: siemens  
-    '''
-    
-    MN = NeuronGroup(n_MN, mn_eq, 
-                   threshold='v > threshold_v', 
-                   reset='v = Eleaky', method='euler')
-    
-    MN.v = initial_state_neurons['MN']['v']
-    MN.gIa = initial_state_neurons['MN']['gIa']
-    MN.gexc = initial_state_neurons['MN']['gexc']
+    # For disynaptic pathway, MNs receive input from both Ia afferents, excitatory interneurons and inhibitory interneurons
+    if neuron_pop.get('Ib, 0)>0 and neuron.get('inhb', 0)>0:
+        mn_eq = '''
+        dv/dt = (gL*(Eleaky - v) + Isyn) / Cm: volt
+        Isyn = gIa*(E_ex - v) + gexc*(E_ex-v)+ gi__*(E_inh-v): amp
+        dgIa/dt = -gIa / tau_e: siemens 
+        dgexc/dt = -gexc / tau_e: siemens
+        dgi__/dt = (ginhb-gi__)/tau_i : siemens
+        dginhb/dt = -ginhb / tau_i : siemens
+        '''
+        
+        MN = NeuronGroup(n_MN, mn_eq, 
+                       threshold='v > threshold_v', 
+                       reset='v = Eleaky', method='euler')
+        
+        MN.v = initial_state_neurons['MN']['v']
+        MN.gIa = initial_state_neurons['MN']['gIa']
+        MN.gexc = initial_state_neurons['MN']['gexc']
+        MN.gi__=initial_state_neurons['MN']['gi__']
+        MN.ginhb=initial_state_neurons['MN']['ginhb']
+    else:
+        mn_eq = '''
+        dv/dt = (gL*(Eleaky - v) + Isyn) / Cm: volt
+        Isyn = gIa*(E_ex - v) + gexc*(E_ex-v): amp
+        dgIa/dt = -gIa / tau_e: siemens 
+        dgexc/dt = -gexc / tau_e: siemens
+        '''
+        
+        MN = NeuronGroup(n_MN, mn_eq, 
+                       threshold='v > threshold_v', 
+                       reset='v = Eleaky', method='euler')
+        
+        MN.v = initial_state_neurons['MN']['v']
+        MN.gIa = initial_state_neurons['MN']['gIa']
+        MN.gexc = initial_state_neurons['MN']['gexc']
                                
     spike_mon_MN = SpikeMonitor(MN)
     
@@ -446,7 +513,9 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     # Extract spike trains from monitors
     result['Ia'] = Ia_spike_mon.spike_trains()
     result['II'] = II_spike_mon.spike_trains()
+    reults['Ib']= Ib_spike_mon.spike_trains()
     result['exc'] = exc_spike_mon.spike_trains()
+    result['inhb']=inhb_spike_mon.spike_trains()
     result['MN'] = spike_mon_MN.spike_trains()
     
     # Process EES-stimulated motoneuron spikes if applicable
@@ -469,14 +538,20 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     final_state_neurons={
       'MN': {'v' :MN.v[:],
       'gIa' : MN.gIa[:],
-      'gexc' :MN.gexc[:]
+      'gexc' :MN.gexc[:],
+      'gi__':MN.gi__[:]
       },
       'exc':{
       'v':exc_neurons.v[:],
       'gII':exc_neurons.gII[:]
-      }
+      }    
     }
-
+    if neuron_pop.get('Ib, 0)>0 and neuron.get('inhb', 0)>0:
+        final_state_neurons['inhb']={
+          'v':inhb_neurons.v[:],
+          'gIb':inhb_neurons.gIb[:]        
+    }
+     
                                
     return [result], final_state_neurons, state_monitors
 
