@@ -1,0 +1,342 @@
+{
+    "L3": {
+        "tib_ant_r": {
+            "Ia": {
+                "threshold": 0.1,
+                "saturation": 0.92,
+                "slope": 19
+            },
+            "II": {
+                "threshold": 0.2,
+                "saturation": 0.88,
+                "slope": 21
+            },
+            "Ib": {
+                "threshold": 0.1,
+                "saturation": 0.92,
+                "slope": 19
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.55,
+                "slope": 29
+            }
+        },
+        "med_gas_r": {
+            "Ia": {
+                "threshold": 0.55,
+                "saturation": 0.68,
+                "slope": 19
+            },
+            "II": {
+                "threshold": 0.6,
+                "saturation": 0.65,
+                "slope": 21
+            },
+            "Ib": {
+                "threshold": 0.55,
+                "saturation": 0.68,
+                "slope": 19
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.3,
+                "slope": 25
+            }
+        },
+        "soleus_r": {
+            "Ia": {
+                "threshold": 0.55,
+                "saturation": 0.68,
+                "slope": 19
+            },
+            "II": {
+                "threshold": 0.6,
+                "saturation": 0.65,
+                "slope": 21
+            },
+            "Ib": {
+                "threshold": 0.55,
+                "saturation": 0.68,
+                "slope": 19
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.3,
+                "slope": 25
+            }
+        }
+    },
+    "L4": {
+        "tib_ant_r": {
+            "Ia": {
+                "threshold": 0.15,
+                "saturation": 0.9,
+                "slope": 20
+            },
+            "II": {
+                "threshold": 0.25,
+                "saturation": 0.85,
+                "slope": 22
+            },
+            "Ib": {
+                "threshold": 0.15,
+                "saturation": 0.9,
+                "slope": 20
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.5,
+                "slope": 28
+            }
+        },
+        "med_gas_r": {
+            "Ia": {
+                "threshold": 0.5,
+                "saturation": 0.7,
+                "slope": 20
+            },
+            "II": {
+                "threshold": 0.55,
+                "saturation": 0.68,
+                "slope": 22
+            },
+            "Ib": {
+                "threshold": 0.5,
+                "saturation": 0.7,
+                "slope": 20
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.35,
+                "slope": 26
+            }
+        },
+        "soleus_r": {
+            "Ia": {
+                "threshold": 0.5,
+                "saturation": 0.7,
+                "slope": 20
+            },
+            "II": {
+                "threshold": 0.55,
+                "saturation": 0.68,
+                "slope": 22
+            },
+            "Ib": {
+                "threshold": 0.5,
+                "saturation": 0.7,
+                "slope": 20
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.35,
+                "slope": 26
+            }
+        }
+    },
+    "L5": {
+        "tib_ant_r": {
+            "Ia": {
+                "threshold": 0.25,
+                "saturation": 0.85,
+                "slope": 21
+            },
+            "II": {
+                "threshold": 0.35,
+                "saturation": 0.8,
+                "slope": 23
+            },
+            "Ib": {
+                "threshold": 0.25,
+                "saturation": 0.85,
+                "slope": 21
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.45,
+                "slope": 28
+            }
+        },
+        "med_gas_r": {
+            "Ia": {
+                "threshold": 0.26,
+                "saturation": 0.84,
+                "slope": 21
+            },
+            "II": {
+                "threshold": 0.36,
+                "saturation": 0.79,
+                "slope": 23
+            },
+            "Ib": {
+                "threshold": 0.26,
+                "saturation": 0.84,
+                "slope": 21
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.44,
+                "slope": 28
+            }
+        },
+        "soleus_r": {
+            "Ia": {
+                "threshold": 0.26,
+                "saturation": 0.84,
+                "slope": 21
+            },
+            "II": {
+                "threshold": 0.36,
+                "saturation": 0.79,
+                "slope": 23
+            },
+            "Ib": {
+                "threshold": 0.26,
+                "saturation": 0.84,
+                "slope": 21
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.44,
+                "slope": 28
+            }
+        }
+    },
+    "S1": {
+        "tib_ant_r": {
+            "Ia": {
+                "threshold": 0.45,
+                "saturation": 0.7,
+                "slope": 22
+            },
+            "II": {
+                "threshold": 0.5,
+                "saturation": 0.68,
+                "slope": 24
+            },
+            "Ib": {
+                "threshold": 0.45,
+                "saturation": 0.7,
+                "slope": 22
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.38,
+                "slope": 26
+            }
+        },
+        "med_gas_r": {
+            "Ia": {
+                "threshold": 0.2,
+                "saturation": 0.9,
+                "slope": 20
+            },
+            "II": {
+                "threshold": 0.3,
+                "saturation": 0.85,
+                "slope": 22
+            },
+            "Ib": {
+                "threshold": 0.2,
+                "saturation": 0.9,
+                "slope": 20
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.5,
+                "slope": 28
+            }
+        },
+        "soleus_r": {
+            "Ia": {
+                "threshold": 0.2,
+                "saturation": 0.9,
+                "slope": 20
+            },
+            "II": {
+                "threshold": 0.3,
+                "saturation": 0.85,
+                "slope": 22
+            },
+            "Ib": {
+                "threshold": 0.2,
+                "saturation": 0.9,
+                "slope": 20
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.5,
+                "slope": 28
+            }
+        }
+    },
+    "S2": {
+        "tib_ant_r": {
+            "Ia": {
+                "threshold": 0.55,
+                "saturation": 0.65,
+                "slope": 22
+            },
+            "II": {
+                "threshold": 0.6,
+                "saturation": 0.63,
+                "slope": 24
+            },
+            "Ib": {
+                "threshold": 0.55,
+                "saturation": 0.65,
+                "slope": 22
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.35,
+                "slope": 25
+            }
+        },
+        "med_gas_r": {
+            "Ia": {
+                "threshold": 0.15,
+                "saturation": 0.95,
+                "slope": 20
+            },
+            "II": {
+                "threshold": 0.25,
+                "saturation": 0.9,
+                "slope": 22
+            },
+            "Ib": {
+                "threshold": 0.15,
+                "saturation": 0.95,
+                "slope": 20
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.55,
+                "slope": 29
+            }
+        },
+        "soleus_r": {
+            "Ia": {
+                "threshold": 0.15,
+                "saturation": 0.95,
+                "slope": 20
+            },
+            "II": {
+                "threshold": 0.25,
+                "saturation": 0.9,
+                "slope": 22
+            },
+            "Ib": {
+                "threshold": 0.15,
+                "saturation": 0.95,
+                "slope": 20
+            },
+            "MN": {
+                "threshold": 0.9,
+                "saturation": 0.55,
+                "slope": 29
+            }
+        }
+    }
+}
