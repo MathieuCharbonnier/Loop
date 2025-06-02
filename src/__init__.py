@@ -1,8 +1,8 @@
-from .BiologicalSystems.monosynaptic import Monosynaptic
-from .BiologicalSystems.disynaptic import Disynaptic
-from .BiologicalSystems.disynaptic_with_ib import DisynapticWithIb
-from .BiologicalSystems.reciprocal_inhibition import ReciprocalInhibition
-from .BiologicalSystems.spinal_circuit_ib import SpinalCircuitWithIb
+from .BiologicalSystems.Monosynaptic import Monosynaptic
+from .BiologicalSystems.Disynaptic import Disynaptic
+from .BiologicalSystems.DisynapticIb import DisynapticIb
+from .BiologicalSystems.BiMuscles import BiMuscles
+from .BiologicalSystems.BiMusclesIb import BiMusclesIb
 from .Analyzers.EESAnalyzer import EESAnalyzer
 from .Analyzers.ReflexAnalyzer import ReflexAnalyzer
 from .Analyzers.Sensitivity import Sensitivity
@@ -11,9 +11,9 @@ from .Controllers.IntelligentEESController import IntelligentEESController
 __all__ = [
     "Monosynaptic",
     "Disynaptic",
-    "DisynapticWithIb",
-    "ReciprocalInhibition",
-    "SpinalCircuitWithIb",
+    "DisynapticIb",
+    "BiMuscles",
+    "BiMusclesIb",
     "EESAnalyzer",
     "ReflexAnalyzer",
     "Sensitivity",
