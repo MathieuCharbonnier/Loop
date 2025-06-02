@@ -10,7 +10,7 @@ import inspect
 from scipy.signal import find_peaks
 from datetime import datetime
 
-from ..Loop.closed_loop import closed_loop
+from ..Loop.closed_loop import closed_loop, get_sto_file
 from ..Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
 
 
@@ -167,14 +167,14 @@ class BiologicalSystem(ABC):
         if not time_step.dimensions == second.dimensions:
             raise ValueError(f"Time step has incorrect unit! Got {time_step.unit}, expected a time unit.")
 
-        torque_array = None
+        self.torque_array = None
         if torque_profile is not None:
             time_points = np.arange(0, self.reaction_time*n_iterations, time_step)
-            torque_array = transform_torque_params_in_array(time_points, torque_profile)
-        
-        ees_params = None
+            self.torque_array = transform_torque_params_in_array(time_points, torque_profile)
+  
+        self.ees_params = None
         if ees_stimulation_params is not None:
-            ees_params = transform_intensity_balance_in_recruitment(
+            self.ees_params = transform_intensity_balance_in_recruitment(
                 self.ees_recruitment_profile, ees_stimulation_params, 
                 self.neurons_population, self.muscles_names)
         
@@ -196,12 +196,19 @@ class BiologicalSystem(ABC):
             deepcopy(self.initial_state_opensim),
             self.activation_function, 
             self.stretch_history_function,
-            torque_array=torque_array, 
-            ees_params=ees_params,
+            torque_array=self.torque_array, 
+            ees_params=self.ees_params,
             seed=seed, 
             base_output_path=base_output_path)
         
         return self.spikes, self.time_series
+
+    def get_sto_file(self,base_output_path):
+
+        return get_sto_file(self.time_series.loc[1,"Time"]-self.time_series.loc[0,"Time"],
+            self.time_series.loc[-1, 'Time'], self.muscles_names, self.associated_joint,
+             np.array([self.time_series[f'activation_{muscle_name}'] for muscle_name in self.muscles_names]), 
+             self.torque_array, base_output_path)
 
     def plot(self, base_output_path=None, ees_stimulation_params=None):
         """
