@@ -47,66 +47,39 @@ def bump(time_array, t_peak, sigma, max_amplitude, sustained_amplitude=0):
     return torque
 
 
-def sigmoid_recruitment(current_amplitude, threshold_10pct, saturation_90pct):
+
+def sigmoid_recruitment(current_amplitude, threshold, saturation, slope):
     """
-    Calculate recruitment fraction using sigmoid function precisely calibrated 
-    to match given threshold and saturation points.
-    
-    Parameters:
-    - current_amplitude: Current stimulation amplitude (same units as threshold/saturation)
-    - threshold_10pct: Current amplitude at which 10% of fibers are recruited
-    - saturation_90pct: Current amplitude at which 90% of fibers are recruited
-    
-    Returns:
-    - Fraction of fibers recruited (0-1)
+    Calculate recruitment fraction using a sigmoid function with user-defined parameters.
     """
-    # Calculate sigmoid parameters from the 10% and 90% points
-    # For sigmoid function: f(x) = 1/(1 + exp(-k*(x-x0)))
-    # where x0 is the midpoint (50% recruitment)
-    # and k determines the steepness
-    
-    x0 = (threshold_10pct + saturation_90pct) / 2
-    k = np.log(9) / (saturation_90pct - x0)
-    
-    # Apply the sigmoid function
-    fraction = 1 / (1 + np.exp(-k * (current_amplitude - x0)))
-    
-    return fraction
-  
+    recruitment_fraction = saturation / (1 + np.exp(-slope * (current_amplitude - threshold)))
+    return recruitment_fraction
+
+
 def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stimulation_params, neurons_population, num_muscles):
     """
     Transform intensity and balance parameters into recruitment counts
-    
-    Parameters:
-    - ees_recruitment_params: Dictionary with threshold and saturation values
-    - ees_stimulation_params: Dictionary with stimulation parameters (intensity, freq)
-    - neurons_population: Dictionary with neuron counts
-    - balance: Balance parameter (-1 to 1)
-    - num_muscles: Number of muscles (default 2 for flexor/extensor model)
-    
-    Returns:
-    - Dictionary with recruitment counts and frequency
     """
-    validate_ees(ees_stimulation_params,ees_recruitment_profile, num_muscles, neurons_population)
+    validate_ees(ees_stimulation_params, ees_recruitment_profile, num_muscles, neurons_population)
     
     # Get fractions first
-    if 'balance' in ees_stimulation_params:
+    if 'site' in ees_stimulation_params:
         fractions = calculate_full_recruitment(
-            ees_stimulation_params['intensity'], 
+            ees_stimulation_params['intensity'],
             ees_recruitment_profile,
             num_muscles,
-            ees_stimulation_params['balance']   
-        )
+            ees_stimulation_params['site'] 
+        )   
     else:
         fractions = calculate_full_recruitment(
-            ees_stimulation_params['intensity'], 
+            ees_stimulation_params['intensity'],
             ees_recruitment_profile,
             num_muscles
-        )   
+        ) 
+    
     # Convert fractions to counts
     counts = {}
     for key, fraction in fractions.items():
-            
         counts[key] = int(fraction * neurons_population[key])
     
     return {
@@ -114,18 +87,10 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
         "frequency": ees_stimulation_params['frequency']
     }
 
-def calculate_full_recruitment(normalized_current, ees_recruitment_profile,num_muscles, balance=0):
+
+def calculate_full_recruitment(normalized_current, ees_recruitment_profile, num_muscles, site=None):
     """
     Calculate recruitment fractions for all fiber types based on normalized current and balance.
-    
-    Parameters:
-    - normalized_current: float (0-1), normalized stimulation intensity
-    - ees_recruitment_params: Dictionary with threshold and saturation values
-    - balance: float (-1 to 1), electrode position bias
-    - num_muscles: Number of muscles (2 for flexor/extensor or 1 for single muscle)
-    
-    Returns:
-    - Dictionary with recruitment fractions (0-1)
     """
     fractions = {}
 
@@ -133,32 +98,33 @@ def calculate_full_recruitment(normalized_current, ees_recruitment_profile,num_m
         for fiber_type in ees_recruitment_profile.keys():
             for muscle_type in ['flexor', 'extensor']:
                 key = f"{fiber_type}_{muscle_type}"
-              
-                # Positive balance favors extensors, negative balance favors flexors
-                shift = 0.2 * balance  # 0.2 scaling factor determines strength of balance effect
-                if muscle_type == 'flexor':
-                    shift = -shift  # Reverse effect for flexors
-    
-                # Apply shifts to threshold and saturation
-                threshold = ees_recruitment_profile[fiber_type]['threshold_10pct'] + shift
-                saturation = ees_recruitment_profile[fiber_type]['saturation_90pct'] + shift
-    
-                # Ensure values stay in reasonable range
-                threshold = max(0.1, min(0.7, threshold))
-                saturation = max(0.3, min(0.9, saturation))
                 
-                # Calculate recruitment fraction
-                fractions[key] = sigmoid_recruitment(normalized_current, threshold, saturation)
+                if site not in ees_recruitment_profile:
+                    raise ValueError(f"The stimulation site '{site}' does not exist in the EES recruitment profile. You should add it!")
+
+                try:
+                    slope = ees_recruitment_profile[site][muscle_type][fiber_type]['slope']
+                    threshold = ees_recruitment_profile[site][muscle_type][fiber_type]['threshold'] 
+                    saturation = ees_recruitment_profile[site][muscle_type][fiber_type]['saturation'] 
+                except Exception as e:
+                    raise ValueError(f"Error when loading the saturation, threshold, or slope of the recruitment curves: {e}")
+                
+                fractions[key] = sigmoid_recruitment(normalized_current, threshold, saturation, slope)
+
     else:
         # Single muscle case
         for fiber_type in ees_recruitment_profile.keys():
-            threshold = ees_recruitment_profile[fiber_type]['threshold_10pct'] 
-            saturation = ees_recruitment_profile[fiber_type]['saturation_90pct'] 
+            try:
+                slope = ees_recruitment_profile[fiber_type]['slope']
+                threshold = ees_recruitment_profile[fiber_type]['threshold'] 
+                saturation = ees_recruitment_profile[fiber_type]['saturation'] 
+            except Exception as e:
+                raise ValueError(f"Error when loading recruitment curve values for single muscle model: {e}")
             
-            # Calculate recruitment fraction directly
-            fractions[fiber_type] = sigmoid_recruitment(normalized_current, threshold, saturation)
-    
+            fractions[fiber_type] = sigmoid_recruitment(normalized_current, threshold, saturation, slope)
+
     return fractions
+
 
 def validate_torque(torque):
     issues = {"warnings": [], "errors": []}
@@ -263,14 +229,12 @@ def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, n
             else:
                 issues["errors"].append("EES parameters must contain 'intensity' parameter")
 
-            if 'balance' in ees_stimulation_params:
-                    if not (-1 <= ees_stimulation_params["balance"] <= 1):
-                        issues["errors"].append(f"'balance parameter ' in ees stimulation must contains values between -1 and 1, got {val}")
+            if 'site' in ees_stimulation_params:
                     if number_muscle==1:
-                        issues["warnings"].append(f"'balance parameter ' in ees stimulation is for two muscles simulation only, it will be not be considered")
+                        issues["warnings"].append(f"'site' parameter in ees stimulation is for two muscles simulation only,it will be not be considered, modify the code if you want this functionnality for one muscle ")
             else:
                 if number_muscle==2:
-                     issues["warnings"].append(f"you should specify a 'balance paramater' for two muscles simulation with ees stimulation,'balance' parameter is set to zero")
+                     issues["warnings"].append(f"you should specify the stimulation site  for two muscles simulation with ees stimulation")
                 
         
 
