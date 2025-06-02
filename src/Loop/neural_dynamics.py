@@ -354,7 +354,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     group_map['II'] = II_neurons
     monitors.append(II_spike_mon)
                                
-    if neuron_pop.get('Ib, 0)>0 and neuron.get('inhb', 0)>0:
+    if neuron_pop.get('Ib', 0)>0 and neuron_pop.get('inhb', 0)>0:
         equation_Ib=spindle_model['Ib']
         force_array=TimedArray(normalized_force_input[0], dt=dt_run)
         if freq > 0 and Ib_recruited > 0:
@@ -424,7 +424,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     # Create motoneurons (MN)
     n_MN = neuron_pop['MN']
     # For disynaptic pathway, MNs receive input from both Ia afferents, excitatory interneurons and inhibitory interneurons
-    if neuron_pop.get('Ib, 0)>0 and neuron.get('inhb', 0)>0:
+    if neuron_pop.get('Ib', 0)>0 and neuron_pop.get('inhb', 0)>0:
         mn_eq = '''
         dv/dt = (gL*(Eleaky - v) + Isyn) / Cm: volt
         Isyn = gIa*(E_ex - v) + gexc*(E_ex-v)+ gi__*(E_inh-v): amp
@@ -546,7 +546,7 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
       'gII':exc_neurons.gII[:]
       }    
     }
-    if neuron_pop.get('Ib, 0)>0 and neuron.get('inhb', 0)>0:
+    if neuron_pop.get('Ib', 0)>0 and neuron_pop.get('inhb', 0)>0:
         final_state_neurons['inhb']={
           'v':inhb_neurons.v[:],
           'gIb':inhb_neurons.gIb[:]        
@@ -669,7 +669,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     rate = ({equation_Ia})*hertz + ees_freq * int(is_ees) : Hz
     '''
                                             
-   equation_II = spindle_model['II']
+    equation_II = spindle_model['II']
     if 'Ia_II_delta_delay' in spindle_model:
         stretch_delay_flexor_array = TimedArray(stretch_delay_input[0], dt=dt_run)
         stretch_delay_extensor_array = TimedArray(stretch_delay_input[1], dt=dt_run)
