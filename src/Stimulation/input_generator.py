@@ -59,7 +59,7 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     """
     Transform intensity and balance parameters into recruitment counts
     """
-    validate_ees(ees_stimulation_params, ees_recruitment_profile, num_muscles, neurons_population)
+    validate_ees(ees_stimulation_params, len(muscles_names))
 
     fractions = calculate_full_recruitment(
             ees_stimulation_params['intensity'],
@@ -171,7 +171,7 @@ def validate_torque(torque):
         warning_messages = "\n".join(issues["warnings"])
         print(f"WARNING: Configuration issues detected:\n{warning_messages}")
 
-def validate_ees(ees_stimulation_params,ees_recruitment_params, number_muscle, neurons_population):
+def validate_ees(ees_stimulation_params, number_muscle):
         
         issues = {"warnings": [], "errors": []}
         if ees_stimulation_params is not None:
