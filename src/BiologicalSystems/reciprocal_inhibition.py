@@ -57,19 +57,44 @@ class ReciprocalInhibition(BiologicalSystem):
             
         if ees_recruitment_profile is None:
             ees_recruitment_profile = {
-                'Ia': {
-                    'threshold_10pct': 0.3,  # Normalized current for 10% recruitment
-                    'saturation_90pct': 0.7  # Normalized current for 90% recruitment
+                "L4": {
+                    "flexor": {
+                        'Ia': {'threshold': 0.15, 'saturation': 0.9, 'slope': 20},
+                        'II': {'threshold': 0.25, 'saturation': 0.85, 'slope': 22},
+                        'MN': {'threshold': 0.9, 'saturation': 0.5, 'slope': 28},
+                    },
+                    "extensor": {
+                        'Ia': {'threshold': 0.5, 'saturation': 0.7, 'slope': 20},
+                        'II': {'threshold': 0.55, 'saturation': 0.68, 'slope': 22},
+                        'MN': {'threshold': 0.9, 'saturation': 0.35, 'slope': 26},
+                    }
                 },
-                'II': {
-                    'threshold_10pct': 0.4,  # Type II fibers have higher threshold
-                    'saturation_90pct': 0.8  # and higher saturation point
+                "L5": {
+                    "flexor": {
+                        'Ia': {'threshold': 0.25, 'saturation': 0.85, 'slope': 21},
+                        'II': {'threshold': 0.35, 'saturation': 0.8, 'slope': 23},
+                        'MN': {'threshold': 0.9, 'saturation': 0.45, 'slope': 28},
+                    },
+                    "extensor": {
+                        'Ia': {'threshold': 0.26, 'saturation': 0.84, 'slope': 21},
+                        'II': {'threshold': 0.36, 'saturation': 0.79, 'slope': 23},
+                        'MN': {'threshold': 0.9, 'saturation': 0.44, 'slope': 28},
+                    }
                 },
-                'MN': {
-                    'threshold_10pct': 0.9,  # Motoneurons are recruited at high intensity
-                    'saturation_90pct': 1  
-                }  
+                "S1": {
+                    "flexor": {
+                        'Ia': {'threshold': 0.45, 'saturation': 0.7, 'slope': 22},
+                        'II': {'threshold': 0.5, 'saturation': 0.68, 'slope': 24},
+                        'MN': {'threshold': 0.9, 'saturation': 0.38, 'slope': 26},
+                    },
+                    "extensor": {
+                        'Ia': {'threshold': 0.2, 'saturation': 0.9, 'slope': 20},
+                        'II': {'threshold': 0.3, 'saturation': 0.85, 'slope': 22},
+                        'MN': {'threshold': 0.9, 'saturation': 0.5, 'slope': 28},
+                    }
+                }
             }
+
         if neurons_population is None:
         
             # Setup specialized neuron populations for reciprocal inhibition
