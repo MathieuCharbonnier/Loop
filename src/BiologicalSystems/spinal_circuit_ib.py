@@ -320,8 +320,8 @@ class SpinalCircuitWithIb(BiologicalSystem):
         for eq in required_spindle_equations:
             if eq not in self.spindle_model:
                 issues["errors"].append(f"Missing {eq} equation in spindle model for Ib circuit")
-        if "Ia_II_delta_delay" in spindle_model and "stretch" in spindle_model.get("II"):
-            issues["errors"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model dealyed II pathway! Otherwise don't specify delay! ") 
+        if "Ia_II_delta_delay" in self.spindle_model and "stretch" in self.spindle_model.get("II"):
+            issues["errors"].append("You define a delay in the spindle model, but you use the 'stretch' variable. Use 'stretch_delay', to model dealyed II pathway! Otherwise don't specify delay! ") 
         
         # Validate Ib equation includes force dependency
         if "Ib" in self.spindle_model:
