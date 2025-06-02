@@ -217,12 +217,23 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 'II' in neurons_population and 
                 'exc' in neurons_population
             )
-        
+            has_Ib_patway=(
+                'Ib' in spindle_model and 
+                'Ib' in neurons_population and 
+                'inhb' in neurons_population
+            )
             if has_II_pathway:
-                all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation(
-                    stretch, stretch_velocity, stretch_II, noramlized_force, neurons_population, connections, 
-                    time_step, reaction_time, spindle_model, seed,
-                    initial_state_neurons, **biophysical_params, ees_params=ees_params
+              
+                if has_Ib_pathway:
+                     all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation(
+                        stretch, stretch_velocity, stretch_II, neurons_population, connections, 
+                        time_step, reaction_time, spindle_model, seed,
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params
+                else:
+                    all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation_with_Ib(
+                        stretch, stretch_velocity, stretch_II, normalized_force, neurons_population, connections, 
+                        time_step, reaction_time, spindle_model, seed,
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params
                 )
             else:
                 all_spikes, final_state_neurons, state_monitors = run_monosynaptic_simulation(
@@ -377,13 +388,12 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         df = pd.concat(muscle_data[muscle_idx], ignore_index=True)
 
         # Compute firing rate for this muscle
+         time_values = df['Time'].values
         # Extract stretch and velocity values for this muscle
         stretch_values = df[f'Stretch_{muscle_name}'].values
         stretch_velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
         stretch_delay_values = stretch_global_buffer[muscle_idx, :len(time_values)]
-      
-        time_values = df['Time'].values
-        
+           
         # Compute Ia firing rate using spindle model
         Ia_rate = eval(spindle_model['Ia'], 
                        {"__builtins__": {'sign': np.sign, 'abs': np.abs, 'clip': np.clip}}, 
