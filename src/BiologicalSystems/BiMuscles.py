@@ -231,13 +231,9 @@ class BiMuscles(BiologicalSystem):
         for eq in required_spindle_equations:
             if eq not in self.spindle_model:
                 issues["errors"].append(f"Missing {eq} equation in spindle model for reciprocal inhibition")
-        if "Ia_II_delta_delay" in self.spindle_model and "stretch" in self.spindle_model.get("II"):
+        if "Ia_II_delta_delay" in self.spindle_model and not "stretch_delay" in self.spindle_model.get("II"):
             issues["errors"].append("You define a delay in the spindle model, but you use the 'stretch' variable. Use 'stretch_delay', to model delayed II pathway, otherwise, don't specify a delay! ")
             
-        # Check EES recruitment parameters
-        for neuron_type in ["Ia", "II", "MN"]:
-            if neuron_type not in self.ees_recruitment_profile:
-                issues["errors"].append(f"Missing EES recruitment parameters for neuron type '{neuron_type}'")
         
         # Check mandatory biophysical parameters (including inhibitory ones)
         required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e', 'E_inh', 'tau_i', 'threshold_v']
