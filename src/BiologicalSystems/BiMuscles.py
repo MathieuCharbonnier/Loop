@@ -2,7 +2,7 @@ from brian2 import *
 import json
 from .BiologicalSystem import BiologicalSystem
 
-class ReciprocalInhibition(BiologicalSystem):
+class BiMuscles(BiologicalSystem):
     """
     Specialized class for reciprocal inhibition reflexes.
     
