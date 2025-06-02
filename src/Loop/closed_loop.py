@@ -94,8 +94,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 activation_history = old_activation
             else:
                 print(f"Warning: stretch_history shape mismatch. Expected ({num_muscles}, {nb_points}), got {old_activation.shape}")
-            except Exception as e:
-                print(f"Warning: Could not load activation history: {e}")
+        except Exception as e:
+            print(f"Warning: Could not load activation history: {e}")
         
 
     delay = spindle_model.get("Ia_II_delay", 0)  
