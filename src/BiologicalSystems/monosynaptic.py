@@ -157,25 +157,33 @@ class Monosynaptic(BiologicalSystem):
                         f"Expected unit compatible with {expected_unit}, but got {value.unit}"
                     )
         
-        # Validate EES parameters
-        for neuron_type, params in self.ees_recruitment_profile.items():
-            if neuron_type in ["Ia", "MN"]:
-                required_ees_params = ["threshold_10pct", "saturation_90pct"]
-                for param in required_ees_params:
-                    if param not in params:
-                        issues["errors"].append(f"Missing '{param}' in EES recruitment parameters for '{neuron_type}'")
-                
-                if "threshold_10pct" in params and "saturation_90pct" in params:
-                    threshold = params['threshold_10pct']
-                    saturation = params['saturation_90pct']
+         # Validate EES parameters
+        for neuron_type, params in ees_recruitment_profile.items():
+            required_ees_params = ["threshold", "saturation", "slope"]
                     
-                    if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
-                        issues["errors"].append(
-                            f"EES parameters for '{neuron_type}' must be between 0 and 1. "
-                            f"Got: threshold={threshold}, saturation={saturation}"
-                        )
-                    if threshold >= saturation:
-                        issues["errors"].append(f"Threshold must be less than saturation for '{neuron_type}'")
+            for param in required_ees_params:
+                if param not in params:
+                    issues["errors"].append(
+                        f"Missing '{param}' in EES recruitment parameters for '{neuron_type}' "
+                            )
+                            
+                    if all(k in params for k in required_ees_params):
+                        threshold = params['threshold']
+                        saturation = params['saturation']
+                        slope = params['slope']
+                        
+                        if not (0 <= threshold <= 1) or not (0 <= saturation <= 1):
+                            issues["errors"].append(
+                                f"EES parameters for '{neuron_type}' at site '{site}', muscle group '{muscle_group}' "
+                                f"must be between 0 and 1. Got: threshold={threshold}, saturation={saturation}"
+                            )
+
+                        if not isinstance(slope, (int, float)) or slope <= 0:
+                            issues["errors"].append(
+                                f"Slope must be a positive number for '{neuron_type}' "
+                                f"at site '{site}', muscle group '{muscle_group}'"
+                            )
+
         
         # Raise error if there are critical issues
         if issues["errors"]:
