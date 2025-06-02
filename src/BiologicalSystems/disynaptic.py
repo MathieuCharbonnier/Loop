@@ -55,7 +55,7 @@ class Disynaptic(BiologicalSystem):
                 'MN': {
                     'threshold': 0.9,  # Motoneurons are recruited at high intensity
                     'saturation': 0.3,
-                    'slope: 10
+                    'slope': 10
                 }  
             }
             
@@ -160,27 +160,27 @@ class Disynaptic(BiologicalSystem):
         for eq in required_spindle_equations:
             if eq not in self.spindle_model:
                 issues["errors"].append(f"Missing {eq} equation in spindle model for disynaptic reflex")
-        if "Ia_II_delta_delay" in spindle_model and "stretch" in spindle_model.get("II"):
-             issues["errors"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model delayed II pathway! Otherwise, don't specify a delay! ")    
+        if "Ia_II_delta_delay" in self.spindle_model and "stretch" in self.spindle_model.get("II"):
+             issues["errors"].append("You define a delay in the spindle model, but you use the 'stretch' variable. Use 'stretch_delay', to model delayed II pathway! Otherwise, don't specify a delay! ")    
                     
                     
         #check Ib path
-        if neurons_population.get("Ib", 0)>0 :
-            if neurons_population.get("inhb", 0)==0 :
-                 issues["errors"].append(f"For Ib path, you must add "inhb" neurons ")
+        if self.neurons_population.get("Ib", 0)>0 :
+            if self.neurons_population.get("inhb", 0)==0 :
+                issues["errors"].append("For Ib path, you must add 'inhb' neurons ")
             if not 'Ib' in self.spindle_model:
-                issues["errors"].append(f"For Ib path, you must specify Ib equation ")
+                issues["errors"].append("For Ib path, you must specify Ib equation ")
             if not "inhb" in self.connections.keys():
-                issues["errors"].append(f"For Ib path, include connections between Ib, inhb and MN neurons!")
+                issues["errors"].append("For Ib path, include connections between Ib, inhb and MN neurons!")
             if not "Ib" in self.connections.keys():
-                issues["errors"].append(f"For Ib path, include connections between Ib, inhb and MN neurons!")
+                issues["errors"].append("For Ib path, include connections between Ib, inhb and MN neurons!")
         else:   
             if "inhb" in self.connections.keys():
-                issues["errors"].append(f"inhb neurons are not present in the population, but you include them in connections")
+                issues["errors"].append("inhb neurons are not present in the population, but you include them in connections")
             if "Ib" in self.connections.keys() :
-                issues["errors"].append(f"Ib neurons are not present in the population, but you include them in connections")
+                issues["errors"].append("Ib neurons are not present in the population, but you include them in connections")
             if "Ib" in self.spindle_model:
-                issues["warning"].append(f"Ib equations in the spindle model will not be considered!")
+                issues["warning"].append("Ib equations in the spindle model will not be considered!")
                 
         # Check mandatory biophysical parameters
         required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e','E_inh', 'tau_i', 'threshold_v']
