@@ -1,5 +1,6 @@
 from .BiologicalSystems.monosynaptic import Monosynaptic
 from .BiologicalSystems.disynaptic import Disynaptic
+from .BiologicalSystems.disynaptic_with_ib import DisynapticWithIb
 from .BiologicalSystems.reciprocal_inhibition import ReciprocalInhibition
 from .BiologicalSystems.spinal_circuit_ib import SpinalCircuitWithIb
 from .Analyzers.EESAnalyzer import EESAnalyzer
@@ -10,6 +11,7 @@ from .Controllers.IntelligentEESController import IntelligentEESController
 __all__ = [
     "Monosynaptic",
     "Disynaptic",
+    "DisynapticWithIb",
     "ReciprocalInhibition",
     "SpinalCircuitWithIb",
     "EESAnalyzer",
