@@ -11,7 +11,7 @@ from collections import defaultdict
 from scipy.stats import gaussian_kde
 from scipy.interpolate import interp1d
 
-from .neural_dynamics import run_monosynaptic_simulation, run_disynaptic_simulation, run_flexor_extensor_neuron_simulation, run_spinal_circuit_with_Ib
+from .neural_dynamics import run_monosynaptic_simulation, run_disynaptic_simulation, run_disynaptic_simulation_with_ib, run_flexor_extensor_neuron_simulation, run_spinal_circuit_with_Ib
 from .activation import decode_spikes_to_activation
 
 
@@ -131,7 +131,6 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         for muscle_name in muscles_names
     }
 
-    print('spike_data', spike_data)
     
     # =============================================================================
     # Main Simulation Loop
@@ -217,7 +216,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 'II' in neurons_population and 
                 'exc' in neurons_population
             )
-            has_Ib_patway=(
+            has_Ib_pathway=(
                 'Ib' in spindle_model and 
                 'Ib' in neurons_population and 
                 'inhb' in neurons_population
@@ -225,16 +224,16 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             if has_II_pathway:
               
                 if has_Ib_pathway:
-                     all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation(
-                        stretch, stretch_velocity, stretch_II, neurons_population, connections, 
-                        time_step, reaction_time, spindle_model, seed,
-                        initial_state_neurons, **biophysical_params, ees_params=ees_params
-                else:
-                    all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation_with_Ib(
+                     all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation_with_ib(
                         stretch, stretch_velocity, stretch_II, normalized_force, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
-                        initial_state_neurons, **biophysical_params, ees_params=ees_params
-                )
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params)
+                else:
+                    all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation(
+                        stretch, stretch_velocity, stretch_II, neurons_population, connections, 
+                        time_step, reaction_time, spindle_model, seed,
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params)
+                
             else:
                 all_spikes, final_state_neurons, state_monitors = run_monosynaptic_simulation(
                     stretch, stretch_velocity, stretch_II, neurons_population, connections, 
@@ -388,7 +387,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         df = pd.concat(muscle_data[muscle_idx], ignore_index=True)
 
         # Compute firing rate for this muscle
-         time_values = df['Time'].values
+        time_values = df['Time'].values
         # Extract stretch and velocity values for this muscle
         stretch_values = df[f'Stretch_{muscle_name}'].values
         stretch_velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
