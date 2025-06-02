@@ -205,7 +205,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
 
 def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_delay_input, normalized_force_input, 
                              neuron_pop, connections, dt_run, T, spindle_model, seed_run, 
-                             initial_state_neurons, Eleaky, gL, Cm, E_ex, tau_e, threshold_v, T_refr,
+                             initial_state_neurons, Eleaky, gL, Cm, E_ex, tau_e, E_inh, tau_i, threshold_v, T_refr,
                              ees_params=None):
     """
     Run a simulation with both Ia and II pathways (disynaptic pathway).
