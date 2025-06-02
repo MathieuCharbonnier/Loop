@@ -138,7 +138,7 @@ def transform_intensity_balance_in_recruitment(ees_recruitment_profile, ees_stim
     muscles_cleaned = [m[:-2] if m.endswith(('_r', '_l')) else m for m in muscles_names]
     fractions = calculate_full_recruitment(
             ees_stimulation_params['intensity'],
-            ees_stimulation_params['site'] 
+            ees_stimulation_params['site'],
             ees_recruitment_profile,
             muscles_cleaned           
     )   
