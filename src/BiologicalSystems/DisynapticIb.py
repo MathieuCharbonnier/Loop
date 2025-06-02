@@ -3,7 +3,7 @@ import json
 from .BiologicalSystem import BiologicalSystem
 
 
-class DisynapticWithIb(BiologicalSystem):
+class DisynapticIb(BiologicalSystem):
     """
     Disynaptic reflex system with Ib pathway (inhibitory feedback).
     
