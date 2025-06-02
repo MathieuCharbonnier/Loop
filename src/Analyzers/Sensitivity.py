@@ -164,7 +164,7 @@ class Sensitivity:
                     if param_name not in self.simulation_data['biophysical']:
                         self.simulation_data['biophysical'][param_name] = {}
                     self.simulation_data['biophysical'][param_name][value] = {
-                      'Spikes': {muscle_name: spike[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
+                      'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                       'Joint': time_series[self.biological_system.associated_joint],
                       'Time': time_series['Time']
                     }   
@@ -232,7 +232,7 @@ class Sensitivity:
                         if param_name not in self.simulation_data['connection']:
                             self.simulation_data['connection'][param_name] = {}
                         self.simulation_data['connection'][param_name][value] = {
-                          'Spikes': {muscle_name: spike[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
+                          'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                           'Joint': time_series[self.biological_system.associated_joint],
                           'Time': time_series['Time']
                     }   
@@ -285,7 +285,7 @@ class Sensitivity:
                     if param_name not in self.simulation_data['neuron_count']:
                         self.simulation_data['neuron_count'][param_name] = {}
                     self.simulation_data['neuron_count'][param_name][value] = {
-                      'Spikes': {muscle_name: spike[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
+                      'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                       'Time': time_series['Time'],
                       'Joint': time_series[self.biological_system.associated_joint],
                     }   
