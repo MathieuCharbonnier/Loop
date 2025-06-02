@@ -32,8 +32,6 @@ class Disynaptic(BiologicalSystem):
                 'Cm': 0.3*nF,
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
-                'E_inh': -75*mV,
-                'tau_i': 5*ms,
                 'threshold_v': -45*mV
             }
             
@@ -156,7 +154,7 @@ class Disynaptic(BiologicalSystem):
             )
 
         # Check mandatory biophysical parameters
-        required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e', 'E_inh', 'tau_i', 'threshold_v']
+        required_params = ['T_refr', 'Eleaky', 'gL', 'Cm', 'E_ex', 'tau_e', 'threshold_v']
         for param in required_params:
             if param not in self.biophysical_params:
                 issues["errors"].append(f"Missing mandatory biophysical parameter: '{param}'")
@@ -164,7 +162,7 @@ class Disynaptic(BiologicalSystem):
         # Unit validation
         expected_units = {
             'T_refr': second, 'Eleaky': volt, 'gL': siemens, 'Cm': farad,
-            'E_ex': volt, 'tau_e': second, 'E_inh': volt, 'tau_i': second, 'threshold_v': volt
+            'E_ex': volt, 'tau_e': second, 'threshold_v': volt
         }
 
         for param, expected_unit in expected_units.items():
