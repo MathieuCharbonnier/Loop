@@ -266,8 +266,8 @@ class ReciprocalInhibition(BiologicalSystem):
         for eq in required_spindle_equations:
             if eq not in self.spindle_model:
                 issues["errors"].append(f"Missing {eq} equation in spindle model for reciprocal inhibition")
-        if "Ia_II_delta_delay" in spindle_model and "stretch" in spindle_model.get("II"):
-            issues["errors"].append("You define a delay in the spindle model, but you use the "stretch" variable. Use "stretch_delay", to model delayed II pathway, otherwise, don't specify a delay! ")
+        if "Ia_II_delta_delay" in self.spindle_model and "stretch" in self.spindle_model.get("II"):
+            issues["errors"].append("You define a delay in the spindle model, but you use the 'stretch' variable. Use 'stretch_delay', to model delayed II pathway, otherwise, don't specify a delay! ")
             
         # Check EES recruitment parameters
         for neuron_type in ["Ia", "II", "MN"]:
