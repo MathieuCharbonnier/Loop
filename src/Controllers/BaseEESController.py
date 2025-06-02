@@ -17,7 +17,8 @@ class BaseEESController:
     """
     
     def __init__(self, biological_system, update_iterations, 
-                 initial_ees_params=None, frequency_grid=[30, 70]*hertz, balance_grid=[-0.8, 0.3],
+                 initial_ees_params=None, frequency_grid=[30, 70]*hertz,
+                 different_sites=['L4', 'L5', 'S1']
                   time_step=0.1*ms):
         """
         Initialize the EES controller.
@@ -79,18 +80,18 @@ class BaseEESController:
                 'intensity': 0.6,
             }
             if self.has_multiple_muscles:
-                self.current_ees_params['balance'] = 0.0
+                self.current_ees_params['site'] = 'L5'
         else:
             self.current_ees_params = BiologicalSystem.copy_brian_dict(initial_ees_params)
-            if not self.has_multiple_muscles and 'balance' in self.current_ees_params:
-                del self.current_ees_params['balance']
+            if not self.has_multiple_muscles and 'site' in self.current_ees_params:
+                del self.current_ees_params['site']
             
         # Optimization ranges
         self.frequency_grid = frequency_grid
         if self.has_multiple_muscles:
-            self.balance_grid = balance_grid
+            self.site_grid = different_sites
         else:
-            self.balance_grid = []
+            self.site_grid = []
         
         # Storage for results
         self.trajectory_history = []
@@ -147,7 +148,7 @@ class BaseEESController:
         # Create list of parameter combinations to test
         if self.has_multiple_muscles:
             param_combinations = list(product(self.frequency_grid, self.balance_grid))
-            print(f"Testing {len(self.frequency_grid)} frequency × {len(self.balance_grid)} balance combinations")
+            print(f"Testing {len(self.frequency_grid)} frequency × {len(self.site_grid)} balance combinations")
         else:
             param_combinations = [(freq, None) for freq in self.frequency_grid]
             print(f"Testing {len(self.frequency_grid)} frequency values")
@@ -197,7 +198,7 @@ class BaseEESController:
         
         print(f"Best cost: {best_cost:.6f}")
         if self.has_multiple_muscles:
-            print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz, balance={best_params['balance']:.3f}")
+            print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz, balance={best_params['site']:.3f}")
         else:
             print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz")
         
@@ -310,7 +311,7 @@ class BaseEESController:
         
         # Determine number of subplots based on system type
         if self.has_multiple_muscles:
-            balances = [params['balance'] for params in self.ees_params_history]
+            sites = [params['site'] for params in self.ees_params_history]
             fig, axes = plt.subplots(3, 1, figsize=(12, 15))
         else:
             fig, axes = plt.subplots(2, 1, figsize=(12, 12))
@@ -357,8 +358,8 @@ class BaseEESController:
                 # Create parameter key for consistent coloring
                 if self.has_multiple_muscles:
                     param_key = (float(traj_data['params']['frequency']), 
-                               float(traj_data['params']['balance']))
-                    param_label = f"f={traj_data['params']['frequency']:.0f}Hz, b={traj_data['params']['balance']:.2f}"
+                               float(traj_data['params']['site']))
+                    param_label = f"f={traj_data['params']['frequency']:.0f}Hz, b={traj_data['params']['site']:.2f}"
                 else:
                     param_key = (float(traj_data['params']['frequency']),)
                     param_label = f"f={traj_data['params']['frequency']:.0f}Hz"
@@ -406,16 +407,25 @@ class BaseEESController:
         axes[1].grid(True, alpha=0.3)
         axes[1].set_ylim([self.frequency_grid[0] - 5*hertz, self.frequency_grid[-1] + 5*hertz])
         
-        # Plot 3: EES Balance evolution (only for multiple muscle systems)
+        #Plot stimulation site evolution
         if self.has_multiple_muscles:
-            axes[2].plot(time_array, balances, color='#D55E00', linewidth=2)
+            # Get unique sites in the order of appearance
+            unique_sites = list(dict.fromkeys(sites))  # preserves order
+            site_indices = [unique_sites.index(site) for site in sites]
+
+            axes[2].plot(time_array, site_indices, color='#D55E00', linewidth=2)
             axes[2].set_xlabel('Time (s)')
-            axes[2].set_ylabel('EES Balance')
-            axes[2].set_title('EES Balance Evolution (Flexor-Extensor)')
+            axes[2].set_ylabel('EES Site')
+            axes[2].set_title('EES Stimulation Sites Evolution (Flexor-Extensor)')
+            
+            # Map index to site string labels
+            axes[2].set_yticks(range(len(unique_sites)))
+            axes[2].set_yticklabels(unique_sites)
             axes[2].grid(True, alpha=0.3)
-            axes[2].set_ylim([self.balance_grid[0] - 0.1, self.balance_grid[-1] + 0.1])
-        
+            axes[2].set_ylim([-0.5, len(unique_sites) - 0.5])
+
         plt.tight_layout()
+
         
         # Save plot if path provided
         if base_output_path:
