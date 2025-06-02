@@ -29,18 +29,8 @@ class Monosynaptic(BiologicalSystem):
             }
 
         if ees_recruitment_profile is None:
-            ees_recruitment_profile = {
-                'Ia': {
-                    'threshold': 0.3,
-                    'saturation': 0.7,
-                    'slope': 10
-                },
-                'MN': {
-                    'threshold': 0.9,
-                    'saturation': 0.2,
-                    'slope': 10
-                }
-            }
+            with open('data/ees_recruitment.json', 'r') as f:
+                ees_recruitment_profile = json.load(f)
 
         if neurons_population is None:
             neurons_population = {
