@@ -18,7 +18,7 @@ class BaseEESController:
     
     def __init__(self, biological_system, update_iterations, 
                  initial_ees_params=None, frequency_grid=[30, 70]*hertz,
-                 different_sites=['L4', 'L5', 'S1']
+                 different_sites=['L4', 'L5', 'S1'],
                   time_step=0.1*ms):
         """
         Initialize the EES controller.
