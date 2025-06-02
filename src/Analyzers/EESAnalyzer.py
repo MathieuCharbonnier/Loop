@@ -39,7 +39,7 @@ class EESAnalyzer:
             'intensity': 0.5
         }
     
-    def analyze_frequency_effects(self, freq_range=None, base_ees_params=None, 
+    def analyze_frequency_effects(self, freq_range=None, base_ees_params=None, torque_profile=None,
                                 n_iterations=20, time_step=0.1*ms, seed=42):
         """
         Analyze the effects of varying EES frequency with fixed afferent and efferent recruitment.
@@ -78,6 +78,7 @@ class EESAnalyzer:
         results = self._compute_ees_parameter_sweep(
             base_ees_params,
             vary_param,
+            torque_profile,
             n_iterations,
             time_step, 
             seed
@@ -85,7 +86,7 @@ class EESAnalyzer:
         
         return results
 
-    def analyze_intensity_effects(self, intensity_range, base_ees_params=None, 
+    def analyze_intensity_effects(self, intensity_range, base_ees_params=None, torque_profile=None, 
                                 n_iterations=20, time_step=0.1*ms, seed=42):
         """
         Analyze the effects of varying stimulation intensity.
@@ -121,6 +122,7 @@ class EESAnalyzer:
         results = self._compute_ees_parameter_sweep(
             base_ees_params,
             vary_param, 
+            torque_profile,
             n_iterations,
             time_step, 
             seed
@@ -128,7 +130,7 @@ class EESAnalyzer:
         
         return results
       
-    def analyze_unbalanced_recruitment_effects(self, b_range, base_ees_params=None, 
+    def analyze_unbalanced_recruitment_effects(self, different_sites=None, base_ees_params=None, torque_profile=None,
                                              n_iterations=20, time_step=0.1*ms, seed=42):
         """
         Analyze the effects of unbalanced afferent recruitment between antagonistic muscles.
@@ -153,10 +155,11 @@ class EESAnalyzer:
         """
         if base_ees_params is None:
             base_ees_params = self._default_ees_params.copy()
-            
+        if different_sites is None:
+            different_sites=['L4','L5','S1']
         vary_param = {
-            'param_name': 'balance',
-            'values': b_range,
+            'param_name': 'site',
+            'values': different_site,
             'label': 'Afferent Fiber Unbalanced Recruitment'
         }
         
@@ -164,6 +167,7 @@ class EESAnalyzer:
         results = self._compute_ees_parameter_sweep(
             base_ees_params,
             vary_param,
+            torque_profile,
             n_iterations,
             time_step, 
             seed
@@ -197,7 +201,7 @@ class EESAnalyzer:
         # Store results for future plotting
         self.results = results
     
-    def _compute_ees_parameter_sweep(self, param_dict, vary_param, n_iterations, 
+    def _compute_ees_parameter_sweep(self, param_dict, vary_param, torque_profile, n_iterations, 
                                    time_step=0.1*ms, seed=42):
         """
         Compute EES stimulation analysis by varying a parameter of interest.
@@ -249,7 +253,7 @@ class EESAnalyzer:
                 n_iterations, 
                 time_step,
                 ees_stimulation_params=current_params,
-                torque_profile=None,
+                torque_profile=torque_profile,
                 seed=seed, 
                 base_output_path=None
             )
