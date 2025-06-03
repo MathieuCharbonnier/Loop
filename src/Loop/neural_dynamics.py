@@ -430,10 +430,10 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
     n_MN = neuron_pop['MN']
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm: volt
-    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + gi__*(E_inh-v): amp
+    Isyn = gIa*(E_ex - v) + gexc*(E_ex-v) + gi*(E_inh-v): amp
     dgIa/dt = -gIa / tau_e: siemens 
     dgexc/dt = -gexc / tau_e: siemens
-    dgi__/dt = (ginhb-gi__)/tau_i : siemens
+    dgi/dt = (ginhb-gi)/tau_i : siemens
     dginhb/dt = -ginhb / tau_i : siemens
     '''
     
@@ -444,7 +444,7 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
     MN.v = initial_state_neurons['MN']['v']
     MN.gIa = initial_state_neurons['MN']['gIa']
     MN.gexc = initial_state_neurons['MN']['gexc']
-    MN.gi__ = initial_state_neurons['MN']['gi__']
+    MN.gi = initial_state_neurons['MN']['gi']
     MN.ginhb = initial_state_neurons['MN']['ginhb']
                            
     spike_mon_MN = SpikeMonitor(MN)
@@ -496,7 +496,7 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
             'gIa': MN.gIa[:],
             'gexc': MN.gexc[:],
             'ginhb': MN.ginhb[:],
-            'gi__': MN.gi__[:]
+            'gi': MN.gi_[:]
         },
         'exc': {
             'v': exc_neurons.v[:],
