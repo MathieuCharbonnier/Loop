@@ -506,7 +506,7 @@ class BiologicalSystem(ABC):
         save_figure(fig_joint, f'Joint_{joint_name}')
     
         # ---------- MUSCLE DYNAMICS PLOT ----------
-        props = ['Fiber_length', 'Stretch', 'Stretch_Velocity', 'Normalized_Force']
+        props = ['Fiber_length', 'Stretch', 'Stretch_Velocity', 'Force']
         ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)', 'Force (dimless)']
     
         fig_muscle, axs_muscle = plt.subplots(len(props), 1, figsize=(12, 3 * len(props)), sharex=True)
