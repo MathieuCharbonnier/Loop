@@ -325,7 +325,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     f'Fiber_length_{muscles_names[muscle_idx]}': fiber_lengths[muscle_idx],
                     f'Stretch_{muscles_names[muscle_idx]}': stretch[muscle_idx],
                     f'Stretch_Velocity_{muscles_names[muscle_idx]}': stretch_velocity[muscle_idx],
-                    f'Normalized_Force_{muscles_names[muscle_idx]}': normalized_force[muscle_idx],
+                    f'Force_{muscles_names[muscle_idx]}': normalized_force[muscle_idx],
                     f'mean_e_{muscles_names[muscle_idx]}': mean_e[muscle_idx],
                     f'mean_u_{muscles_names[muscle_idx]}': mean_u[muscle_idx],
                     f'mean_c_{muscles_names[muscle_idx]}': mean_c[muscle_idx],
@@ -415,7 +415,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         if "Ib" in neurons_population and "Ib" in spindle_model:
             Ib_rate = eval(spindle_model['Ib'], 
                           {"__builtins__": {}}, 
-                          {"normalized_force": normalized_force}
+                          {"force_normalized": normalized_force}
                            )
 
             df[f'Ib_rate_baseline_{muscle_name}'] = Ib_rate
