@@ -82,7 +82,7 @@ class DisynapticIb(BiologicalSystem):
                     'gIa': 0*nS,
                     'gexc': 0*nS,
                     'ginhb': 0*nS,
-                    'gi__': 0*nS
+                    'gi': 0*nS
                 }
             }
             
