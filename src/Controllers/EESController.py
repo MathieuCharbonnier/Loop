@@ -139,10 +139,8 @@ class EESController:
             
             iteration = 1
             freq = self.ees_frequency_guess
-            final_trajectory = None
-            best_ees_params = None
             amplitude_error = float('inf')  # Initialize amplitude_error
-            
+                
             # Store optimization data for this phase
             phase_optimization_data = []
             
@@ -188,12 +186,7 @@ class EESController:
                 
                 # Clamp frequency to valid range
                 freq = max(self.min_frequency, min(self.max_frequency, freq))
-                
-                # Store best parameters
-                if final_trajectory is None or amplitude_error < min([opt['cost'] for opt in phase_optimization_data[:-1]]) if len(phase_optimization_data) > 1 else True:
-                    final_trajectory = actual_trajectory.copy()
-                    best_ees_params = ees_params.copy()
-                
+            
                 iteration += 1
             
             # Store optimization data for this phase
@@ -203,8 +196,8 @@ class EESController:
             self.biological_system.update_state()
             
             # Store results for this phase
-            self.trajectory_history.append(final_trajectory)
-            self.ees_params_history.append(best_ees_params)
+            self.trajectory_history.append(phase_optimization_data[-1]['trajectory'])
+            self.ees_params_history.append(phase_optimization_data[-1]['params'])
 
             # Update time to next phase
             current_time = next_event_time   
