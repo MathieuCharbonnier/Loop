@@ -26,8 +26,8 @@ class EESController:
             The biological system to control
         """
         self.biological_system = biological_system.clone_with()
-        self.ees_intensity=ees_intensity
-        self.ees_frequency_guess=ees_frequency_guess
+        self.ees_intensity = ees_intensity
+        self.ees_frequency_guess = ees_frequency_guess
         
         # Load trajectory data
         mot_file = 'data/BothLegsWalk.mot'
@@ -50,109 +50,50 @@ class EESController:
         # Extract time and joint data
         self.time = df['time'].values
         self.desired_trajectory = df[self.biological_system.associated_joint].values
-        self.total_time=time[-1]
-        self.desired_trajectory_function = interp1d(time, data, kind='cubic', fill_value="extrapolate")
-        self.event=np.array([self.time[np.argmax(self.desired_trajectory)], self.time[np.argmin(self.desired_trajectory)])*second# define the 3 phases: first dorsiflexion, then plantarflexion, and recovery 
-        self.site_stimulation=['L4', 'S1', 'L4']
-    
+        self.total_time = self.time[-1]
+        self.desired_trajectory_function = interp1d(self.time, self.desired_trajectory, kind='cubic', fill_value="extrapolate")
+        
+        # Define gait events: max dorsiflexion and max plantarflexion
+        max_dorsi_idx = np.argmax(self.desired_trajectory)
+        min_plantar_idx = np.argmin(self.desired_trajectory)
+        
+        # Create event times for the three phases
+        self.event_times = np.array([0, self.time[max_dorsi_idx], self.time[min_plantar_idx], self.total_time])
+        self.site_stimulation = ['L4', 'S1', 'L4']  # dorsiflexion, plantarflexion, recovery
+        
+        
+        # Frequency search parameters
+        self.freq_step = 5 * hertz  # Step size for frequency adjustment
+        self.min_frequency = 10 * hertz
+        self.max_frequency = 100 * hertz
+        self.amplitude_tolerance = 0.1  # Tolerance for amplitude matching
+        self.max_iterations = 10
+        
         # Storage for results
         self.trajectory_history = []
         self.desired_trajectory_history = []
         self.ees_params_history = []
         self.time_history = []
         self.cost_history = []
-        self.optimization_trajectories = []
+        self.optimization_trajectories = []  # Now stores list of phase optimization data
 
-    def _compute_trajectory_cost(self, actual_trajectory, desired_trajectory):
+    
+    def _get_trajectory_amplitude(self, trajectory):
         """
-        Compute the cost between actual and desired trajectories.
+        Calculate the amplitude (peak-to-peak) of a trajectory.
         
         Parameters:
         -----------
-        actual_trajectory : np.ndarray
-            Actual joint trajectory from simulation
-        desired_trajectory : np.ndarray
-            Desired joint trajectory
+        trajectory : np.ndarray
+            Joint trajectory
             
         Returns:
         --------
         float
-            Cost value (lower is better)
+            Amplitude of the trajectory
         """
-        return np.mean((actual_trajectory - desired_trajectory) ** 2)
-        
-    
-    def _optimize_ees_parameters(self,time_step, update_iteration,site):
-        """
-        Optimize EES parameters by increasing/decreasing EES frequency if the absolute amplitude of the movement is too weak/strong, 
-        and optionally optimize the site of stimulation if the joint is too much in dorsi or plantar flexion..
-        Returns the system state, results, and parameters for the best combination.
-        
-        Parameters:
-        -----------
-        current_time : float
-            Current simulation time
-            
-        Returns:
-        --------
-        tuple
-            (best_system_state, best_spikes, best_time_series, best_params, best_cost, optimization_trajectories)
-        """
-        best_cost = float('inf')
-        best_params = BiologicalSystem.copy_brian_dict(self.current_ees_params)
-        best_spikes = None
-        best_time_series = None
-        best_system_state = None
-        
-        print(f"Optimizing EES parameters at time {current_time:.3f}s...")
-        
-        # Store trajectories for this optimization cycle
-        optimization_cycle_trajectories = []
-        
-        #here need to define the optimization: if amplitude of movement too  weak/strong increase/decrease frequency
-            test_params={'frequency': freq,
-                        'intensity':self.ees_intensity,
-                        'site':site
-                       }
-    
-            # Run simulation with test parameters
-            spikes, time_series = self.biological_system.run_simulation(
-                n_iterations=update_iterations,
-                time_step=time_step,
-                ees_stimulation_params=test_params
-            )
-            
-            # Extract joint trajectory
-            joint_col = f"Joint_{self.biological_system.associated_joint}"
-            if joint_col in time_series.columns:
-                actual_trajectory = time_series[joint_col].values
-                prediction_time = time_series['Time'] + current_time
-                desired_trajectory = self.desired_trajectory_function(prediction_time)
-
-                # Compute cost
-                cost = self._compute_trajectory_cost(actual_trajectory, desired_trajectory)
-                
-                # Store this trajectory for plotting
-                optimization_cycle_trajectories.append({
-                    'time': prediction_time[:len(actual_trajectory)],
-                    'trajectory': actual_trajectory,
-                    'params': test_params,
-                    'cost': cost
-                })
-                    
-                # Update best parameters if this is better
-                if cost < best_cost:
-                    best_cost = cost
-                    best_params = test_params
-                    best_spikes = spikes
-                    best_time_series = time_series
-                    # Save the system state after the best simulation
-                    best_system_state = self.biological_system.get_system_state()
-        
-        print(f"Best cost: {best_cost:.6f}")
-        print(f"Best parameters: frequency={best_params['frequency']:.1f} Hz")
-        
-        return best_system_state, best_spikes, best_time_series, best_params, best_cost, optimization_cycle_trajectories
+        return np.max(trajectory) - np.min(trajectory)
+  
     
     def run(self, time_step=0.1*ms):
         """
@@ -160,80 +101,116 @@ class EESController:
         
         Parameters:
         -----------
-        total_iterations : int
-            Total number of iterations to simulate
         time_step : float
             Time step for simulation (in seconds)
-        base_output_path : str, optional
-            Base path for saving output files
             
         Returns:
         --------
         tuple
             (trajectory_history, desired_trajectory_history, ees_params_history, time_history)
         """
-        current_time = 0.0 * ms
-           
-        print(f"Starting EES control simulation...")
+        current_time = 0.0
+        phase_idx = 0
         
-        while current_time < self.total_time:
-            #Find the next gait event and the number of iteration of the closed loop to achieve it
-            next_indices = np.where(self.time> current_time)[0]
-            if next_indices.size > 0:
-                next_index = next_indices[0]
-                next_time = self.time[next_index]
-                site=self.stimulation_site[next_index]
-            else:
-                next_time=self.total_time
-                site=self.stimulation_site[-1]
+        print(f"Starting EES control simulation...")
+        print(f"Event times: {self.event_times}")
+        print(f"Stimulation sites: {self.site_stimulation}")
+        
+        while current_time < self.total_time and phase_idx < len(self.site_stimulation):
+            # Determine next phase transition time
+            next_event_time = self.event_times[phase_idx + 1] if phase_idx + 1 < len(self.event_times) else self.total_time
+            phase_duration = next_event_time - current_time
             
-            update_iteration=int((next_time-current_time)/self.biological_system.reaction_time) 
+            # Get stimulation site for current phase
+            site = self.site_stimulation[phase_idx]
             
-            # Optimize EES parameters
-            (best_system_state, spikes, time_series, 
-             optimal_params, cost, optimization_trajectories) = self._optimize_ees_parameters(time_step, update_iteration, site)
+            # Calculate number of iterations for this phase
+            update_iterations = max(1, int(phase_duration / (self.biological_system.reaction_time / second)))
             
-            # Update current parameters and cost history
-            self.current_ees_params = optimal_params
-            self.cost_history.append(cost)
+            print(f"\nPhase {phase_idx + 1}: {current_time:.3f}s to {next_event_time:.3f}s")
+            print(f"Duration: {phase_duration:.3f}s, Iterations: {update_iterations}, Site: {site}")
             
-            # Store optimization trajectories
-            self.optimization_trajectories.append(optimization_trajectories)
+            simulation_time = np.arange(update_iterations) * time_step
+            prediction_time = simulation_time + current_time
+            desired_trajectory_segment = self.desired_trajectory_function(prediction_time)
+            desired_amplitude = self._get_trajectory_amplitude(desired_trajectory_segment)
+            self.time_history.append(prediction_time)
+            self.desired_trajectory_history.append(desired_trajectory_segment)
             
-            # Apply the best system state to our main biological system
-            # This avoids re-running the simulation with the best parameters
-            self.biological_system.set_system_state(best_system_state)
-           
-            # Extract joint trajectory from the already-computed best simulation
-            joint_col = f"Joint_{self.biological_system.associated_joint}"
+            iteration = 1
+            freq = self.ees_frequency_guess
+            final_trajectory = None
+            best_ees_params = None
+            amplitude_error = float('inf')  # Initialize amplitude_error
             
-            actual_trajectory = time_series[joint_col].values
+            # Store optimization data for this phase
+            phase_optimization_data = []
             
-            # Create time array for this segment
-            segment_time = np.arange(
-                current_time,
-                current_time + len(actual_trajectory) * time_step,
-                time_step
-            )[:len(actual_trajectory)] * second
-      
-            # Get desired trajectory for this segment
-            desired_trajectory = self.desired_trajectory_function(segment_time)
+            while amplitude_error > self.amplitude_tolerance and iteration < self.max_iterations:
+                # Optimize EES parameters for this phase
+                ees_params = {
+                    'frequency': freq,
+                    'intensity': self.ees_intensity,
+                    'site': site
+                }
+                
+                # Run simulation with test parameters
+                spikes, time_series = self.biological_system.run_simulation(
+                    n_iterations=update_iterations,
+                    time_step=time_step,
+                    ees_stimulation_params=ees_params
+                )
+                
+                # Extract joint trajectory
+                joint_col = f"Joint_{self.biological_system.associated_joint}"
+                actual_trajectory = time_series[joint_col].values
+                actual_amplitude = self._get_trajectory_amplitude(actual_trajectory)
+                    
+                # Calculate amplitude error
+                amplitude_error = abs(actual_amplitude - desired_amplitude)
+                
+                # Store optimization trajectory data correctly
+                optimization_data = {
+                    'trajectory': actual_trajectory.copy(),
+                    'time': prediction_time.copy(),
+                    'params': ees_params.copy(),
+                    'cost': amplitude_error,
+                    'amplitude': actual_amplitude
+                }
+                phase_optimization_data.append(optimization_data)
+                
+                self.cost_history.append(amplitude_error)
+                
+                if actual_amplitude > desired_amplitude:
+                    freq = freq - self.freq_step
+                else:
+                    freq = freq + self.freq_step
+                
+                # Clamp frequency to valid range
+                freq = max(self.min_frequency, min(self.max_frequency, freq))
+                
+                # Store best parameters
+                if final_trajectory is None or amplitude_error < min([opt['cost'] for opt in phase_optimization_data[:-1]]) if len(phase_optimization_data) > 1 else True:
+                    final_trajectory = actual_trajectory.copy()
+                    best_ees_params = ees_params.copy()
+                
+                iteration += 1
             
-            # Store results
-            self.trajectory_history.extend(actual_trajectory)
-            self.desired_trajectory_history.extend(desired_trajectory)
-            self.time_history.extend(segment_time)
+            # Store optimization data for this phase
+            self.optimization_trajectories.append(phase_optimization_data)
             
-            # Store EES parameters for this segment
-            for _ in range(len(actual_trajectory)):
-                self.ees_params_history.append(deepcopy(self.current_ees_params))
+            # Update biological system state
+            self.biological_system.update_state()
+            
+            # Store results for this phase
+            self.trajectory_history.append(final_trajectory)
+            self.ees_params_history.append(best_ees_params)
 
-            # Update counters
-            current_iteration += iterations_this_cycle
-            current_time = segment_time[-1] + time_step if len(segment_time) > 0 else current_time + time_step
+            # Update time to next phase
+            current_time = next_event_time   
+            phase_idx += 1
         
         print(f"\nControl simulation completed!")
-        print(f"Final trajectory length: {len(self.trajectory_history)} points")
         
         return (self.trajectory_history, self.desired_trajectory_history, 
                 self.ees_params_history, self.time_history)
@@ -251,21 +228,18 @@ class EESController:
             raise ValueError("No simulation results to plot. Run control simulation first.")
         
         # Convert lists to numpy arrays for easier handling
-        time_array = np.array(self.time_history)
-        actual_traj = np.array(self.trajectory_history)
-        desired_traj = np.array(self.desired_trajectory_history)
+        time_array = np.concatenate(self.time_history)
+        actual_traj = np.concatenate(self.trajectory_history)
+        desired_traj = np.concatenate(self.desired_trajectory_history)
         
         # Extract EES parameters over time
-        frequencies = [params['frequency'] for params in self.ees_params_history]
+        frequencies = [params['frequency'] / hertz for params in self.ees_params_history]
+        sites = [params['site'] for params in self.ees_params_history]
         
-        # Determine number of subplots based on system type
-        if self.has_multiple_muscles:
-            sites = [params['site'] for params in self.ees_params_history]
-            fig, axes = plt.subplots(3, 1, figsize=(12, 15))
-        else:
-            fig, axes = plt.subplots(2, 1, figsize=(12, 12))
+        # Create subplots
+        fig, axes = plt.subplots(3, 1, figsize=(12, 15))
         
-        # Color-blind friendly palette (Wong 2011)
+        # Color-blind friendly palette
         cb_colors = [
             '#000000',  # Black
             '#E69F00',  # Orange
@@ -275,14 +249,6 @@ class EESController:
             '#0072B2',  # Blue
             '#D55E00',  # Vermillion
             '#CC79A7',  # Reddish Purple
-            '#999999',  # Gray
-            '#8B4513',  # Brown
-            '#FF1493',  # Deep Pink
-            '#32CD32',  # Lime Green
-            '#4169E1',  # Royal Blue
-            '#FF8C00',  # Dark Orange
-            '#9370DB',  # Medium Purple
-            '#20B2AA'   # Light Sea Green
         ]
         
         # Plot 1: Enhanced trajectory comparison with optimization trajectories
@@ -291,51 +257,39 @@ class EESController:
         axes[0].plot(time_array, actual_traj, color='#E69F00', linestyle='--', linewidth=2, 
                     label='Actual trajectory (selected)', zorder=9)
         
-        # Create a mapping from parameter combinations to colors
+        # Add phase boundaries
+        for i, event_time in enumerate(self.event_times[1:-1], 1):
+            axes[0].axvline(x=event_time, color='red', linestyle=':', alpha=0.7, 
+                          label=f'Phase {i} boundary' if i == 1 else "")
+        
+        # Plot optimization trajectories with transparency
         param_to_color = {}
         plotted_params = set()
         
-        for optimization_cycle in self.optimization_trajectories:
-            # Sort trajectories by cost to show best ones more prominently
-            sorted_trajectories = sorted(optimization_cycle, key=lambda x: x['cost'])
-            
-            for traj_idx, traj_data in enumerate(sorted_trajectories):
-                # Skip the best trajectory as it's already shown as "Actual trajectory"
-                if traj_idx == 0:
-                    continue
-                
-                # Create parameter key for consistent coloring
-                if self.has_multiple_muscles:
-                    param_key = (float(traj_data['params']['frequency']), 
-                               float(traj_data['params']['site']))
-                    param_label = f"f={traj_data['params']['frequency']:.0f}Hz, b={traj_data['params']['site']:.2f}"
-                else:
-                    param_key = (float(traj_data['params']['frequency']),)
-                    param_label = f"f={traj_data['params']['frequency']:.0f}Hz"
-                
-                # Assign color if not already assigned
-                if param_key not in param_to_color:
-                    color_idx = len(param_to_color) % len(cb_colors)
-                    if color_idx == 0:  # Skip black
-                        color_idx = 2
-                    elif color_idx == 1:  # Skip orange  
-                        color_idx = 3
-                    param_to_color[param_key] = cb_colors[color_idx]
-                
-                # Determine if this should be in legend
-                show_in_legend = param_key not in plotted_params
-                if show_in_legend:
-                    plotted_params.add(param_key)
-                
-                # Plot with transparency and thinner lines for non-optimal trajectories
-                alpha = 0.4 if traj_idx > 2 else 0.7
-                linewidth = 0.8 if traj_idx > 2 else 1.2
-                
-                axes[0].plot(traj_data['time'], traj_data['trajectory'], 
-                           color=param_to_color[param_key], 
-                           alpha=alpha, linewidth=linewidth, 
-                           label=param_label if show_in_legend else "", 
-                           zorder=1)
+        if self.optimization_trajectories:
+            for phase_idx, phase_optimization_data in enumerate(self.optimization_trajectories):
+                for opt_data in phase_optimization_data:
+                    # Create parameter key for consistent coloring
+                    param_key = (float(opt_data['params']['frequency'] / hertz), opt_data['params']['site'])
+                    param_label = f"f={opt_data['params']['frequency']/hertz:.0f}Hz, {opt_data['params']['site']}"
+                    
+                    # Assign color if not already assigned
+                    if param_key not in param_to_color:
+                        color_idx = (len(param_to_color) + 2) % len(cb_colors)
+                        param_to_color[param_key] = cb_colors[color_idx]
+                    
+                    # Determine if this should be in legend
+                    show_in_legend = param_key not in plotted_params
+                    if show_in_legend:
+                        plotted_params.add(param_key)
+                    
+                    # Plot with transparency (skip the best trajectory as it's already shown in orange)
+                    if not np.array_equal(opt_data['trajectory'], self.trajectory_history[phase_idx]):
+                        axes[0].plot(opt_data['time'], opt_data['trajectory'], 
+                                   color=param_to_color[param_key], 
+                                   alpha=0.4, linewidth=1.0, 
+                                   label=param_label if show_in_legend else "", 
+                                   zorder=1)
         
         axes[0].set_xlabel('Time (s)', fontsize=12)
         axes[0].set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)', fontsize=12)
@@ -343,20 +297,41 @@ class EESController:
                          fontsize=14, fontweight='bold')
         
         legend = axes[0].legend(bbox_to_anchor=(1.02, 1), loc='upper left', 
-                              fontsize=11, frameon=True, fancybox=True, 
+                              fontsize=10, frameon=True, fancybox=True, 
                               shadow=True, framealpha=0.9)
-        legend.get_frame().set_facecolor('white')
         axes[0].grid(True, alpha=0.3)
         
         # Plot 2: EES Frequency evolution
-        axes[1].plot(time_array, frequencies, color='#009E73', linewidth=2)
+        # Create time array for frequency plot (one point per phase)
+        freq_time_array = []
+        for i, time_segment in enumerate(self.time_history):
+            freq_time_array.append(time_segment[0])  # Use start time of each phase
+        
+        axes[1].plot(freq_time_array, frequencies, color='#009E73', linewidth=2, marker='o', markersize=4)
+        for event_time in self.event_times[1:-1]:
+            axes[1].axvline(x=event_time, color='red', linestyle=':', alpha=0.7)
         axes[1].set_xlabel('Time (s)')
         axes[1].set_ylabel('EES Frequency (Hz)')
-        axes[1].set_title('EES Frequency Evolution')
+        axes[1].set_title('EES Frequency Evolution Across Gait Phases')
         axes[1].grid(True, alpha=0.3)
-        axes[1].set_ylim([self.frequency_grid[0] - 5*hertz, self.frequency_grid[-1] + 5*hertz])
+        axes[1].set_ylim([self.min_frequency/hertz - 5, self.max_frequency/hertz + 5])
         
-
+        # Plot 3: Stimulation sites
+        unique_sites = list(set(sites))
+        site_to_num = {site: i for i, site in enumerate(unique_sites)}
+        site_nums = [site_to_num[site] for site in sites]
+        
+        axes[2].plot(freq_time_array, site_nums, color='#0072B2', linewidth=2, marker='s', markersize=4)
+        for event_time in self.event_times[1:-1]:
+            axes[2].axvline(x=event_time, color='red', linestyle=':', alpha=0.7)
+        axes[2].set_xlabel('Time (s)')
+        axes[2].set_ylabel('Stimulation Site')
+        axes[2].set_title('Stimulation Site Across Gait Phases')
+        axes[2].set_yticks(range(len(unique_sites)))
+        axes[2].set_yticklabels(unique_sites)
+        axes[2].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
         
         # Save plot if path provided
         if base_output_path:
@@ -370,12 +345,12 @@ class EESController:
         # Plot cost evolution
         if len(self.cost_history) > 0:
             plt.figure(figsize=(10, 6))
-            optimization_points = np.arange(len(self.cost_history)) * self.update_iterations
+            phase_points = np.arange(len(self.cost_history))
             
-            plt.plot(optimization_points, self.cost_history, 'o-', color='#0072B2', linewidth=2, markersize=6)
-            plt.xlabel('Iteration')
+            plt.plot(phase_points, self.cost_history, 'o-', color='#0072B2', linewidth=2, markersize=6)
+            plt.xlabel('Optimization Phase')
             plt.ylabel('Optimization Cost (MSE)')
-            plt.title('EES Parameter Optimization Cost Evolution')
+            plt.title('EES Parameter Optimization Cost Evolution by Phase')
             plt.grid(True, alpha=0.3)
             plt.yscale('log')
             
@@ -384,41 +359,3 @@ class EESController:
                            dpi=300, bbox_inches='tight')
             
             plt.show()
-    
-    def get_performance_metrics(self):
-        """
-        Calculate and return performance metrics for the control.
-        
-        Returns:
-        --------
-        dict
-            Dictionary containing various performance metrics
-        """
-        if not self.trajectory_history:
-            raise ValueError("No simulation results available. Run control simulation first.")
-        
-        actual_traj = np.array(self.trajectory_history)
-        desired_traj = np.array(self.desired_trajectory_history)
-        
-        # Calculate metrics
-        mse = np.mean((actual_traj - desired_traj) ** 2)
-        rmse = np.sqrt(mse)
-        mae = np.mean(np.abs(actual_traj - desired_traj))
-        max_error = np.max(np.abs(actual_traj - desired_traj))
-        
-        # R-squared coefficient
-        ss_res = np.sum((actual_traj - desired_traj) ** 2)
-        ss_tot = np.sum((desired_traj - np.mean(desired_traj)) ** 2)
-        r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-        
-        metrics = {
-            'mse': mse,
-            'rmse': rmse,
-            'mae': mae,
-            'max_error': max_error,
-            'r_squared': r_squared,
-            'final_frequency': self.ees_params_history[-1]['frequency'] if self.ees_params_history else None,
-        }
-        
-        
-        return metrics
