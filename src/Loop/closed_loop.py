@@ -115,9 +115,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     print(f"Warning: stretch_history shape mismatch. Expected ({num_muscles}, {delay_points}), got {old_stretch.shape}")
             except Exception as e:
                 print(f"Warning: Could not load stretch history: {e}")
-        else:
-            # Initialize delay buffer with resting length (stretch = 0)
-            stretch_global_buffer[:, :delay_points] = 0.0
+
     
     # Containers for simulation data
     muscle_data = [[] for _ in range(num_muscles)]
@@ -190,12 +188,6 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             # Calculate velocity using time step
             stretch_velocity[muscle_idx] = np.gradient(stretch[muscle_idx], time_step / second)
         
-        # Update stretch buffer 
-        if delay_points > 0:
-            # Shift existing data left (remove oldest, keep recent)
-            stretch_global_buffer[:, :delay_points] = stretch_global_buffer[:, nb_points:delay_points + nb_points]
-        
-        
         buffer_start = delay_points + iteration * nb_points
         buffer_end = delay_points + (iteration + 1) * nb_points
         stretch_global_buffer[:, buffer_start:buffer_end] = stretch
@@ -236,7 +228,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 
             else:
                 all_spikes, final_state_neurons, state_monitors = run_monosynaptic_simulation(
-                    stretch, stretch_velocity, neurons_population, connections, 
+                    stretch, stretch_velocity, stretch_II, neurons_population, connections, 
                     time_step, reaction_time, spindle_model, seed,
                     initial_state_neurons, **biophysical_params, ees_params=ees_params
                 )
