@@ -1,6 +1,5 @@
 import os
 import numpy as np
-from datetime import datetime
 
 from tqdm import tqdm
 from brian2 import *
@@ -46,7 +45,6 @@ class ReflexAnalyzer:
             Directory to save the plots
         """
         # Create output directory
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
             print(f"Created directory '{output_dir}' for saving plots")
@@ -116,7 +114,7 @@ class ReflexAnalyzer:
             fig.tight_layout(rect=[0, 0, 1, 0.95])
             
             # Save with appropriate filename
-            filename = f'{plot_type}_variation_{timestamp}.png'
+            filename = f'{plot_type}_variation.png'
             fig.savefig(os.path.join(output_dir, filename))
             plt.close(fig)
             print(f"Saved {filename}")
