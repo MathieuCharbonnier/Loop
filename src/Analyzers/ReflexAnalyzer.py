@@ -95,7 +95,7 @@ class ReflexAnalyzer:
                     label = "Fast type Motor Unit" if param_value else "Slow type Motor Unit"
                     ylabel = f"{label}\nJoint angle (deg)"
                 elif plot_type == "threshold":
-                    ylabel = f"Threshold = {int(param_value/mV)} mV\nJoint angle (deg)"
+                    ylabel = f"Vth = {int(param_value/mV)} mV\nJoint angle (deg)"
                 
                 axs[i, 0].set_ylabel(ylabel)
                 
