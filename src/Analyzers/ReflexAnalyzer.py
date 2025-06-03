@@ -116,7 +116,7 @@ class ReflexAnalyzer:
             # Save with appropriate filename
             filename = f'{plot_type}_variation.png'
             fig.savefig(os.path.join(output_dir, filename))
-            plt.close(fig)
+            plt.show()
             print(f"Saved {filename}")
           
     def run_delay(self, torque_profile=None, delay_values=None, 
