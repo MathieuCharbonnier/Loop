@@ -236,7 +236,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 
             else:
                 all_spikes, final_state_neurons, state_monitors = run_monosynaptic_simulation(
-                    stretch, stretch_velocity, stretch_II, neurons_population, connections, 
+                    stretch, stretch_velocity, neurons_population, connections, 
                     time_step, reaction_time, spindle_model, seed,
                     initial_state_neurons, **biophysical_params, ees_params=ees_params
                 )
