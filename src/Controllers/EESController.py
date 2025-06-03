@@ -12,14 +12,11 @@ class EESController:
     """
     Model Predictive Controller for EES parameters to achieve desired joint trajectories.
     
-    This controller uses a model-based approach where it simulates different EES parameter
-    combinations and selects the one that best matches the desired trajectory.
+    This controller uses a model-based approach.
+    It optimizes EES parameters by increasing/decreasing EES frequency if the absolute amplitude of the movement is too weak/strong, 
     """
     
-    def __init__(self, biological_system, update_iterations, 
-                 initial_ees_params=None, frequency_grid=[30, 70]*hertz,
-                 different_sites=['L4', 'L5', 'S1'],
-                  time_step=0.1*ms):
+    def __init__(self, biological_system, ees_intensity=0.5, ees_frequency_guess=50*hertz):
         """
         Initialize the EES controller.
         
@@ -27,27 +24,10 @@ class EESController:
         -----------
         biological_system : BiologicalSystem
             The biological system to control
-        desired_trajectory_func : callable
-            Function that takes time array and returns desired joint angles
-        update_iterations : int
-            Number of iterations after which to update EES parameters
-        initial_ees_params : dict, optional
-            Initial EES parameters. If None, uses default values
-        frequency_range : tuple
-            (min_freq, max_freq) range for frequency optimization
-        balance_range : tuple
-            (min_balance, max_balance) range for balance optimization (ignored for single muscle)
-        frequency_step : float
-            Step size for frequency optimization
-        balance_step : float
-            Step size for balance optimization (ignored for single muscle)
         """
         self.biological_system = biological_system.clone_with()
-        self.update_iterations = update_iterations
-        self.time_step = time_step
-        
-        # Check if system has multiple muscles
-        self.has_multiple_muscles = self.biological_system.number_muscles > 1
+        self.ees_intensity=ees_intensity
+        self.ees_frequency_guess=ees_frequency_guess
         
         # Load trajectory data
         mot_file = 'data/BothLegsWalk.mot'
@@ -68,31 +48,13 @@ class EESController:
         df.columns = [move_side_to_suffix(col) for col in df.columns]
 
         # Extract time and joint data
-        time = df['time'].values
-        data = df[self.biological_system.associated_joint].values
-
+        self.time = df['time'].values
+        self.desired_trajectory = df[self.biological_system.associated_joint].values
+        self.total_time=time[-1]
         self.desired_trajectory_function = interp1d(time, data, kind='cubic', fill_value="extrapolate")
-
-        # Default EES parameters
-        if initial_ees_params is None:
-            self.current_ees_params = {
-                'frequency': 50 * hertz,
-                'intensity': 0.6,
-            }
-            if self.has_multiple_muscles:
-                self.current_ees_params['site'] = 'L5'
-        else:
-            self.current_ees_params = BiologicalSystem.copy_brian_dict(initial_ees_params)
-            if not self.has_multiple_muscles and 'site' in self.current_ees_params:
-                del self.current_ees_params['site']
-            
-        # Optimization ranges
-        self.frequency_grid = frequency_grid
-        if self.has_multiple_muscles:
-            self.site_grid = different_sites
-        else:
-            self.site_grid = []
-        
+        self.event=np.array([self.time[np.argmax(self.desired_trajectory)], self.time[np.argmin(self.desired_trajectory)])*second# define the 3 phases: first dorsiflexion, then plantarflexion, and recovery 
+        self.site_stimulation=['L4', 'S1', 'L4']
+    
         # Storage for results
         self.trajectory_history = []
         self.desired_trajectory_history = []
@@ -118,10 +80,12 @@ class EESController:
             Cost value (lower is better)
         """
         return np.mean((actual_trajectory - desired_trajectory) ** 2)
+        
     
-    def _optimize_ees_parameters(self, current_time):
+    def _optimize_ees_parameters(self,time_step, update_iteration,site):
         """
-        Optimize EES parameters by testing different combinations.
+        Optimize EES parameters by increasing/decreasing EES frequency if the absolute amplitude of the movement is too weak/strong, 
+        and optionally optimize the site of stimulation if the joint is too much in dorsi or plantar flexion..
         Returns the system state, results, and parameters for the best combination.
         
         Parameters:
@@ -145,27 +109,16 @@ class EESController:
         # Store trajectories for this optimization cycle
         optimization_cycle_trajectories = []
         
-        # Create list of parameter combinations to test
-        if self.has_multiple_muscles:
-            param_combinations = list(product(self.frequency_grid, self.balance_grid))
-            print(f"Testing {len(self.frequency_grid)} frequency × {len(self.site_grid)} balance combinations")
-        else:
-            param_combinations = [(freq, None) for freq in self.frequency_grid]
-            print(f"Testing {len(self.frequency_grid)} frequency values")
-        
-        for i, (freq, balance) in enumerate(param_combinations):
-            print('balance : ', balance)
-            # Create test parameters
-            test_params =BiologicalSystem.copy_brian_dict(self.current_ees_params)
-            test_params['frequency'] = freq
-            if self.has_multiple_muscles:
-                test_params['balance'] = balance
-
-                
+        #here need to define the optimization: if amplitude of movement too  weak/strong increase/decrease frequency
+            test_params={'frequency': freq,
+                        'intensity':self.ees_intensity,
+                        'site':site
+                       }
+    
             # Run simulation with test parameters
             spikes, time_series = self.biological_system.run_simulation(
-                n_iterations=self.update_iterations,
-                time_step=self.time_step,
+                n_iterations=update_iterations,
+                time_step=time_step,
                 ees_stimulation_params=test_params
             )
             
@@ -197,14 +150,11 @@ class EESController:
                     best_system_state = self.biological_system.get_system_state()
         
         print(f"Best cost: {best_cost:.6f}")
-        if self.has_multiple_muscles:
-            print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz, balance={best_params['site']:.3f}")
-        else:
-            print(f"Best parameters: frequency={best_params['frequency']:.1f}Hz")
+        print(f"Best parameters: frequency={best_params['frequency']:.1f} Hz")
         
         return best_system_state, best_spikes, best_time_series, best_params, best_cost, optimization_cycle_trajectories
     
-    def run(self, total_iterations, time_step=0.1*ms, base_output_path=None):
+    def run(self, time_step=0.1*ms):
         """
         Run the complete control simulation.
         
@@ -222,25 +172,26 @@ class EESController:
         tuple
             (trajectory_history, desired_trajectory_history, ees_params_history, time_history)
         """
-        current_iteration = 0
         current_time = 0.0 * ms
-        
+           
         print(f"Starting EES control simulation...")
-        print(f"Total iterations: {total_iterations}")
-        print(f"Update every: {self.update_iterations} iterations")
-        print(f"Time step: {time_step:.1f}")
-        print(f"System type: {'Multiple muscles' if self.has_multiple_muscles else 'Single muscle'}")
         
-        while current_iteration < total_iterations:
-            # Determine how many iterations to run this cycle
-            remaining_iterations = total_iterations - current_iteration
-            iterations_this_cycle = min(self.update_iterations, remaining_iterations)
+        while current_time < self.total_time:
+            #Find the next gait event and the number of iteration of the closed loop to achieve it
+            next_indices = np.where(self.time> current_time)[0]
+            if next_indices.size > 0:
+                next_index = next_indices[0]
+                next_time = self.time[next_index]
+                site=self.stimulation_site[next_index]
+            else:
+                next_time=self.total_time
+                site=self.stimulation_site[-1]
             
-            print(f"\nControl cycle: iterations {current_iteration} to {current_iteration + iterations_this_cycle}")
+            update_iteration=int((next_time-current_time)/self.biological_system.reaction_time) 
             
-            # Optimize EES parameters (including first iteration now)
+            # Optimize EES parameters
             (best_system_state, spikes, time_series, 
-             optimal_params, cost, optimization_trajectories) = self._optimize_ees_parameters(current_time)
+             optimal_params, cost, optimization_trajectories) = self._optimize_ees_parameters(time_step, update_iteration, site)
             
             # Update current parameters and cost history
             self.current_ees_params = optimal_params
@@ -255,8 +206,6 @@ class EESController:
            
             # Extract joint trajectory from the already-computed best simulation
             joint_col = f"Joint_{self.biological_system.associated_joint}"
-            if joint_col not in time_series.columns:
-                raise ValueError(f"Joint column '{joint_col}' not found in time series")
             
             actual_trajectory = time_series[joint_col].values
             
@@ -407,24 +356,6 @@ class EESController:
         axes[1].grid(True, alpha=0.3)
         axes[1].set_ylim([self.frequency_grid[0] - 5*hertz, self.frequency_grid[-1] + 5*hertz])
         
-        #Plot stimulation site evolution
-        if self.has_multiple_muscles:
-            # Get unique sites in the order of appearance
-            unique_sites = list(dict.fromkeys(sites))  # preserves order
-            site_indices = [unique_sites.index(site) for site in sites]
-
-            axes[2].plot(time_array, site_indices, color='#D55E00', linewidth=2)
-            axes[2].set_xlabel('Time (s)')
-            axes[2].set_ylabel('EES Site')
-            axes[2].set_title('EES Stimulation Sites Evolution (Flexor-Extensor)')
-            
-            # Map index to site string labels
-            axes[2].set_yticks(range(len(unique_sites)))
-            axes[2].set_yticklabels(unique_sites)
-            axes[2].grid(True, alpha=0.3)
-            axes[2].set_ylim([-0.5, len(unique_sites) - 0.5])
-
-        plt.tight_layout()
 
         
         # Save plot if path provided
@@ -489,7 +420,5 @@ class EESController:
             'final_frequency': self.ees_params_history[-1]['frequency'] if self.ees_params_history else None,
         }
         
-        if self.has_multiple_muscles:
-            metrics['final_balance'] = self.ees_params_history[-1]['balance'] if self.ees_params_history else None
         
         return metrics
