@@ -49,11 +49,10 @@ class Disynaptic(BiologicalSystem):
             }
         
         if connections is None:
-            # Exclude Ib pathway connections
             connections = {
-                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.4},      # Direct excitation
-                ("II", "exc"): {"w": 3.64*nS, "p": 0.4},    # Stretch feedback
-                ("exc", "MN"): {"w": 2.1*nS, "p": 0.4}      # Excitatory interneuron
+                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7},      # Direct excitation
+                ("II", "exc"): {"w": 1.65*nS, "p": 0.7},    # Stretch feedback
+                ("exc", "MN"): {"w": 0.7*nS, "p": 0.5},     # Excitatory interneuron
             }
 
         if spindle_model is None:
@@ -61,7 +60,7 @@ class Disynaptic(BiologicalSystem):
             spindle_model = {
                 "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
                 "II": "20 + 13.5*stretch_delay",
-                "Ia_II_delta_delay": 15*ms
+                "Ia_II_delta_delay": 20*ms
             }
                  
         if initial_state_neurons is None:
