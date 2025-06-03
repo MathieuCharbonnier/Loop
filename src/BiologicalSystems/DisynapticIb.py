@@ -34,7 +34,7 @@ class DisynapticIb(BiologicalSystem):
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
                 'E_inh': -75*mV,
-                'tau_i': 5*ms,
+                'tau_i': 3*ms,
                 'threshold_v': -45*mV
             }
             
@@ -56,20 +56,20 @@ class DisynapticIb(BiologicalSystem):
         if connections is None:
             # Include all connections including Ib pathway
             connections = {
-                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.5},      # Direct excitation
-                ("II", "exc"): {"w": 3.64*nS, "p": 0.5},    # Stretch feedback
-                ("exc", "MN"): {"w": 2.1*nS, "p": 0.5},     # Excitatory interneuron
-                ("Ib", "inhb"): {"w": 3.64*nS, "p": 0.5},   # Force feedback
-                ("inhb", "MN"): {"w": 2.1*nS, "p": 0.5}     # Inhibitory interneuron
+                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7},      # Direct excitation
+                ("II", "exc"): {"w": 1.65*nS, "p": 0.7},    # Stretch feedback
+                ("exc", "MN"): {"w": 0.7*nS, "p": 0.5},     # Excitatory interneuron
+                ("Ib", "inhb"): {"w": 2.1*nS, "p": 0.7},   # Force feedback
+                ("inhb", "MN"): {"w": 0.7*nS, "p": 0.6}     # Inhibitory interneuron
             }
 
         if spindle_model is None:
             # Include Ib equation for force feedback
-            spindle_model = {
+             spindle_model = {
                 "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
                 "II": "20 + 13.5*stretch_delay",
-                "Ib": "10 + 1*force_normalized**0.2",
-                "Ia_II_delta_delay": 15*ms
+                "Ib": " 10*force_normalized**0.2",
+                "Ia_II_delta_delay": 20*ms
             }
                  
         if initial_state_neurons is None:
