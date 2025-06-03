@@ -252,7 +252,8 @@ class Sensitivity:
                     modified_populations[population_name] = count
                     
                     modified_system = self.biological_system.clone_with(
-                        neurons_population=modified_populations)
+                        neurons_population=modified_populations,
+                         initial_condition_spike_activation=None)
                     
                     spikes, time_series = modified_system.run_simulation(
                         n_iterations=n_iterations,
@@ -793,7 +794,7 @@ class Sensitivity:
         for result, param_value in zip(varied_results, varied_params):
             if baseline_metric != 0 and original_param != 0:
                 output_change_pct = abs(result - baseline_metric) / abs(baseline_metric)
-                param_change_pct = abs(param_value - original_param) / abs(original_param)
+                param_change_pct = abs(param_value - float(original_param)) / abs(float(original_param))
                 
                 if param_change_pct > 0:
                     sensitivity = output_change_pct / param_change_pct
