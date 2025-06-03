@@ -6,8 +6,8 @@ from .BiologicalSystems.BiMusclesIb import BiMusclesIb
 from .Analyzers.EESAnalyzer import EESAnalyzer
 from .Analyzers.ReflexAnalyzer import ReflexAnalyzer
 from .Analyzers.Sensitivity import Sensitivity
-from .Controllers.BaseEESController import BaseEESController
-from .Controllers.IntelligentEESController import IntelligentEESController
+from .Controllers.EESController import EESController
+from .Stimulation.input_generator import plot_recruitment_curves
 __all__ = [
     "Monosynaptic",
     "Disynaptic",
@@ -17,6 +17,6 @@ __all__ = [
     "EESAnalyzer",
     "ReflexAnalyzer",
     "Sensitivity",
-    "BaseEESController",
-    "IntelligentEESController"
+    "EESController",
+    "plot_recruitment_curves"
 ]
