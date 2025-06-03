@@ -148,12 +148,12 @@ class Sensitivity:
                         
                     # Calculate metrics
                     metric_values = self._calculate_joint_metrics(time_series, metrics)
-                        
+                    print('metric_values ', metric_values)    
                     # Store results
                     result_row = {
                             'parameter_type': 'biophysical',
                             'parameter_name': param_name,
-                            'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
+                            'parameter_value': float(value),
                             **metric_values
                         }
                     results_list.append(result_row)
@@ -174,71 +174,65 @@ class Sensitivity:
                     #continue
         
         return pd.DataFrame(results_list)
-    
-    def _analyze_connection_sensitivity(self, variations: Dict, n_iterations: int,
+    def analyze_connection_sensitivity(self, variations: Dict, n_iterations: int,
                                       time_step: float, ees_params: Optional[Dict],
                                       torque_profile: Optional[Dict], seed: int,
                                       metrics: List[str]) -> pd.DataFrame:
-        """Analyze sensitivity to connection parameter variations."""
+        """
+        Analyze sensitivity to connection parameter variations.
         
+        Args:
+            variations: {connection_tuple: {param_name: [values_list]}}
+                       e.g., {("Ia", "MN"): {"w": [1.0*nS, 2.1*nS], "p": [0.3, 0.45]}}
+        """
         results_list = []
         
-        for connection_key, param_variations in variations.items():
-            # Parse connection key
-            if isinstance(connection_key, str):
-                parts = connection_key.split('_to_')
-                if len(parts) == 2:
-                    connection_tuple = (parts[0], parts[1])
-                else:
-                    connection_tuple = connection_key
-            else:
-                connection_tuple = connection_key
-            
+        for connection_tuple, param_variations in variations.items():
+            if connection_tuple not in self.biological_system.connections:
+                warnings.warn(f"Connection {connection_tuple} not found in system. Skipping.")
+                continue
+                
             for param_name, values_list in param_variations.items():
                 for value in values_list:
                     try:
                         # Create modified connections
                         modified_connections = BiologicalSystem.copy_brian_dict(self.biological_system.connections)
-                        
-                        # Apply connection modification
-                        if connection_tuple not in modified_connections:
-                            modified_connections[connection_tuple] = {}
-                        
                         modified_connections[connection_tuple][param_name] = value
                         
-                        modified_system = self.biological_system.clone_with(
-                            connections=modified_connections)
-                        
+                        # Run simulation with modified system
+                        modified_system = self.biological_system.clone_with(connections=modified_connections)
                         spikes, time_series = modified_system.run_simulation(
-                            n_iterations=n_iterations,
-                            time_step=time_step,
-                            ees_stimulation_params=ees_params,
-                            torque_profile=torque_profile,
-                            seed=seed
+                            n_iterations=n_iterations, time_step=time_step,
+                            ees_stimulation_params=ees_params, torque_profile=torque_profile, seed=seed
                         )
                         
+                        # Calculate metrics and store results
                         metric_values = self._calculate_joint_metrics(time_series, metrics)
-                        
-                        result_row = {
+                        results_list.append({
                             'parameter_type': 'connection',
-                            'connection': str(connection_tuple),
-                            'parameter_name': f"{connection_key}_{param_name}",
+                            'connection': f"{connection_tuple[0]}_to_{connection_tuple[1]}",
+                            'parameter_name': param_name,
                             'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
                             **metric_values
-                        }
-                        results_list.append(result_row)
+                        })
+                        
                         # Store simulation data
                         if 'connection' not in self.simulation_data:
                             self.simulation_data['connection'] = {}
-                        if param_name not in self.simulation_data['connection']:
-                            self.simulation_data['connection'][param_name] = {}
-                        self.simulation_data['connection'][param_name][float(value)] = {
-                          'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
-                          'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
-                          'Time': time_series['Time']
-                    }   
+                        connection_key = f"{connection_tuple[0]}_to_{connection_tuple[1]}"
+                        if connection_key not in self.simulation_data['connection']:
+                            self.simulation_data['connection'][connection_key] = {}
+                        if param_name not in self.simulation_data['connection'][connection_key]:
+                            self.simulation_data['connection'][connection_key][param_name] = {}
+                        
+                        self.simulation_data['connection'][connection_key][param_name][float(value) if hasattr(value, 'magnitude') else value] = {
+                            'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
+                            'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
+                            'Time': time_series['Time']
+                        }
+                        
                     except Exception as e:
-                        warnings.warn(f"Simulation failed for connection {connection_tuple}, {param_name} = {value}: {e}")
+                        warnings.warn(f"Simulation failed for {connection_tuple}, {param_name}={value}: {e}")
                         continue
         
         return pd.DataFrame(results_list)
@@ -300,55 +294,49 @@ class Sensitivity:
         """Calculate joint-specific metrics from simulation results."""
         
         metric_values = {}
-        
-        try:
-            # Get joint angle data
-            joint_angle_key = f'{self.biological_system.associated_joint}'
-            joint_angles = time_series.get(joint_angle_key, [])
+        # Get joint angle data
+        joint_angle_key = f'Joint_{self.biological_system.associated_joint}'
+        joint_angles = time_series.get(joint_angle_key, [])
+        joint_velocity_key=f'Joint_Velocity_{self.biological_system.associated_joint}'  
+        joint_velocity=time_series.get(joint_velocity_key, [])
+      
+        # Get time data for derivatives
+        time_data = time_series.get('Time', [])
             
-            # Get time data for derivatives
-            time_data = time_series.get('Time', [])
-            
-            if len(joint_angles) == 0 or len(time_data) == 0:
-                # Return NaN values if no data
-                for metric in metrics:
-                    metric_values[metric] = np.nan
-                return metric_values
-            
-            joint_angles = np.array(joint_angles)
-            time_data = np.array(time_data)
-            
-            for metric in metrics:
-                if metric == 'max_joint_angle':
-                    metric_values[metric] = np.max(joint_angles)
-                
-                elif metric == 'min_joint_angle':
-                    metric_values[metric] = np.min(joint_angles)
-                
-                elif metric == 'joint_velocity_l2':
-                    # Calculate joint velocity from angle and time
-                    if len(joint_angles) > 1:
-                        velocity = np.gradient(joint_angles, time_data)
-                        metric_values[metric] = np.linalg.norm(velocity)
-                    else:
-                        metric_values[metric] = 0.0
-                
-                elif metric == 'joint_acceleration_l2':
-                    # Calculate joint acceleration from velocity
-                    if len(joint_angles) > 2:
-                        velocity = np.gradient(joint_angles, time_data)
-                        acceleration = np.gradient(velocity, time_data)
-                        metric_values[metric] = np.linalg.norm(acceleration)
-                    else:
-                        metric_values[metric] = 0.0
-                
-                else:
-                    metric_values[metric] = np.nan
-                    
-        except Exception as e:
-            warnings.warn(f"Error calculating joint metrics: {e}")
+        if len(joint_angles) == 0 or len(time_data) == 0:
+            # Return NaN values if no data
             for metric in metrics:
                 metric_values[metric] = np.nan
+            return metric_values
+            
+        joint_angles = np.array(joint_angles)
+        time_data = np.array(time_data)
+            
+        for metric in metrics:
+            if metric == 'max_joint_angle':
+                metric_values[metric] = np.max(joint_angles)
+                
+            elif metric == 'min_joint_angle':
+                metric_values[metric] = np.min(joint_angles)
+                
+            elif metric == 'joint_velocity_l2':
+                # Calculate joint velocity from angle and time
+                if len(joint_velocity) > 1:
+                    metric_values[metric] = np.linalg.norm(joint_velocity)
+                else:
+                    metric_values[metric] = 0.0
+                
+            elif metric == 'joint_acceleration_l2':
+                # Calculate joint acceleration from velocity
+                if len(joint_velocity) > 2:
+                    acceleration = np.gradient(joint_velocity, time_data)
+                    metric_values[metric] = np.linalg.norm(acceleration)
+                else:
+                    metric_values[metric] = 0.0
+                
+            else:
+                metric_values[metric] = np.nan
+                    
         
         return metric_values
 
@@ -555,7 +543,7 @@ class Sensitivity:
             return os.path.join("Results", filename)
     
     
-    def plot_detailed_analysis(self, save_path: Optional[str] = None) -> Dict[str, list]:
+    def detailed_plot(self, save_path: Optional[str] = None) -> Dict[str, list]:
         """
         Plot detailed analysis including joint angles, raster plots, and frequency spectra
         for each parameter variation.
@@ -567,17 +555,6 @@ class Sensitivity:
         if not hasattr(self, 'simulation_data'):
             raise ValueError("No simulation data available. Run run() method first.")
         
-        saved_figures = {
-            'joint_angles': [],
-            'raster_plots': [],
-            'frequency_spectra': []
-        }
-        
-        plot_methods = {
-            'joint_angles': self._plot_joint_angle,
-            'raster_plots': self._plot_raster,
-            'frequency_spectra': self._plot_frequency_spectrum
-        }
         
         for param_type in ['biophysical', 'connections', 'neuron_counts']:
             if param_type not in self.simulation_data:
@@ -585,26 +562,16 @@ class Sensitivity:
                 
             for param_name in self.simulation_data[param_type].keys():
                 print(f"Plotting {param_type} parameter: {param_name}")
-                
-                try:
-                    # Plot joint angles
-                    fig_path = self._plot_joint_angle(param_name, param_type, save_path)
-                    saved_figures['joint_angles'].append(fig_path)
+              
+                # Plot joint angles
+                self._plot_joint_angle(param_name, param_type, save_path)
+                  
+                # Plot raster plots
+                self._plot_raster(param_name, param_type, save_path)
+         
+                # Plot frequency spectra
+                self._plot_frequency_spectrum(param_name, param_type, save_path)
                     
-                    # Plot raster plots
-                    fig_path = self._plot_raster(param_name, param_type, save_path)
-                    saved_figures['raster_plots'].append(fig_path)
-                    
-                    # Plot frequency spectra
-                    fig_path = self._plot_frequency_spectrum(param_name, param_type, save_path)
-                    saved_figures['frequency_spectra'].append(fig_path)
-                    
-                except Exception as e:
-                    print(f"Error plotting {param_name} ({param_type}): {str(e)}")
-                    continue
-        
-        print(f"Analysis complete. Figures saved to: {save_path if save_path else 'Results/'}")
-        return saved_figures
     
     def _get_parameter_variations(self, param_name: str, param_value: Any, param_type: str) -> List[Any]:
         """
