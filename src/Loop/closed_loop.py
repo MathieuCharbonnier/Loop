@@ -266,7 +266,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
         # Update initial potentials for next iteration
         initial_state_neurons.update(final_state_neurons)
-
+        
         # Store spike times for visualization
         for muscle_idx, muscle_name in enumerate(muscles_names):
             muscle_spikes = all_spikes[muscle_idx]
@@ -304,7 +304,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 mean_u[muscle_idx] = np.mean(u, axis=0)
                 mean_c[muscle_idx] = np.mean(c, axis=0)
                 mean_P[muscle_idx] = np.mean(P, axis=0)
-                mean_activation[muscle_idx] =np.clip(np.mean(activations_result, axis=0), 0, 1) 
+                mean_activation[muscle_idx] = np.mean(activations_result, axis=0)
 
                 # Update activation for next iteration
                 activation_history[muscle_idx] = mean_activation[muscle_idx]
@@ -391,6 +391,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         # Extract stretch and velocity values for this muscle
         stretch_values = df[f'Stretch_{muscle_name}'].values
         stretch_velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
+        force_normalized_values=df[f'Force_{muscle_name}'].values
         stretch_delay_values = stretch_global_buffer[muscle_idx, :len(time_values)]
            
         # Compute Ia firing rate using spindle model
@@ -415,7 +416,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         if "Ib" in neurons_population and "Ib" in spindle_model:
             Ib_rate = eval(spindle_model['Ib'], 
                           {"__builtins__": {}}, 
-                          {"force_normalized": normalized_force}
+                          {"force_normalized": force_normalized_values}
                            )
 
             df[f'Ib_rate_baseline_{muscle_name}'] = Ib_rate
