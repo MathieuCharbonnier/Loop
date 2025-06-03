@@ -277,7 +277,7 @@ class ReflexAnalyzer:
         print("Running threshold variation analysis...")
         for threshold in tqdm(threshold_values, desc="Varying threshold voltage"):
             bio_phys = BiologicalSystem.copy_brian_dict(self.original_system.biophysical_params)
-            bio_phys['v_threshold'] = threshold
+            bio_phys['threshold_v'] = threshold
             new_system = self.original_system.clone_with(biophysical_params=bio_phys)
            
             spikes, time_series = new_system.run_simulation(
