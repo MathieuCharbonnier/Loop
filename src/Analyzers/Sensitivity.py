@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from brian2 import *
 import pandas as pd
+import os
 from copy import deepcopy
 from itertools import product
 from typing import Dict, List, Tuple, Any, Optional, Callable
@@ -41,7 +42,7 @@ class Sensitivity:
         connection_variations : dict, optional
             Dictionary specifying variations in connection parameters
             Format: {connection_name: {param: [values_list]}}
-            Example: {'Ia_flexor_to_MN_flexor': {'w': [1.0*nS, 2.1*nS, 3.0*nS], 'p': 0.5}}
+            Example: {('Ia', 'MN'): {'w': [1.0*nS, 2.1*nS, 3.0*nS], 'p': 0.5}}
             
         neuron_count_variations : dict, optional
             Dictionary specifying variations in neuron population sizes
@@ -174,7 +175,7 @@ class Sensitivity:
                     #continue
         
         return pd.DataFrame(results_list)
-    def analyze_connection_sensitivity(self, variations: Dict, n_iterations: int,
+    def _analyze_connection_sensitivity(self, variations: Dict, n_iterations: int,
                                       time_step: float, ees_params: Optional[Dict],
                                       torque_profile: Optional[Dict], seed: int,
                                       metrics: List[str]) -> pd.DataFrame:
@@ -219,13 +220,11 @@ class Sensitivity:
                         # Store simulation data
                         if 'connection' not in self.simulation_data:
                             self.simulation_data['connection'] = {}
-                        connection_key = f"{connection_tuple[0]}_to_{connection_tuple[1]}"
+                        connection_key = f"{param_name}_{connection_tuple[0]}_to_{connection_tuple[1]}"
                         if connection_key not in self.simulation_data['connection']:
                             self.simulation_data['connection'][connection_key] = {}
-                        if param_name not in self.simulation_data['connection'][connection_key]:
-                            self.simulation_data['connection'][connection_key][param_name] = {}
                         
-                        self.simulation_data['connection'][connection_key][param_name][float(value) if hasattr(value, 'magnitude') else value] = {
+                        self.simulation_data['connection'][connection_key][float(value)] = {
                             'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                             'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
                             'Time': time_series['Time']
@@ -322,7 +321,7 @@ class Sensitivity:
             elif metric == 'joint_velocity_l2':
                 # Calculate joint velocity from angle and time
                 if len(joint_velocity) > 1:
-                    metric_values[metric] = np.linalg.norm(joint_velocity)
+                    metric_values[metric] =  np.sqrt(np.mean(joint_velocity**2))
                 else:
                     metric_values[metric] = 0.0
                 
@@ -330,7 +329,7 @@ class Sensitivity:
                 # Calculate joint acceleration from velocity
                 if len(joint_velocity) > 2:
                     acceleration = np.gradient(joint_velocity, time_data)
-                    metric_values[metric] = np.linalg.norm(acceleration)
+                    metric_values[metric] = np.sqrt(np.mean(acceleration)**2)
                 else:
                     metric_values[metric] = 0.0
                 
@@ -364,29 +363,26 @@ class Sensitivity:
         for i, (param_value, simulation_results) in enumerate(data.items()):
             if i < len(axs):
                 ax = axs[i]
-                ax.plot(simulation_results['Time'], simulation_results['Joint'], 
-                       label=f"{param_name}: {param_value}", linewidth=2)
-                ax.set_title(f"{param_name} = {param_value}")
+                formatted_value = f"${param_value:.2e}$"
+                ax.plot(simulation_results['Time'], simulation_results['Joint'])
+                ax.set_title(f"{param_name} = {formatted_value}")
                 ax.set_xlabel("Time (s)")
                 ax.set_ylabel("Joint Angle")
-                ax.grid(True, alpha=0.3)
-                ax.legend()
+              
         
         # Hide unused subplots
         for i in range(len(data), len(axs)):
             axs[i].set_visible(False)
         
-        fig.suptitle(f'Joint Angle Analysis - {param_name}', fontsize=14, fontweight='bold')
+        fig.suptitle(f'Joint Angle Analysis - {param_name}')
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         
         # Save figure
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'{param_name}_Joint_Angle_{timestamp}.png'
+        filename = f'{param_name}_Joint_Angle.png'
         fig_path = self._get_save_path(save_path, filename)
         fig.savefig(fig_path, dpi=300, bbox_inches='tight')
         plt.show()
         
-        return fig_path
     
     
     def _plot_raster(self, param_name: str, param_type: str, save_path: Optional[str] = None):
@@ -424,16 +420,15 @@ class Sensitivity:
                         if neuron_spikes:  # Only plot if there are spikes
                             spike_times = np.array(neuron_spikes)
                             neuron_positions = np.ones_like(spike_times) * (int(neuron_id) + neuron_offset)
-                            ax.scatter(spike_times, neuron_positions, s=15, c=color, 
-                                     marker='|', alpha=0.8, label=muscle_name if int(neuron_id) == 0 else "")
+                            ax.scatter(spike_times, neuron_positions, '.', c=color, markersize=3)
                     
                     # Update offset for next muscle
                     if spikes_muscle:
                         neuron_offset += len(spikes_muscle)
                 
-                ax.set_title(f"{param_name} = {param_value}")
+                formatted_value = f"${param_value:.2e}$"
+                ax.set_title(f"{param_name} = {formatted_value}")
                 ax.set_ylabel("Neuron Index")
-                ax.grid(True, alpha=0.3)
                 
                 # Add legend only for the first subplot to avoid clutter
                 if i == 0:
@@ -450,17 +445,15 @@ class Sensitivity:
             if axs[i].get_visible():
                 axs[i].set_xlabel("Time (s)")
         
-        fig.suptitle(f'Spikes Raster Plot - {param_name}', fontsize=14, fontweight='bold')
+        fig.suptitle(f'Spikes Raster Plot - {param_name}')
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         
         # Save figure
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'{param_name}_Raster_Plot_{timestamp}.png'
+        filename = f'{param_name}_Raster_Plot.png'
         fig_path = self._get_save_path(save_path, filename)
         fig.savefig(fig_path, dpi=300, bbox_inches='tight')
         plt.show()
         
-        return fig_path
     
     
     def _plot_frequency_spectrum(self, param_name: str, param_type: str, save_path: Optional[str] = None):
@@ -504,9 +497,9 @@ class Sensitivity:
                     
                     # Plot frequency spectrum
                     ax.loglog(freqs, magnitudes, linewidth=2)  # Log-log plot for better visualization
-                    ax.set_title(f"{param_name} = {param_value}")
+                    formatted_value = f"${param_value:.2e}$"
+                    ax.set_title(f"{param_name} = {formatted_value}")
                     ax.set_ylabel("Amplitude")
-                    ax.grid(True, alpha=0.3)
                 else:
                     ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, 
                            ha='center', va='center')
@@ -520,18 +513,16 @@ class Sensitivity:
             if axs[i].get_visible():
                 axs[i].set_xlabel("Frequency (Hz)")
         
-        fig.suptitle(f'Frequency Spectrum - {param_name}', fontsize=14, fontweight='bold')
+        fig.suptitle(f'Frequency Spectrum - {param_name}')
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         
         # Save figure
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'{param_name}_Frequency_Spectrum_{timestamp}.png'
+        filename = f'{param_name}_Frequency_Spectrum.png'
         fig_path = self._get_save_path(save_path, filename)
         fig.savefig(fig_path, dpi=300, bbox_inches='tight')
         plt.show()
         
-        return fig_path
-    
+        
     
     def _get_save_path(self,save_path: Optional[str], filename: str) -> str:
         """Helper function to determine the save path for figures."""
@@ -540,7 +531,7 @@ class Sensitivity:
             return os.path.join(save_path, filename)
         else:
             os.makedirs("Sensitivity", exist_ok=True)
-            return os.path.join("Results", filename)
+            return os.path.join("Sensitivity", filename)
     
     
     def detailed_plot(self, save_path: Optional[str] = None) -> Dict[str, list]:
@@ -555,11 +546,10 @@ class Sensitivity:
         if not hasattr(self, 'simulation_data'):
             raise ValueError("No simulation data available. Run run() method first.")
         
-        
-        for param_type in ['biophysical', 'connections', 'neuron_counts']:
+        for param_type in ['biophysical', 'connection', 'neuron_counts']:
+           
             if param_type not in self.simulation_data:
-                continue
-                
+                continue 
             for param_name in self.simulation_data[param_type].keys():
                 print(f"Plotting {param_type} parameter: {param_name}")
               
