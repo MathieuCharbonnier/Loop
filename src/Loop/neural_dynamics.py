@@ -496,7 +496,7 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
             'gIa': MN.gIa[:],
             'gexc': MN.gexc[:],
             'ginhb': MN.ginhb[:],
-            'gi': MN.gi_[:]
+            'gi': MN.gi[:]
         },
         'exc': {
             'v': exc_neurons.v[:],
