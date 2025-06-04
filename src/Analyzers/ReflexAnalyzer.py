@@ -120,7 +120,7 @@ class ReflexAnalyzer:
             print(f"Saved {filename}")
           
     def run_delay(self, torque_profile=None, delay_values=None, 
-                  duration=1*second, time_step=0.1*ms, seed=41):
+                  duration=1*second, time_step=0.1*ms):
         """
         Analyze reflex behavior by varying delay parameter.
         
@@ -168,7 +168,6 @@ class ReflexAnalyzer:
                 time_step,
                 ees_stimulation_params=None,
                 torque_profile=torque_profile,
-                seed=seed, 
                 base_output_path=None
             )
             
@@ -177,7 +176,7 @@ class ReflexAnalyzer:
         return self.delay_results
                       
     def run_mu_type(self, torque_profile=None, duration=1*second, 
-                    time_step=0.1*ms, seed=41):
+                    time_step=0.1*ms):
         """
         Analyze reflex behavior by varying motor unit type (fast vs slow twitch).
         
@@ -223,7 +222,6 @@ class ReflexAnalyzer:
                 time_step,
                 ees_stimulation_params=None,
                 torque_profile=torque_profile,
-                seed=seed, 
                 base_output_path=None
             )
             
@@ -232,7 +230,7 @@ class ReflexAnalyzer:
         return self.fast_twitch_results
 
     def run_excitability(self, torque_profile=None, threshold_values=None, 
-                        duration=1*second, time_step=0.1*ms, seed=41):
+                        duration=1*second, time_step=0.1*ms):
         """
         Analyze reflex behavior by varying neuron excitability threshold.
         
@@ -282,8 +280,7 @@ class ReflexAnalyzer:
                 n_iterations, 
                 time_step,
                 ees_stimulation_params=None,
-                torque_profile=torque_profile,
-                seed=seed, 
+                torque_profile=torque_profile, 
                 base_output_path=None
             )
             
@@ -293,7 +290,7 @@ class ReflexAnalyzer:
 
     def run(self, torque_profile=None, delay_values=None, 
                                   threshold_values=None, duration=1*second, 
-                                  time_step=0.1*ms, seed=41, output_dir="reflex_analysis"):
+                                  time_step=0.1*ms, output_dir="reflex_analysis"):
         """
         Run all analysis methods and generate plots.
         
@@ -324,9 +321,9 @@ class ReflexAnalyzer:
         
         # Run all analyses and collect results
         results = {}
-        results['delay'] = self.run_delay(torque_profile, delay_values, duration, time_step, seed)
-        results['twitch'] = self.run_mu_type(torque_profile, duration, time_step, seed)
-        results['threshold'] = self.run_excitability(torque_profile, threshold_values, duration, time_step, seed)
+        results['delay'] = self.run_delay(torque_profile, delay_values, duration, time_step)
+        results['twitch'] = self.run_mu_type(torque_profile, duration, time_step)
+        results['threshold'] = self.run_excitability(torque_profile, threshold_values, duration, time_step)
         
         # Generate all plots using the unified plotting function
         print("Generating plots...")
