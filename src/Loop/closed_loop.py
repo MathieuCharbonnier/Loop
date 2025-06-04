@@ -473,15 +473,15 @@ def get_sto_file(time_step, total_time, muscles_names, associated_joint,activati
         on_colab = is_running_on_colab()
         simulator = CoLabSimulator() if on_colab else LocalSimulator()
       
-        # Run final simulation for visualization
-        fiber_lengths,normalized_force, joint=simulator.run_muscle_simulation(
+       # Run final simulation for visualization
+        fiber_lengths, force_normalized, joint=simulator.run_muscle_simulation(
                 time_step,
                 total_time,
                 muscles_names,
                 associated_joint,
                 activations_all,
                 torque_array,
-                sto_path
+                sto_path=sto_path
             )
 
     
@@ -535,7 +535,7 @@ class CoLabSimulator(SimulatorBase):
 
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
-                              activation, torque=None, initial_state=None):
+                              activation, torque=None, initial_state=None, sto_path=None):
         """Run a single muscle simulation iteration using conda subprocess"""
         
         # Save activation to temp file
@@ -560,7 +560,8 @@ class CoLabSimulator(SimulatorBase):
         if torque is not None:
             np.save(self.input_torque_path, torque)
             cmd += ['--torque', self.input_torque_path]
-        
+        if sto_path is not None:
+            cmd += ['--output_all', sto_path]
         
         # Run OpenSim simulation
         process = subprocess.run(cmd, capture_output=True, text=True)
@@ -593,13 +594,13 @@ class LocalSimulator(SimulatorBase):
         return self.current_state   
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
-                              activation, torque):
+                              activation, torque, sto_path=None):
         """Run a single muscle simulation iteration using direct function call with in-memory state"""
         from muscle_sim import run_simulation
         # Run simulation directly with in-memory state
         fiber_lengths,normalized_force, joint, new_state = run_simulation(
             dt, T, muscle_names, joint_name, activation,
-            self.current_state
+            state_storage=self.current_state, output_all=sto_path
         )
         # Update in-memory state
         self.current_state = new_state
@@ -614,3 +615,4 @@ def is_running_on_colab():
         return True
     except ImportError:
         return False
+
