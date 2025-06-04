@@ -139,8 +139,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         freq = ees_params['frequency']
         if isinstance(freq, tuple):
            print("Phase specific EES modulation")
-           print(f"frequency swing phase: {freq[0]}")
-           print(f"frequency stance phase: {freq[1]}")
+           print(f"frequency dorsiflexion phase: {freq[0]}")
+           print(f"frequency plantarflexion phase: {freq[1]}")
         else:
             print(f"EES frequency: {freq}")
 
