@@ -13,7 +13,7 @@ import warnings
 
 
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
-
+from ..helpers.copy_brian_dict import copy_brian_dict
 
 class EESAnalyzer:
     """
@@ -233,7 +233,7 @@ class EESAnalyzer:
         for i, value in enumerate(tqdm(param_values, desc=f"Analyzing {param_label}")):
             print(f"  Computing {param_label} = {value} ({i+1}/{len(param_values)})")
             
-            current_params = self.original_system.copy_brian_dict(param_dict)
+            current_params = copy_brian_dict(param_dict)
    
             
             # Update the parameter we're varying
