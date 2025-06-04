@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Any, Optional, Callable
 import matplotlib.pyplot as plt
 
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
-
+from ..helpers.copy_brian_dict import copy_brian_dict
 
 class ReflexAnalyzer:
     """
@@ -272,7 +272,7 @@ class ReflexAnalyzer:
                         
         print("Running threshold variation analysis...")
         for threshold in tqdm(threshold_values, desc="Varying threshold voltage"):
-            bio_phys = BiologicalSystem.copy_brian_dict(self.original_system.biophysical_params)
+            bio_phys = copy_brian_dict(self.original_system.biophysical_params)
             bio_phys['threshold_v'] = threshold
             new_system = self.original_system.clone_with(biophysical_params=bio_phys)
            
