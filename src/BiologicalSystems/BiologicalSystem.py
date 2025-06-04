@@ -206,8 +206,8 @@ class BiologicalSystem(ABC):
     def get_sto_file(self,base_output_path):
 
         return get_sto_file(self.time_series.loc[1,"Time"]-self.time_series.loc[0,"Time"],
-            self.time_series.loc[-1, 'Time'], self.muscles_names, self.associated_joint,
-             np.array([self.time_series[f'activation_{muscle_name}'] for muscle_name in self.muscles_names]), 
+            self.time_series.iloc[-1]['Time'], self.muscles_names, self.associated_joint,
+             np.array([self.time_series[f'Activation_{muscle_name}'] for muscle_name in self.muscles_names]), 
              self.torque_array, base_output_path)
 
     def plot(self, base_output_path=None, ees_stimulation_params=None):
@@ -321,6 +321,7 @@ class BiologicalSystem(ABC):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f'Raster_Plot_{timestamp}.png'
         if base_output_path:
+            os.makedirs(base_output_path, exist_ok=True)
             fig_path = os.path.join(base_output_path, filename)
         else:
             os.makedirs("Results", exist_ok=True)
@@ -395,6 +396,7 @@ class BiologicalSystem(ABC):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f'Neurons_Dynamics_{timestamp}.png'
         if base_output_path:
+            os.makedirs(base_output_path, exist_ok=True)
             fig_path = os.path.join(base_output_path, filename)
         else:
             os.makedirs("Results", exist_ok=True)
@@ -440,6 +442,7 @@ class BiologicalSystem(ABC):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f'Activation_{timestamp}.png'
         if base_output_path:
+            os.makedirs(base_output_path, exist_ok=True)
             fig_path = os.path.join(base_output_path, filename)
         else:
             os.makedirs("Results", exist_ok=True)
@@ -469,6 +472,7 @@ class BiologicalSystem(ABC):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f'{filename}_{timestamp}.png'
             if base_output_path:
+                os.makedirs(base_output_path, exist_ok=True)
                 fig_path = os.path.join(base_output_path, filename)
             else:
                 os.makedirs("Results", exist_ok=True)
