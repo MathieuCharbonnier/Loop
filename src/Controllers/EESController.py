@@ -7,7 +7,7 @@ from copy import deepcopy
 import os
 from scipy.interpolate import interp1d
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
-
+from ..helpers.copy_brain_dict import copy_brian_dict
 class EESController:
     """
     Model Predictive Controller for EES parameters to achieve desired joint trajectories.
