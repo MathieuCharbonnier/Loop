@@ -184,10 +184,6 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
         result["MN"] = process_motoneuron_spikes(
             neuron_pop, result["MN"], ees_spikes, T_refr)
     
-    # Count spiking neurons for reporting
-    MN_spikes = result["MN"]
-    recruited_MN = sum(1 for spikes in MN_spikes.values() if len(spikes) > 0)
-    print(f"Number of recruited motoneuron: {recruited_MN}/{n_MN}")
     
     # Store state monitors for plotting
     state_monitors = [{
@@ -523,10 +519,6 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
         result["MN"] = process_motoneuron_spikes(
             neuron_pop, result["MN"], ees_spikes, T_refr)
     
-    # Count spiking neurons for reporting
-    MN_spikes = result["MN"]
-    recruited_MN = sum(1 for spikes in MN_spikes.values() if len(spikes) > 0)
-    print(f"Number of recruited motoneuron: {recruited_MN}/{n_MN}")
     
     # Store state monitors for plotting
     state_monitors = [{
@@ -788,10 +780,6 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
             neuron_pop, result['MN'], ees_spikes, T_refr
         )
 
-    # Count how many motoneurons were recruited
-    MN_spikes = result['MN']
-    recruited_MN = sum(1 for spikes in MN_spikes.values() if len(spikes) > 0)
-    print(f"Number of recruited motoneurons: {recruited_MN}/{n_MN}")
 
     # Prepare state monitor output for plotting
     state_monitors = [{
@@ -1103,11 +1091,6 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
                 T_refr
             )
 
-    # Count spiking neurons
-    recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
-    print(f"Number of flexor recruited motoneuron: {recruited_MN_flexor}/{n_MN_flexor}")
-    recruited_MN_extensor = sum(1 for spikes in MN_extensor_spikes.values() if len(spikes) > 0)
-    print(f"Number of extensor recruited motoneuron: {recruited_MN_extensor}/{n_MN_extensor}")
 
     # Save neuron states
     final_state_neurons = {
@@ -1498,11 +1481,6 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
                 T_refr
             )
 
-    # Count spiking neurons
-    recruited_MN_flexor = sum(1 for spikes in MN_flexor_spikes.values() if len(spikes) > 0)
-    print(f"Number of flexor recruited motoneurons: {recruited_MN_flexor}/{n_MN_flexor}")
-    recruited_MN_extensor = sum(1 for spikes in MN_extensor_spikes.values() if len(spikes) > 0)
-    print(f"Number of extensor recruited motoneurons: {recruited_MN_extensor}/{n_MN_extensor}")
 
     # Store the final state to continue the simulation
     final_state_neurons = {
