@@ -11,7 +11,7 @@ import warnings
 import matplotlib.pyplot as plt
 
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
-from ..helpers.copy_brian_dict import copy_brian_dict
+
 
 class Sensitivity:
   
@@ -131,7 +131,7 @@ class Sensitivity:
             for value in values_list:
                 #try:
                     # Create modified biophysical parameters
-                    modified_params = copy_brian_dict(self.biological_system.biophysical_params)
+                    modified_params = BiologicalSystem.copy_brian_dict(self.biological_system.biophysical_params)
                     modified_params[param_name] = value
                     
                     # Run simulation with modified parameters
@@ -153,6 +153,7 @@ class Sensitivity:
                             'parameter_type': 'biophysical',
                             'parameter_name': param_name,
                             'parameter_value': float(value),
+                            'original_value': value,
                             **metric_values
                         }
                     results_list.append(result_row)
@@ -166,7 +167,8 @@ class Sensitivity:
                     self.simulation_data['biophysical'][param_name][key] = {
                       'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                       'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
-                      'Time': time_series['Time']
+                      'Time': time_series['Time'],
+                      'original_value': value
                     }   
                 #except Exception as e:
                     #warnings.warn(f"Simulation failed for {param_name} = {value}: {e}")
@@ -195,7 +197,7 @@ class Sensitivity:
                 for value in values_list:
                     #try:
                         # Create modified connections
-                        modified_connections = copy_brian_dict(self.biological_system.connections)
+                        modified_connections = BiologicalSystem.copy_brian_dict(self.biological_system.connections)
                         modified_connections[connection_tuple][param_name] = value
                         
                         # Run simulation with modified system
@@ -212,6 +214,7 @@ class Sensitivity:
                             'connection': f"{connection_tuple[0]}_to_{connection_tuple[1]}",
                             'parameter_name': param_name,
                             'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
+                            'original_value': value,
                             **metric_values
                         })
                         
@@ -225,7 +228,8 @@ class Sensitivity:
                         self.simulation_data['connection'][connection_key][float(value)] = {
                             'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                             'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
-                            'Time': time_series['Time']
+                            'Time': time_series['Time'],
+                            'original_value': value
                         }
                         
                     #except Exception as e:
@@ -246,7 +250,7 @@ class Sensitivity:
             for count in count_list:
                 #try:
                     # Create modified neuron populations
-                    modified_populations = copy_brian_dict(self.biological_system.neurons_population)
+                    modified_populations = BiologicalSystem.copy_brian_dict(self.biological_system.neurons_population)
                     modified_populations[population_name] = count
                     
                     modified_system = self.biological_system.clone_with(
@@ -265,8 +269,8 @@ class Sensitivity:
                     result_row = {
                         'parameter_type': 'neuron_count',
                         'parameter_name': population_name,
-                        'neuron_count': count,
                         'parameter_value': count,
+                        'original_value': count,
                         **metric_values
                     }
                     results_list.append(result_row)
@@ -280,6 +284,7 @@ class Sensitivity:
                       'Spikes': {muscle_name: spikes[muscle_name]['MN'] for muscle_name in self.biological_system.muscles_names},
                       'Time': time_series['Time'],
                       'Joint': time_series[f'Joint_{self.biological_system.associated_joint}'],
+                      'original_value': count
                     }   
                 #except Exception as e:
                 #    warnings.warn(f"Simulation failed for {population_name} count = {count}: {e}")
@@ -361,7 +366,14 @@ class Sensitivity:
         for i, (param_value, simulation_results) in enumerate(data.items()):
             if i < len(axs):
                 ax = axs[i]
-                formatted_value = f"${param_value:.2e}$"
+                #formatted_value = f"${param_value:.2e}$"
+                formatted_value=simulation_results['original_value']
+                #if isinstance(original_value, Quantity):
+                #    unit = original_value.get_best_unit()
+                #    formatted_value = round(float(original_value / unit), 1) * unit
+                #else:
+                #    formatted_value = round(original_value, 1)
+     
                 ax.plot(simulation_results['Time'], simulation_results['Joint'])
                 ax.set_title(f"{param_name} = {formatted_value}")
                 ax.set_xlabel("Time (s)")
@@ -409,30 +421,39 @@ class Sensitivity:
             if i < len(axs):
                 ax = axs[i]
                 neuron_offset = 0
-                
+            
                 # Plot spikes for each muscle
                 for muscle_idx, (muscle_name, spikes_muscle) in enumerate(simulation_results['Spikes'].items()):
                     color = colors[muscle_idx % len(colors)]
-                    
+                  
                     for neuron_id, neuron_spikes in spikes_muscle.items():
                         if neuron_spikes:  # Only plot if there are spikes
                             spike_times = np.array(neuron_spikes)
                             neuron_positions = np.ones_like(spike_times) * (int(neuron_id) + neuron_offset)
-                            ax.scatter(spike_times, neuron_positions, marker='.', c=color, s=9)
+                            ax.scatter(spike_times, neuron_positions, label=muscle_name, marker='.', c=color, s=9)
                     
                     # Update offset for next muscle
                     if spikes_muscle:
                         neuron_offset += len(spikes_muscle)
-                
-                formatted_value = f"${param_value:.2e}$"
+
+                formatted_value=simulation_results['original_value']
+                #if isinstance(original_value, Quantity):
+                #    unit = original_value.get_best_unit()
+                #    formatted_value = round(float(original_value / unit), 1) * unit
+                #else:
+                #    formatted_value = round(original_value, 1)
+
+                #formatted_value = f"${param_value:.2e}$"
                 ax.set_title(f"{param_name} = {formatted_value}")
                 ax.set_ylabel("Neuron Index")
+                ax.set_xlim([simulation_results['Time'].iloc[0], simulation_results['Time'].iloc[-1]])
+                ax.set_ylim([-0.5, neuron_offset + 0.5])
                 
                 # Add legend only for the first subplot to avoid clutter
-                if i == 0:
-                    handles, labels = ax.get_legend_handles_labels()
-                    by_label = dict(zip(labels, handles))  # Remove duplicate labels
-                    ax.legend(by_label.values(), by_label.keys(), loc='upper right')
+                #if i == 0:
+                #    handles, labels = ax.get_legend_handles_labels()
+                #    by_label = dict(zip(labels, handles))  # Remove duplicate labels
+                #    ax.legend(by_label.values(), by_label.keys(), loc='upper right')
         
         # Hide unused subplots
         for i in range(len(data), len(axs)):
@@ -452,76 +473,8 @@ class Sensitivity:
         fig.savefig(fig_path, dpi=300, bbox_inches='tight')
         plt.show()
         
-    
-    
-    def _plot_frequency_spectrum(self, param_name: str, param_type: str, save_path: Optional[str] = None):
-        """Plot frequency spectrum for all parameter variations."""
-        
-        data = self.simulation_data[param_type][param_name]
-        n_plots = len(data)
-        
-        # Calculate subplot layout
-        n_cols = min(3, n_plots)
-        n_rows = (n_plots + n_cols - 1) // n_cols
-        
-        fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 4), 
-                               sharex=True, sharey=True)
-        
-        # Handle case where there's only one subplot
-        if n_plots == 1:
-            axs = [axs]
-        elif n_rows == 1:
-            axs = axs if isinstance(axs, (list, np.ndarray)) else [axs]
-        else:
-            axs = axs.flatten()
-        
-        for i, (param_value, simulation_results) in enumerate(data.items()):
-            if i < len(axs):
-                ax = axs[i]
-                joint = simulation_results['Joint']
-                time = simulation_results['Time']
-                
-                # Calculate sampling rate and perform FFT
-                if len(time) > 1:
-                    dt = float(time.iloc[1] - time.iloc[0])  # Ensure float conversion
-                    n = len(joint)
-                    freqs = np.fft.fftfreq(n, d=dt)
-                    fft_values = np.fft.fft(joint)
-                    
-                    # Keep only positive frequencies
-                    pos_mask = freqs > 0
-                    freqs = freqs[pos_mask]
-                    magnitudes = np.abs(fft_values[pos_mask])
-                    
-                    # Plot frequency spectrum
-                    ax.loglog(freqs, magnitudes, linewidth=2)  # Log-log plot for better visualization
-                    formatted_value = f"${param_value:.2e}$"
-                    ax.set_title(f"{param_name} = {formatted_value}")
-                    ax.set_ylabel("Amplitude")
-                else:
-                    ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, 
-                           ha='center', va='center')
-        
-        # Hide unused subplots
-        for i in range(len(data), len(axs)):
-            axs[i].set_visible(False)
-        
-        # Set common x-label for bottom row
-        for i in range(max(0, len(axs) - n_cols), len(axs)):
-            if axs[i].get_visible():
-                axs[i].set_xlabel("Frequency (Hz)")
-        
-        fig.suptitle(f'Frequency Spectrum - {param_name}')
-        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-        
-        # Save figure
-        filename = f'{param_name}_Frequency_Spectrum.png'
-        fig_path = self._get_save_path(save_path, filename)
-        fig.savefig(fig_path, dpi=300, bbox_inches='tight')
-        plt.show()
         
         
-    
     def _get_save_path(self,save_path: Optional[str], filename: str) -> str:
         """Helper function to determine the save path for figures."""
         if save_path:
@@ -556,9 +509,6 @@ class Sensitivity:
                   
                 # Plot raster plots
                 self._plot_raster(param_name, param_type, save_path)
-         
-                # Plot frequency spectra
-                self._plot_frequency_spectrum(param_name, param_type, save_path)
                     
     
     def _get_parameter_variations(self, param_name: str, param_value: Any, param_type: str) -> List[Any]:
@@ -587,8 +537,8 @@ class Sensitivity:
         voltage_variations = {
             'Eleaky': [-80, -76, -72, -68, -64, -60],  # Typical resting potentials
             'E_ex': [-10, -6, -2, 2, 6, 10],          # Excitatory reversal potentials
-            'E_inh': [-85, -80, -75, -70, -65],   # Inhibitory reversal potentials  
-            'threshold_v': [ -55,-53,-51,-49,-47 -45]  # Action potential thresholds
+            'E_inh': [-90, -85, -80, -75, -70, -65],   # Inhibitory reversal potentials  
+            'threshold_v': [ -55,-53,-51,-49,-47, -45]  # Action potential thresholds
         }
         
         variations = []
@@ -606,8 +556,9 @@ class Sensitivity:
                 # For other biophysical parameters (conductances, capacitances, time constants), use multiplicative factors
                 for factor in multiplicative_factors:
                     if hasattr(param_value, 'magnitude'):  # Brian2 quantity
-                        new_val = param_value.magnitude * factor
-                        variations.append(new_val * param_value.dim)
+                        unit=param_value.get_best_unit()
+                        new_val =round( param_value/unit * factor, 1)*unit
+                        variations.append(new_val * param_valu)
                     else:
                         variations.append(param_value * factor)
         
@@ -632,8 +583,9 @@ class Sensitivity:
                 # For weight parameters, use multiplicative factors
                 for factor in multiplicative_factors:
                     if hasattr(param_value, 'magnitude'):  # Brian2 quantity
-                        new_val = param_value.magnitude * factor
-                        variations.append(new_val * param_value.dim)
+                         unit=param_value.get_best_unit()
+                        new_val =round( param_value/unit * factor, 1)*unit
+                        variations.append(new_val * param_valu)
                     else:
                         variations.append(param_value * factor)
         
@@ -753,9 +705,9 @@ class Sensitivity:
                 if metric not in param_data.columns:
                     continue
                     
-                metric_values = param_data[metric].dropna()
-                param_values = param_data['parameter_value'].dropna()
-                
+                metric_values = param_data[metric]
+                param_values = param_data['parameter_value']
+
                 if len(metric_values) > 1 and len(param_values) > 1:
                     sensitivity = self._calculate_sensitivity_coefficient(
                         baseline_metrics[metric], metric_values,
@@ -857,12 +809,12 @@ class Sensitivity:
                     if metric in param_data.columns:
                         # Sort by parameter value for smooth plotting
                         param_data_sorted = param_data.sort_values('parameter_value')
-                        
-                        ax.plot(param_data_sorted['parameter_value'], 
+                        unit=param_data_sorted['original_value'].iloc[0].get_best_unit()
+                        ax.plot(param_data_sorted['original_value']/unit, 
                                param_data_sorted[metric], 
                                'o-', linewidth=2, markersize=6, alpha=0.8)
                         
-                        ax.set_xlabel(param)
+                        ax.set_xlabel(f'{param} ({unit})')
                         ax.set_ylabel(metric_labels[metric])
                         ax.set_title(f'{metric_labels[metric]} vs {param}')
                         ax.grid(True, alpha=0.3)
@@ -944,10 +896,10 @@ class Sensitivity:
                                   f'{value:.2e}', ha='center', va='bottom',  rotation=90)
         
         # Add legend
-        legend_elements = [plt.Rectangle((0,0),1,1, facecolor='#1f77b4', alpha=0.7, label='Biophysical'),
-                          plt.Rectangle((0,0),1,1, facecolor='#ff7f0e', alpha=0.7, label='Connection'),
-                          plt.Rectangle((0,0),1,1, facecolor='#2ca02c', alpha=0.7, label='Neuron Population')]
-        fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.65, 0.5))
+        #legend_elements = [plt.Rectangle((0,0),1,1, facecolor='#1f77b4', alpha=0.7, label='Biophysical'),
+        #                  plt.Rectangle((0,0),1,1, facecolor='#ff7f0e', alpha=0.7, label='Connection'),
+        #                  plt.Rectangle((0,0),1,1, facecolor='#2ca02c', alpha=0.7, label='Neuron Population')]
+        #fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.65, 0.5))
         
         plt.suptitle('Global Parameter Impact Analysis - Top 15 Most Influential Parameters')
         plt.tight_layout(rect=[0, 0, 1, 0.93])  # Leave space at the top for suptitle
