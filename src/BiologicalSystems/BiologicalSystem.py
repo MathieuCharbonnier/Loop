@@ -34,7 +34,7 @@ class BiologicalSystem(ABC):
     def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names,
                  associated_joint, fast_type_mu, neurons_population, connections, spindle_model, 
                  initial_state_neurons, initial_condition_spike_activation, initial_state_opensim,
-                 activation_func, stretch_history_func=None):
+                 activation_func, stretch_history_func=None, seed=42):
         """
         Initialize the biological system with common parameters.
         
@@ -96,7 +96,9 @@ class BiologicalSystem(ABC):
         self.initial_condition_spike_activation = initial_condition_spike_activation
         self.activation_function = activation_func
         self.stretch_history_function=stretch_history_func
-
+                     
+        #To fix the connection probability
+        self.seed=seed
                      
         # Store the results:
         self.spikes = None
@@ -135,8 +137,8 @@ class BiologicalSystem(ABC):
 
 
     def run_simulation(self, n_iterations, time_step=0.1*ms, 
-                      ees_stimulation_params=None, torque_profile=None, 
-                      seed=42, base_output_path=None):
+                      ees_stimulation_params=None, torque_profile=None,
+                       base_output_path=None):
         """
         Run simulations and generate plots.
         
@@ -198,7 +200,7 @@ class BiologicalSystem(ABC):
             self.stretch_history_function,
             torque_array=self.torque_array, 
             ees_params=self.ees_params,
-            seed=seed, 
+            seed=self.seed, 
             base_output_path=base_output_path)
         
         return self.spikes, self.time_series
