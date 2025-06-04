@@ -296,7 +296,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 mean_u[muscle_idx] = np.mean(u, axis=0)
                 mean_c[muscle_idx] = np.mean(c, axis=0)
                 mean_P[muscle_idx] = np.mean(P, axis=0)
-                mean_activation[muscle_idx] = np.mean(activations_result, axis=0)
+                mean_activation[muscle_idx] = np.clip(np.mean(activations_result, axis=0), 0, 1)
 
                 # Update activation for next iteration
                 activation_history[muscle_idx] = mean_activation[muscle_idx]
