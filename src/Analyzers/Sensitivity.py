@@ -149,7 +149,7 @@ class Sensitivity:
                         
                     # Calculate metrics
                     metric_values = self._calculate_joint_metrics(time_series, metrics)
-                    print('metric_values ', metric_values)    
+                     
                     # Store results
                     result_row = {
                             'parameter_type': 'biophysical',
@@ -421,7 +421,7 @@ class Sensitivity:
                         if neuron_spikes:  # Only plot if there are spikes
                             spike_times = np.array(neuron_spikes)
                             neuron_positions = np.ones_like(spike_times) * (int(neuron_id) + neuron_offset)
-                            ax.scatter(spike_times, neuron_positions, '.', c=color, markersize=3)
+                            ax.scatter(spike_times, neuron_positions, marker='.', c=color, s=9)
                     
                     # Update offset for next muscle
                     if spikes_muscle:
@@ -584,18 +584,15 @@ class Sensitivity:
         """
         
         # Define the multiplicative factors for regular parameters
-        multiplicative_factors = [1/2, 1/np.sqrt(2), 10/11, 1, 11/10, np.sqrt(2), 2]
+        multiplicative_factors = [1/2, 1/np.sqrt(2), 10/11, 11/10, np.sqrt(2), 2]
         
         # Define explicit values for voltage potentials (in mV)
         voltage_variations = {
-            'Eleaky': [-80, -75, -70, -65, -60],  # Typical resting potentials
-            'E_ex': [-10, -5, 0, 5, 10],          # Excitatory reversal potentials
+            'Eleaky': [-80, -76, -72, -68, -64, -60],  # Typical resting potentials
+            'E_ex': [-10, -6, -2, 2, 6, 10],          # Excitatory reversal potentials
             'E_inh': [-85, -80, -75, -70, -65],   # Inhibitory reversal potentials  
-            'threshold_v': [-60, -55, -50, -45, -40]  # Action potential thresholds
+            'threshold_v': [ -55,-53,-51,-49,-47 -45]  # Action potential thresholds
         }
-        
-        # Define explicit values for probability parameters
-        probability_values = [0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95]
         
         variations = []
         
@@ -625,11 +622,11 @@ class Sensitivity:
                 
                 # Create variations around the original probability
                 if original_p >= 0.8:  # High probability connections
-                    variations = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
+                    variations = [0.7,0.75, 0.8, 0.85, 0.9, 0.95]
                 elif original_p >= 0.5:  # Medium probability connections  
-                    variations = [0.1, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9]
+                    variations = [0.45, 0.5, 0.55, 0.6, 0.65, 0.7]
                 else:  # Low probability connections
-                    variations = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+                    variations = [ 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]
                     
                 # Ensure we don't exceed probability bounds
                 variations = [p for p in variations if 0 < p <= 1]
@@ -657,11 +654,11 @@ class Sensitivity:
         return variations
 
     def global_sensitivity_analysis(self, 
-                              n_iterations: int = 10,
-                              time_step=0.1*ms,
-                              ees_stimulation_params: Optional[Dict] = None,
-                              torque_profile: Optional[Dict] = None,
-                              seed: int = 42) -> Dict[str, pd.DataFrame]:
+                          n_iterations: int = 10,
+                          time_step=0.1*ms,
+                          ees_stimulation_params: Optional[Dict] = None,
+                          torque_profile: Optional[Dict] = None,
+                          seed: int = 42) -> Dict[str, pd.DataFrame]:
         """
         Perform global normalized sensitivity analysis by varying all parameters.
         
@@ -689,39 +686,44 @@ class Sensitivity:
                 original_params[f"{conn_key}_{param_name}"] = param_value
         original_params.update(self.biological_system.neurons_population)
         
-        # 1. Analyze biophysical parameters
-        print("Analyzing biophysical parameter sensitivities...")
+        # Prepare variations for the run function
+        print("Preparing parameter variations...")
+        
+        # 1. Biophysical parameter variations
         biophysical_variations = {name: self._get_parameter_variations(name, value, 'biophysical')
                                 for name, value in self.biological_system.biophysical_params.items()}
-        bio_results = self._analyze_biophysical_sensitivity(
-            biophysical_variations, n_iterations, time_step,
-            ees_stimulation_params, torque_profile, seed, metrics
-        )
-           
-        # 2. Analyze connection parameters
-        print("Analyzing connection parameter sensitivities...")
+        
+        # 2. Connection parameter variations
         connection_variations = {}
         for connection_key, connection_params in self.biological_system.connections.items():
             connection_variations[connection_key] = {
                 param_name: self._get_parameter_variations(param_name, param_value, 'connection')
                 for param_name, param_value in connection_params.items()
             }
-        conn_results = self._analyze_connection_sensitivity(
-            connection_variations, n_iterations, time_step,
-            ees_stimulation_params, torque_profile, seed, metrics
-        )
-            
-        # 3. Analyze neuron populations
-        print("Analyzing neuron population sensitivities...")
+        
+        # 3. Neuron population variations
         neuron_variations = {name: self._get_parameter_variations(name, count, 'neuron_population')
-                           for name, count in self.biological_system.neurons_population.items()}
-        neuron_results = self._analyze_neuron_count_sensitivity(
-            neuron_variations, n_iterations, time_step,
-            ees_stimulation_params, torque_profile, seed, metrics
+                          for name, count in self.biological_system.neurons_population.items()}
+        
+        # Use the run function to get all sensitivity results
+        print("Running comprehensive sensitivity analysis...")
+        results = self.run(
+            biophysical_variations=biophysical_variations,
+            connection_variations=connection_variations,
+            neuron_count_variations=neuron_variations,
+            n_iterations=n_iterations,
+            time_step=time_step,
+            ees_stimulation_params=ees_stimulation_params,
+            torque_profile=torque_profile,
+            seed=seed
         )
-            
-        # Combine all results
-        all_results = pd.concat([bio_results, conn_results, neuron_results], ignore_index=True)
+        
+        # Combine all results from the run function
+        all_results = pd.concat([
+            results['biophysical'], 
+            results['connections'], 
+            results['neuron_counts']
+        ], ignore_index=True)
             
         # Calculate sensitivity coefficients
         sensitivities = []
@@ -775,15 +777,16 @@ class Sensitivity:
             metric_data = metric_data.sort_values('sensitivity_coefficient', ascending=False)
             top_parameters[metric] = metric_data.head(15)
         
-        results = {
+        final_results = {
             'all_sensitivities': sensitivity_df,
             'top_parameters': top_parameters,
-            'baseline_metrics': baseline_metrics
+            'baseline_metrics': baseline_metrics,
+            'detailed_results': results  # Include the detailed results from run function
         }
         
-        self.global_variance_results = results
-        return results
-    
+        self.global_variance_results = final_results
+        return final_results
+
     def _calculate_sensitivity_coefficient(self, baseline_metric, varied_results, 
                                          original_param, varied_params):
         """
@@ -794,7 +797,7 @@ class Sensitivity:
         for result, param_value in zip(varied_results, varied_params):
             if baseline_metric != 0 and original_param != 0:
                 output_change_pct = abs(result - baseline_metric) / abs(baseline_metric)
-                param_change_pct = abs(param_value - float(original_param)) / abs(float(original_param))
+                param_change_pct = abs(float(param_value) - float(original_param)) / abs(float(original_param))
                 
                 if param_change_pct > 0:
                     sensitivity = output_change_pct / param_change_pct
@@ -821,8 +824,8 @@ class Sensitivity:
         metric_labels = {
             'max_joint_angle': 'Max Joint Angle (degree)',
             'min_joint_angle': 'Min Joint Angle (degree)', 
-            'joint_velocity_l2': 'Joint Velocity L2 Norm (degree/s)',
-            'joint_acceleration_l2': 'Joint Acceleration L2 Norm (degree/s²)'
+            'joint_velocity_l2': 'RMS Joint Velocity  (degree/s)',
+            'joint_acceleration_l2': 'RMS Joint Acceleration (degree/s²)'
         }
         
         types_to_plot = (['biophysical', 'connections', 'neuron_counts'] 
@@ -856,7 +859,7 @@ class Sensitivity:
                                param_data_sorted[metric], 
                                'o-', linewidth=2, markersize=6, alpha=0.8)
                         
-                        ax.set_xlabel('Parameter Value')
+                        ax.set_xlabel(param)
                         ax.set_ylabel(metric_labels[metric])
                         ax.set_title(f'{metric_labels[metric]} vs {param}')
                         ax.grid(True, alpha=0.3)
@@ -875,7 +878,7 @@ class Sensitivity:
                 plt.show()
     
     
-    def plot_global_variance(self, save_path: Optional[str] = None):
+    def plot_global_sensitivity(self, save_path: Optional[str] = None):
         """
         Plot global variance analysis results as bar plots showing top 15 most impactful parameters.
         
@@ -891,17 +894,15 @@ class Sensitivity:
         top_parameters = self.global_variance_results['top_parameters']
         metrics = ['max_joint_angle', 'min_joint_angle', 'joint_velocity_l2', 'joint_acceleration_l2']
         metric_labels = {
-            'max_joint_angle': 'Max Joint Angle Variance',
-            'min_joint_angle': 'Min Joint Angle Variance', 
-            'joint_velocity_l2': 'Joint Velocity L2 Variance',
-            'joint_acceleration_l2': 'Joint Acceleration L2 Variance'
+            'max_joint_angle': 'Sensitivity Max Joint Angle',
+            'min_joint_angle': 'Sensitivity Min Joint Angle', 
+            'joint_velocity_l2': 'Sensitivity Joint Velocity ',
+            'joint_acceleration_l2': 'Sensitivity Joint Acceleration '
         }
         
         # Create subplots for each metric
         fig, axes = plt.subplots(2, 2, figsize=(20, 15))
         axes = axes.flatten()
-        
-        colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Different colors for parameter types
         
         for i, metric in enumerate(metrics):
             ax = axes[i]
@@ -910,17 +911,17 @@ class Sensitivity:
                 data = top_parameters[metric]
                 
                 if not data.empty:
-                    # Create colors based on parameter type
+                   
                     color_map = {'biophysical': '#1f77b4', 'connection': '#ff7f0e', 'neuron_population': '#2ca02c'}
-                    bar_colors = [color_map.get(ptype, '#gray') for ptype in data['parameter_type']]
+                    bar_colors = [color_map.get(ptype, '#808080') for ptype in data['parameter_type']]  # Changed '#gray' to '#808080'
                     
                     # Create bar plot
-                    bars = ax.bar(range(len(data)), data['variance'], color=bar_colors, alpha=0.7)
+                    bars = ax.bar(range(len(data)), data['sensitivity_coefficient'], color=bar_colors, alpha=0.7)
                     
                     # Customize plot
                     ax.set_xlabel('Parameters (Ranked by Impact)')
-                    ax.set_ylabel('Variance')
-                    ax.set_title(f'Top 15 Most Impactful Parameters\n{metric_labels[metric]}')
+                    ax.set_ylabel('Sensibility')
+                    ax.set_title(f'{metric_labels[metric]}')
                     
                     # Set x-tick labels (rotated for readability)
                     ax.set_xticks(range(len(data)))
@@ -934,20 +935,20 @@ class Sensitivity:
                     ax.spines['right'].set_visible(False)
                     
                     # Add value labels on bars
-                    for j, (bar, value) in enumerate(zip(bars, data['variance'])):
+                    for j, (bar, value) in enumerate(zip(bars, data['sensitivity_coefficient'])):
                         if not np.isnan(value):
-                            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(data['variance'])*0.01,
-                                   f'{value:.2e}', ha='center', va='bottom', fontsize=8, rotation=90)
+                            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(data['sensitivity_coefficient'])*0.01,
+                                  f'{value:.2e}', ha='center', va='bottom',  rotation=90)
         
         # Add legend
         legend_elements = [plt.Rectangle((0,0),1,1, facecolor='#1f77b4', alpha=0.7, label='Biophysical'),
                           plt.Rectangle((0,0),1,1, facecolor='#ff7f0e', alpha=0.7, label='Connection'),
                           plt.Rectangle((0,0),1,1, facecolor='#2ca02c', alpha=0.7, label='Neuron Population')]
-        fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.98, 0.98))
+        fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.65, 0.5))
         
-        plt.suptitle('Global Parameter Impact Analysis - Top 15 Most Influential Parameters', 
-                     fontsize=16, y=0.95)
-        plt.tight_layout()
+        plt.suptitle('Global Parameter Impact Analysis - Top 15 Most Influential Parameters')
+        plt.tight_layout(rect=[0, 0, 1, 0.93])  # Leave space at the top for suptitle
+
         
         if save_path:
             plt.savefig(f"{save_path}/global_variance_analysis.png", dpi=300, bbox_inches='tight')
