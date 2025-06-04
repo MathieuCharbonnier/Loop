@@ -212,7 +212,7 @@ class BiologicalSystem(ABC):
              np.array([self.time_series[f'Activation_{muscle_name}'] for muscle_name in self.muscles_names]), 
              self.torque_array, base_output_path)
 
-    def plot(self, base_output_path=None, ees_stimulation_params=None):
+    def plot(self, base_output_path=None, prefix=None):
         """
         Generate plots of simulation results.
         
@@ -227,10 +227,10 @@ class BiologicalSystem(ABC):
             raise ValueError("You should first launch a simulation!")
         
                 
-        self.plot_mouvement(base_output_path)
-        self.plot_neural_dynamic(base_output_path)
-        self.plot_raster(base_output_path)
-        self.plot_activation(base_output_path)
+        self.plot_mouvement(base_output_path, prefix)
+        self.plot_neural_dynamic(base_output_path, prefix)
+        self.plot_raster(base_output_path, prefix)
+        self.plot_activation(base_output_path, prefix)
         
 
     def plot_frequency_spectrum(self, col_name):
@@ -289,7 +289,7 @@ class BiologicalSystem(ABC):
         return np.mean(periods)
 
     
-    def plot_raster(self, base_output_path=None):
+    def plot_raster(self, base_output_path=None, prefix=None):
         """
         Plot raster plot of spikes for different neuron types and muscles.
         
@@ -321,7 +321,10 @@ class BiologicalSystem(ABC):
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'Raster_Plot_{timestamp}.png'
+        if prefix is not None:
+            filename = f'{prefix}_Raster_Plot_{timestamp}.png'
+        else:
+            filename = f'Raster_Plot_{timestamp}.png'
         if base_output_path:
             os.makedirs(base_output_path, exist_ok=True)
             fig_path = os.path.join(base_output_path, filename)
@@ -332,7 +335,7 @@ class BiologicalSystem(ABC):
         plt.show()
     
     
-    def plot_neural_dynamic(self, base_output_path=None):
+    def plot_neural_dynamic(self, base_output_path=None, prefix=None):
         """
         Plot neural dynamics from a combined dataframe.
     
@@ -396,7 +399,10 @@ class BiologicalSystem(ABC):
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'Neurons_Dynamics_{timestamp}.png'
+        if prefix is not None:
+            filename = f'{prefix}Neurons_Dynamics_{timestamp}.png'
+        else:
+            filename = f'Neurons_Dynamics_{timestamp}.png'
         if base_output_path:
             os.makedirs(base_output_path, exist_ok=True)
             fig_path = os.path.join(base_output_path, filename)
@@ -407,7 +413,7 @@ class BiologicalSystem(ABC):
         plt.show()
     
     
-    def plot_activation(self, base_output_path=None):
+    def plot_activation(self, base_output_path=None, prefix=None):
         """
         Plot activation dynamics from a combined dataframe.
         
@@ -442,7 +448,10 @@ class BiologicalSystem(ABC):
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'Activation_{timestamp}.png'
+        if prefix is not None:
+            filename = f'{prefix}_Activation_{timestamp}.png'
+        else:
+            filename = f'Activation_{timestamp}.png'
         if base_output_path:
             os.makedirs(base_output_path, exist_ok=True)
             fig_path = os.path.join(base_output_path, filename)
@@ -453,7 +462,7 @@ class BiologicalSystem(ABC):
         plt.show()
     
     
-    def plot_mouvement(self, base_output_path=None):
+    def plot_mouvement(self, base_output_path=None, prefix=None):
         """
         Plot joint and muscle dynamics from dataframe.
     
@@ -469,10 +478,14 @@ class BiologicalSystem(ABC):
         muscle_names = self.muscles_names
         joint_name = self.associated_joint
         
-        def save_figure(fig, filename):
+        def save_figure(fig, filename, prefix):
             """Helper to save figures."""
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f'{filename}_{timestamp}.png'
+            if prefix is not None:
+                filename = f'{prefix}_{filename}_{timestamp}.png'
+            else:
+                filename = f'{filename}_{timestamp}.png'
+                
             if base_output_path:
                 os.makedirs(base_output_path, exist_ok=True)
                 fig_path = os.path.join(base_output_path, filename)
@@ -509,7 +522,8 @@ class BiologicalSystem(ABC):
     
         fig_joint.suptitle("Joint Dynamics")
         fig_joint.tight_layout(rect=[0, 0.03, 1, 0.95])
-        save_figure(fig_joint, f'Joint_{joint_name}')
+            
+        save_figure(fig_joint, f'Joint_{joint_name}', prefix)
     
         # ---------- MUSCLE DYNAMICS PLOT ----------
         props = ['Fiber_length', 'Stretch', 'Stretch_Velocity', 'Force']
