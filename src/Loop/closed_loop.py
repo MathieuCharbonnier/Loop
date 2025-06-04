@@ -13,7 +13,7 @@ from scipy.interpolate import interp1d
 
 from .neural_dynamics import run_monosynaptic_simulation, run_disynaptic_simulation, run_disynaptic_simulation_with_ib, run_flexor_extensor_neuron_simulation, run_spinal_circuit_with_Ib
 from .activation import decode_spikes_to_activation
-
+from ..BiologicalSystem import copy_brian_dict
 
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
@@ -238,12 +238,18 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             ees_params_copy = None
         
             if ees_params is not None:
-                ees_params_copy = ees_params.copy()
-        
                 freq = ees_params.get("frequency")
                 if isinstance(freq, tuple) and len(freq) == 2:
-                    dominant = 0 if np.mean(activation_history[0]) >= np.mean(activation_history[1]) else 1
-                    ees_params_copy["frequency"] = freq[dominant]
+                    ees_params_copy = copy_brian_dict(ees_params)
+                    mean_0 = np.mean(activation_history[0])
+                    mean_1 = np.mean(activation_history[1])
+                    
+                    if np.isclose(mean_0, mean_1, atol=1e-2):  
+                        ees_params_copy["frequency"] = (freq[0] + freq[1]) / 2
+                    else:
+                        dominant = 0 if mean_0 >= mean_1 else 1
+                        ees_params_copy["frequency"] = freq[dominant]
+
                   
             if "Ib" in neurons_population:
                 all_spikes, final_state_neurons, state_monitors = run_spinal_circuit_with_Ib(
