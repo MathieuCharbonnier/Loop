@@ -13,7 +13,7 @@ from scipy.interpolate import interp1d
 
 from .neural_dynamics import run_monosynaptic_simulation, run_disynaptic_simulation, run_disynaptic_simulation_with_ib, run_flexor_extensor_neuron_simulation, run_spinal_circuit_with_Ib
 from .activation import decode_spikes_to_activation
-from ..BiologicalSystem import copy_brian_dict
+from ..helpers.copy_brian_dict import copy_brian_dict
 
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
