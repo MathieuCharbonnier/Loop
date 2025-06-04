@@ -456,7 +456,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         print(f"Saved combined data to {csv_path}")
 
         get_sto_file(time_step/second,reaction_time/second*n_iterations,
-          muscles_names,associated_joint, torque_array,base_output_path, )
+          muscles_names, associated_joint, activations_all, torque_array, base_output_path )
 
     return spike_data, combined_df, final_state
 
