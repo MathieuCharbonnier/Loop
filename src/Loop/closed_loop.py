@@ -474,7 +474,7 @@ def get_sto_file(time_step, total_time, muscles_names, associated_joint,activati
         simulator = CoLabSimulator() if on_colab else LocalSimulator()
       
         # Run final simulation for visualization
-        fiber_lengths, joint=simulator.run_muscle_simulation(
+        fiber_lengths,normalized_force, joint=simulator.run_muscle_simulation(
                 time_step,
                 total_time,
                 muscles_names,
