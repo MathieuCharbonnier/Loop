@@ -27,7 +27,6 @@ class Sensitivity:
             time_step=0.1*ms,
             ees_stimulation_params: Optional[Dict] = None,
             torque_profile: Optional[Dict] = None,
-            seed: int = 42,
             base_output_path: Optional[str] = None) -> Dict[str, pd.DataFrame]:
         """
         Perform comprehensive sensitivity analysis on the biological system.
@@ -91,7 +90,7 @@ class Sensitivity:
             print("Analyzing biophysical parameter sensitivity...")
             bio_results = self._analyze_biophysical_sensitivity(
                 biophysical_variations, n_iterations, time_step, 
-                ees_stimulation_params, torque_profile, seed, metrics)
+                ees_stimulation_params, torque_profile, metrics)
             results['biophysical'] = bio_results
             
         # 2. Connection parameter sensitivity
@@ -99,7 +98,7 @@ class Sensitivity:
             print("Analyzing connection parameter sensitivity...")
             conn_results = self._analyze_connection_sensitivity(
                 connection_variations, n_iterations, time_step,
-                ees_stimulation_params, torque_profile, seed, metrics)
+                ees_stimulation_params, torque_profile,  metrics)
             results['connections'] = conn_results
             
         # 3. Neuron count sensitivity
@@ -107,7 +106,7 @@ class Sensitivity:
             print("Analyzing neuron count sensitivity...")
             neuron_results = self._analyze_neuron_count_sensitivity(
                 neuron_count_variations, n_iterations, time_step,
-                ees_stimulation_params, torque_profile, seed, metrics)
+                ees_stimulation_params, torque_profile, metrics)
             results['neuron_counts'] = neuron_results
             
         # Save results if path provided
@@ -122,7 +121,7 @@ class Sensitivity:
     
     def _analyze_biophysical_sensitivity(self, variations: Dict[str, List], n_iterations: int, 
                                        time_step: float, ees_params: Optional[Dict],
-                                       torque_profile: Optional[Dict], seed: int,
+                                       torque_profile: Optional[Dict],
                                        metrics: List[str]) -> pd.DataFrame:
         """Analyze sensitivity to biophysical parameter variations."""
         
@@ -143,8 +142,7 @@ class Sensitivity:
                             n_iterations=n_iterations,
                             time_step=time_step,
                             ees_stimulation_params=ees_params,
-                            torque_profile=torque_profile,
-                            seed=seed
+                            torque_profile=torque_profile
                     )
                         
                     # Calculate metrics
@@ -177,7 +175,7 @@ class Sensitivity:
         return pd.DataFrame(results_list)
     def _analyze_connection_sensitivity(self, variations: Dict, n_iterations: int,
                                       time_step: float, ees_params: Optional[Dict],
-                                      torque_profile: Optional[Dict], seed: int,
+                                      torque_profile: Optional[Dict],
                                       metrics: List[str]) -> pd.DataFrame:
         """
         Analyze sensitivity to connection parameter variations.
@@ -204,7 +202,7 @@ class Sensitivity:
                         modified_system = self.biological_system.clone_with(connections=modified_connections)
                         spikes, time_series = modified_system.run_simulation(
                             n_iterations=n_iterations, time_step=time_step,
-                            ees_stimulation_params=ees_params, torque_profile=torque_profile, seed=seed
+                            ees_stimulation_params=ees_params, torque_profile=torque_profile
                         )
                         
                         # Calculate metrics and store results
@@ -238,7 +236,7 @@ class Sensitivity:
     
     def _analyze_neuron_count_sensitivity(self, variations: Dict, n_iterations: int,
                                         time_step: float, ees_params: Optional[Dict],
-                                        torque_profile: Optional[Dict], seed: int,
+                                        torque_profile: Optional[Dict], 
                                         metrics: List[str]) -> pd.DataFrame:
         """Analyze sensitivity to neuron population count variations."""
         
@@ -259,8 +257,7 @@ class Sensitivity:
                         n_iterations=n_iterations,
                         time_step=time_step,
                         ees_stimulation_params=ees_params,
-                        torque_profile=torque_profile,
-                        seed=seed
+                        torque_profile=torque_profile
                     )
                     
                     metric_values = self._calculate_joint_metrics(time_series, metrics)
@@ -657,8 +654,7 @@ class Sensitivity:
                           n_iterations: int = 10,
                           time_step=0.1*ms,
                           ees_stimulation_params: Optional[Dict] = None,
-                          torque_profile: Optional[Dict] = None,
-                          seed: int = 42) -> Dict[str, pd.DataFrame]:
+                          torque_profile: Optional[Dict] = None) -> Dict[str, pd.DataFrame]:
         """
         Perform global normalized sensitivity analysis by varying all parameters.
         
@@ -674,7 +670,7 @@ class Sensitivity:
         spikes_base, time_series_base = original_system.run_simulation(
             n_iterations=n_iterations, time_step=time_step,
             ees_stimulation_params=ees_stimulation_params,
-            torque_profile=torque_profile, seed=seed
+            torque_profile=torque_profile
         )
         baseline_metrics = self._calculate_joint_metrics(time_series_base, metrics)
         
@@ -714,8 +710,7 @@ class Sensitivity:
             n_iterations=n_iterations,
             time_step=time_step,
             ees_stimulation_params=ees_stimulation_params,
-            torque_profile=torque_profile,
-            seed=seed
+            torque_profile=torque_profile
         )
         
         # Combine all results from the run function
