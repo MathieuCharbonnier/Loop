@@ -128,7 +128,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         }
         for muscle_name in muscles_names
     }
-
+    recruitment=np.zeros(num_muscles)
     
     # =============================================================================
     # Main Simulation Loop
@@ -238,19 +238,17 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             ees_params_copy = None
         
             if ees_params is not None:
+                ees_params_copy = copy_brian_dict(ees_params)
                 freq = ees_params.get("frequency")
                 if isinstance(freq, tuple) and len(freq) == 2:
-                    ees_params_copy = copy_brian_dict(ees_params)
-                    mean_0 = np.mean(activation_history[0])
-                    mean_1 = np.mean(activation_history[1])
                     
-                    if np.isclose(mean_0, mean_1, atol=1e-2):  
+                    if np.isclose(recruitment[0], recruitment[1], atol=1e-2):  
                         ees_params_copy["frequency"] = (freq[0] + freq[1]) / 2
                     else:
-                        dominant = 0 if mean_0 >= mean_1 else 1
+                        dominant = 0 if recruitment[0] >= recruitment[1] else 1
                         ees_params_copy["frequency"] = freq[dominant]
 
-                  
+                print('ees_freq ', ees_params_copy['frequency']) 
             if "Ib" in neurons_population:
                 all_spikes, final_state_neurons, state_monitors = run_spinal_circuit_with_Ib(
                     stretch, stretch_velocity, stretch_II, normalized_force, neurons_population, connections, time_step, reaction_time, 
@@ -264,7 +262,13 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
         # Update initial potentials for next iteration
         initial_state_neurons.update(final_state_neurons)
-        
+
+        for muscle_idx, muscle_name in enumerate(muscles_names):
+            muscle_spikes = all_spikes[muscle_idx]
+            recruited_MN = sum(1 for spikes in muscle_spikes['MN'].values() if len(spikes) > 0)
+            print(f"Number of recruited {muscle_name} motoneuron: {recruited_MN}/{len(muscle_spikes['MN'])}") 
+            recruitment[muscle_idx]=recruited_MN
+
         # Store spike times for visualization
         for muscle_idx, muscle_name in enumerate(muscles_names):
             muscle_spikes = all_spikes[muscle_idx]
