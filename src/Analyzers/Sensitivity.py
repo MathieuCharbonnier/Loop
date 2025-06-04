@@ -654,7 +654,8 @@ class Sensitivity:
                           n_iterations: int = 10,
                           time_step=0.1*ms,
                           ees_stimulation_params: Optional[Dict] = None,
-                          torque_profile: Optional[Dict] = None) -> Dict[str, pd.DataFrame]:
+                          torque_profile: Optional[Dict] = None, 
+                                   what=['biophysic','neuron', 'connection']) -> Dict[str, pd.DataFrame]:
         """
         Perform global normalized sensitivity analysis by varying all parameters.
         
@@ -686,20 +687,27 @@ class Sensitivity:
         print("Preparing parameter variations...")
         
         # 1. Biophysical parameter variations
-        biophysical_variations = {name: self._get_parameter_variations(name, value, 'biophysical')
+        if 'biophysic' in what:
+            biophysical_variations = {name: self._get_parameter_variations(name, value, 'biophysical')
                                 for name, value in self.biological_system.biophysical_params.items()}
-        
-        # 2. Connection parameter variations
+        else:
+            biophysical_variations=None
+          
+        # 2. Connection parameter variations                      
         connection_variations = {}
-        for connection_key, connection_params in self.biological_system.connections.items():
-            connection_variations[connection_key] = {
-                param_name: self._get_parameter_variations(param_name, param_value, 'connection')
-                for param_name, param_value in connection_params.items()
-            }
+        if 'connection' in what:
+            for connection_key, connection_params in self.biological_system.connections.items():
+                connection_variations[connection_key] = {
+                    param_name: self._get_parameter_variations(param_name, param_value, 'connection')
+                    for param_name, param_value in connection_params.items()
+                }
         
         # 3. Neuron population variations
-        neuron_variations = {name: self._get_parameter_variations(name, count, 'neuron_population')
+        if 'neuron' in what:
+            neuron_variations = {name: self._get_parameter_variations(name, count, 'neuron_population')
                           for name, count in self.biological_system.neurons_population.items()}
+        else:
+            neuron_variations=None
         
         # Use the run function to get all sensitivity results
         print("Running comprehensive sensitivity analysis...")
