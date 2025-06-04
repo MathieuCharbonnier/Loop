@@ -92,7 +92,7 @@ class ReflexAnalyzer:
                 if plot_type == "delay":
                     ylabel = f"Delay = {int(param_value/ms)} ms\nJoint angle (deg)"
                 elif plot_type == "twitch":
-                    label = "Fast type Motor Unit" if param_value else "Slow type Motor Unit"
+                    label = "Fast MU" if param_value else "Slow MU"
                     ylabel = f"{label}\nJoint angle (deg)"
                 elif plot_type == "threshold":
                     ylabel = f"Vth = {int(param_value/mV)} mV\nJoint angle (deg)"
