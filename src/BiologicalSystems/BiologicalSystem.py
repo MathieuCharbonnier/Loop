@@ -12,7 +12,7 @@ from datetime import datetime
 
 from ..Loop.closed_loop import closed_loop, get_sto_file
 from ..Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
-
+from ..helpers.copy_brian_dict import copy_brian_dict
 
 class BiologicalSystem(ABC):
     """
@@ -193,7 +193,7 @@ class BiologicalSystem(ABC):
             self.resting_lengths,
             self.associated_joint, 
             self.fast_type_mu,
-            BiologicalSystem.copy_brian_dict(self.initial_state_neurons), 
+            copy_brian_dict(self.initial_state_neurons), 
             deepcopy(self.initial_condition_spike_activation), 
             deepcopy(self.initial_state_opensim),
             self.activation_function, 
@@ -550,9 +550,9 @@ class BiologicalSystem(ABC):
     def get_system_state(self):
         """Return the current state of the biological system for transfer"""
         if self.final_state is not None:
-            return BiologicalSystem.copy_brian_dict(self.final_state)
+            return copy_brian_dict(self.final_state)
         else:
-            return {'neurons': BiologicalSystem.copy_brian_dict(self.nitial_state_neurons),
+            return {'neurons': copy_brian_dict(self.nitial_state_neurons),
                     'spikes_activations':self.initial_condition_spike_activation,
                     'opensim': self.initial_state_opensim ,
                     'last_activations': self.activation_function,
@@ -576,7 +576,7 @@ class BiologicalSystem(ABC):
         if self.final_state is None:
             raise ValueError("You should first launch a simulation!")
         
-        self.initial_state_neurons = BiologicalSystem.copy_brian_dict(self.final_state['neurons'])
+        self.initial_state_neurons = copy_brian_dict(self.final_state['neurons'])
         self.initial_condition_spike_activation = self.final_state['spikes_activations']
         self.initial_state_opensim = self.final_state['opensim']
         self.activation_function = self.final_state['last_activations']
@@ -609,7 +609,7 @@ class BiologicalSystem(ABC):
                 # Use deep copy or custom logic for specific types
                 if isinstance(attr, dict):
                     # Safe copy for Brian2 quantities
-                    kwargs[name] = BiologicalSystem.copy_brian_dict(attr)
+                    kwargs[name] = copy_brian_dict(attr)
                 else:
                     kwargs[name] = deepcopy(attr)
             elif param.default is not inspect.Parameter.empty:
@@ -618,27 +618,4 @@ class BiologicalSystem(ABC):
         kwargs.update(params)
         return cls(**kwargs)
 
-    @staticmethod 
-    def copy_brian_dict(d):
-        """
-        Safely copy dictionaries that may contain Brian2 quantities.
-        
-        Parameters:
-        -----------
-        d : dict or other
-            Dictionary or value to copy
-            
-        Returns:
-        --------
-        dict or other
-            Copied dictionary or value
-        """
-        if isinstance(d, dict):
-            # If d is a dictionary, apply the function to each value
-            return {k: BiologicalSystem.copy_brian_dict(v) for k, v in d.items()}
-        elif hasattr(d, 'copy') and callable(getattr(d, 'copy', None)):
-            # If the object has a callable `.copy()` method (e.g., Brian2 Quantity), use it
-            return d.copy()
-        else:
-            # Otherwise, return the value as-is (int, float, string, bool, etc.)
-            return d
+
