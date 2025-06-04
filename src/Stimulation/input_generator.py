@@ -2,7 +2,6 @@
 import pandas as pd
 import numpy as np
 import json
-from datetime import datetime
 import os
 import matplotlib.pyplot as plt
 from brian2 import*
@@ -70,7 +69,7 @@ def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruit
         Path to save the plot
     """  
     if ees_recruitment_profile is None:
-        with open('ees_recruitment.json', 'r') as f:
+        with open('data/ees_recruitment.json', 'r') as f:
             ees_recruitment_profile = json.load(f)
 
     currents = np.linspace(0, 1, 100)
@@ -83,7 +82,7 @@ def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruit
             ees_recruitment_profile, 
             [muscle_name]
         )
-        fraction_results.append(fractions[muscle_name])
+        fraction_results.append(fractions)
 
     df = pd.DataFrame(fraction_results)
 
@@ -109,8 +108,7 @@ def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruit
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f'Recruitment_Curve_{site}_{muscle_name}_{timestamp}.png'
+    filename = f'Recruitment_Curve_{site}_{muscle_name}.png'
     
     if base_output_path:
         fig_path = os.path.join(base_output_path, filename)
