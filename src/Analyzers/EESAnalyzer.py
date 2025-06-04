@@ -41,7 +41,7 @@ class EESAnalyzer:
         }
     
     def analyze_frequency_effects(self, freq_range=None, base_ees_params=None, torque_profile=None,
-                                n_iterations=20, time_step=0.1*ms, seed=42):
+                                n_iterations=20, time_step=0.1*ms):
         """
         Analyze the effects of varying EES frequency with fixed afferent and efferent recruitment.
         
@@ -55,8 +55,6 @@ class EESAnalyzer:
             Number of iterations for each simulation
         time_step : Quantity
             Time step for simulations (in ms, will be converted to brian2 units)
-        seed : int
-            Random seed for reproducibility
         
         Returns:
         --------
@@ -81,14 +79,13 @@ class EESAnalyzer:
             vary_param,
             torque_profile,
             n_iterations,
-            time_step, 
-            seed
+            time_step
         )
         
         return results
 
     def analyze_intensity_effects(self, intensity_range, base_ees_params=None, torque_profile=None, 
-                                n_iterations=20, time_step=0.1*ms, seed=42):
+                                n_iterations=20, time_step=0.1*ms):
         """
         Analyze the effects of varying stimulation intensity.
         
@@ -102,8 +99,6 @@ class EESAnalyzer:
             Number of iterations for each simulation
         time_step : Quantity
             Time step for simulations (in ms, will be converted to brian2 units)
-        seed : int
-            Random seed for reproducibility
         
         Returns:
         --------
@@ -125,14 +120,13 @@ class EESAnalyzer:
             vary_param, 
             torque_profile,
             n_iterations,
-            time_step, 
-            seed
+            time_step
         )
         
         return results
       
     def analyze_stimulation_sites(self, different_sites=None, base_ees_params=None, torque_profile=None,
-                                             n_iterations=20, time_step=0.1*ms, seed=42):
+                                             n_iterations=20, time_step=0.1*ms):
         """
         Analyze the effects of unbalanced afferent recruitment between antagonistic muscles.
         
@@ -146,8 +140,6 @@ class EESAnalyzer:
             Number of iterations for each simulation
         time_step : Quantity
             Time step for simulations
-        seed : int
-            Random seed for reproducibility
         
         Returns:
         --------
@@ -177,7 +169,7 @@ class EESAnalyzer:
         return results
     
        
-    def plot (self, results=None, save_dir="stimulation_analysis", seed=42, show_plots=True):
+    def plot (self, results=None, save_dir="stimulation_analysis", show_plots=True):
         """
         Plot the analysis results.
         
@@ -203,7 +195,7 @@ class EESAnalyzer:
         self.results = results
     
     def _compute_ees_parameter_sweep(self, param_dict, vary_param, torque_profile, n_iterations, 
-                                   time_step=0.1*ms, seed=42):
+                                   time_step=0.1*ms):
         """
         Compute EES stimulation analysis by varying a parameter of interest.
         
@@ -218,8 +210,6 @@ class EESAnalyzer:
             Number of iterations for each simulation
         time_step : Quantity
             Time step for simulation (in ms)
-        seed : int
-            Random seed for reproducibility
             
         Returns:
         --------
@@ -255,7 +245,6 @@ class EESAnalyzer:
                 time_step,
                 ees_stimulation_params=current_params,
                 torque_profile=torque_profile,
-                seed=seed, 
                 base_output_path=None
             )
             
@@ -288,8 +277,7 @@ class EESAnalyzer:
         
         return results
     
-    def _plot_ees_analysis_results(self, results, save_dir="stimulation_analysis", 
-                                 seed=42, show_plots=True):
+    def _plot_ees_analysis_results(self, results, save_dir="stimulation_analysis", show_plots=True):
         """
         Plot the results from EES parameter sweep analysis.
 
