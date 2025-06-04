@@ -12,7 +12,7 @@ class BiMusclesIb(BiologicalSystem):
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
-             initial_state_opensim=None, activation_funct=None, stretch_history_func=None):
+             initial_state_opensim=None, activation_funct=None, stretch_history_func=None, seed=42):
         """
         Initialize a reciprocal inhibition system with Ib fibers with default or custom parameters.
         
@@ -171,7 +171,7 @@ class BiMusclesIb(BiologicalSystem):
                         muscles_names, associated_joint, fast_type_mu,
                         neurons_population, connections, spindle_model, 
                         initial_state_neurons, initial_condition_spike_activation, 
-                        initial_state_opensim, activation_funct)
+                        initial_state_opensim, activation_funct, seed)
         
         # Validate the configuration
         self.validate_input()
