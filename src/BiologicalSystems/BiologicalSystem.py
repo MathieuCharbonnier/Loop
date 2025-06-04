@@ -544,7 +544,7 @@ class BiologicalSystem(ABC):
     
         fig_muscle.suptitle("Muscle Dynamics")
         fig_muscle.tight_layout(rect=[0, 0.03, 1, 0.95])
-        save_figure(fig_muscle, "Muscle_dynamic")
+        save_figure(fig_muscle, "Muscle_dynamic", prefix)
     
 
     def get_system_state(self):
