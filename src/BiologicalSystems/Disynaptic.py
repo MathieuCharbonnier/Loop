@@ -32,7 +32,7 @@ class Disynaptic(BiologicalSystem):
                 'Cm': 0.3*nF,
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
-                'threshold_v': -45*mV
+                'threshold_v': -50*mV
             }
             
         if ees_recruitment_profile is None:
