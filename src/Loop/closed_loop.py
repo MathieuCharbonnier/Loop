@@ -71,7 +71,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
     tuple
         (spikes, time_series, final_state) - Neuronal spikes, simulation time series data, and final state
     """
-
+    print(" seed : ", seed)
     # =============================================================================
     # Initialization
     # =============================================================================
@@ -141,7 +141,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
            print("Phase specific EES modulation")
            print(f"frequency dorsiflexion phase: {freq[0]}")
            print(f"frequency plantarflexion phase: {freq[1]}")
-        elif isinstance(freq, np.ndarray):
+        elif isinstance(freq, list):
             if len(freq) != n_iterations:
                 raise ValueError(f"The length of the frequency array should match the number of iterations: n_iterations={n_iterations}, but len(freq)={len(freq)}")
             print('Temporal EES modulation')
@@ -217,7 +217,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     dominant = 0 if recruitment[0] >= recruitment[1] else 1
                     ees_params_copy["frequency"] = freq[dominant]
         
-            elif isinstance(freq, np.ndarray): 
+            elif isinstance(freq, list): 
                 ees_params_copy["frequency"] = freq[iteration]
         
             print('ees_freq', ees_params_copy['frequency'])
