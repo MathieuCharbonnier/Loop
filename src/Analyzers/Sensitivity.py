@@ -583,7 +583,7 @@ class Sensitivity:
                 # For weight parameters, use multiplicative factors
                 for factor in multiplicative_factors:
                     if hasattr(param_value, 'magnitude'):  # Brian2 quantity
-                         unit=param_value.get_best_unit()
+                        unit=param_value.get_best_unit()
                         new_val =round( param_value/unit * factor, 1)*unit
                         variations.append(new_val * param_valu)
                     else:
