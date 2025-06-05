@@ -126,12 +126,13 @@ class Sensitivity:
         """Analyze sensitivity to biophysical parameter variations."""
         
         results_list = []
-        
+        print('biophysic variations : ', variations)
         for param_name, values_list in variations.items():
-            print("param name: ", param_name)
+            
             for value in values_list:
                 #try:
                     # Create modified biophysical parameters
+                    print("param name: ", param_name)
                     print("value ", value)
                     modified_params = copy_brian_dict(self.biological_system.biophysical_params)
                     modified_params[param_name] = value
@@ -189,7 +190,7 @@ class Sensitivity:
                        e.g., {("Ia", "MN"): {"w": [1.0*nS, 2.1*nS], "p": [0.3, 0.45]}}
         """
         results_list = []
-        
+        print('connection variations : ', variations)
         for connection_tuple, param_variations in variations.items():
             if connection_tuple not in self.biological_system.connections:
                 warnings.warn(f"Connection {connection_tuple} not found in system. Skipping.")
@@ -198,6 +199,8 @@ class Sensitivity:
             for param_name, values_list in param_variations.items():
                 for value in values_list:
                     #try:
+                        print("param name: ", param_name)
+                        print("value ", value)
                         # Create modified connections
                         modified_connections = copy_brian_dict(self.biological_system.connections)
                         modified_connections[connection_tuple][param_name] = value
@@ -247,10 +250,12 @@ class Sensitivity:
         """Analyze sensitivity to neuron population count variations."""
         
         results_list = []
-        
+        print('neuron count variations : ', variations)
         for population_name, count_list in variations.items():
             for count in count_list:
                 #try:
+                    print("population name: ", population_name)
+                    print("count ", count)
                     # Create modified neuron populations
                     modified_populations = copy_brian_dict(self.biological_system.neurons_population)
                     modified_populations[population_name] = count
@@ -557,7 +562,7 @@ class Sensitivity:
             else:
                 # For other biophysical parameters (conductances, capacitances, time constants), use multiplicative factors
                 for factor in multiplicative_factors:
-                    if hasattr(param_value, 'magnitude'):  # Brian2 quantity
+                    if hasattr(param_value, 'dim'):  # Brian2 quantity
                         unit=param_value.get_best_unit()
                         new_val =round( param_value/unit * factor, 1)*unit
                         variations.append(new_val )
@@ -584,7 +589,7 @@ class Sensitivity:
             else:
                 # For weight parameters, use multiplicative factors
                 for factor in multiplicative_factors:
-                    if hasattr(param_value, 'magnitude'):  # Brian2 quantity
+                    if hasattr(param_value, 'dim'):  # Brian2 quantity
                         unit=param_value.get_best_unit()
                         new_val =round( param_value/unit * factor, 1)*unit
                         variations.append(new_val)
