@@ -51,7 +51,7 @@ class BiMusclesIb(BiologicalSystem):
                 'tau_e': 0.5*ms,
                 'E_inh': -75*mV,
                 'tau_i': 2.5*ms,
-                'threshold_v': -48*mV
+                'threshold_v': -50*mV
             }
             
         if ees_recruitment_profile is None:
