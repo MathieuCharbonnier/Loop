@@ -767,7 +767,7 @@ class Sensitivity:
         
         return np.mean(sensitivities) if sensitivities else 0.0
       
-    def plot(self, analysis_type: str = 'all', save_path: Optional[str] = None):
+    def plot(self, analysis_type: str = 'all'):
         """
         Plot sensitivity analysis results with joint-specific metrics.
         
@@ -833,14 +833,14 @@ class Sensitivity:
                 plt.suptitle(f'Sensitivity Analysis: {param} ({analysis.title()})', fontsize=16)
                 plt.tight_layout()
                 
-                if save_path:
-                    plt.savefig(f"{save_path}/sensitivity_{analysis}_{param.replace(' ', '_')}.png", 
+                os.makedirs("metric_sensitivity", exist_ok=True)
+                plt.savefig(f"metric_sensitivity/{analysis}_{param.replace(' ', '_')}.png", 
                                dpi=300, bbox_inches='tight')
                 
                 plt.show()
     
     
-    def plot_global_sensitivity(self, save_path: Optional[str] = None):
+    def plot_global_sensitivity(self):
         """
         Plot global variance analysis results as bar plots showing top 15 most impactful parameters.
         
@@ -911,9 +911,8 @@ class Sensitivity:
         plt.suptitle('Global Parameter Impact Analysis - Top 15 Most Influential Parameters')
         plt.tight_layout(rect=[0, 0, 1, 0.93])  # Leave space at the top for suptitle
 
-        
-        if save_path:
-            plt.savefig(f"{save_path}/global_variance_analysis.png", dpi=300, bbox_inches='tight')
+        os.makedirs("global_sensitivity", exist_ok=True)
+        plt.savefig(f"global_sensitivity/global_variance_analysis.png", dpi=300, bbox_inches='tight')
         
         plt.show()
     
