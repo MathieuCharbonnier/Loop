@@ -11,7 +11,7 @@ import warnings
 import matplotlib.pyplot as plt
 
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
-
+from ..helpers.copy_brian_dict import copy_brian_dict
 
 class Sensitivity:
   
@@ -131,7 +131,7 @@ class Sensitivity:
             for value in values_list:
                 #try:
                     # Create modified biophysical parameters
-                    modified_params = BiologicalSystem.copy_brian_dict(self.biological_system.biophysical_params)
+                    modified_params = copy_brian_dict(self.biological_system.biophysical_params)
                     modified_params[param_name] = value
                     
                     # Run simulation with modified parameters
@@ -197,7 +197,7 @@ class Sensitivity:
                 for value in values_list:
                     #try:
                         # Create modified connections
-                        modified_connections = BiologicalSystem.copy_brian_dict(self.biological_system.connections)
+                        modified_connections = copy_brian_dict(self.biological_system.connections)
                         modified_connections[connection_tuple][param_name] = value
                         
                         # Run simulation with modified system
@@ -250,7 +250,7 @@ class Sensitivity:
             for count in count_list:
                 #try:
                     # Create modified neuron populations
-                    modified_populations = BiologicalSystem.copy_brian_dict(self.biological_system.neurons_population)
+                    modified_populations = copy_brian_dict(self.biological_system.neurons_population)
                     modified_populations[population_name] = count
                     
                     modified_system = self.biological_system.clone_with(
@@ -558,7 +558,7 @@ class Sensitivity:
                     if hasattr(param_value, 'magnitude'):  # Brian2 quantity
                         unit=param_value.get_best_unit()
                         new_val =round( param_value/unit * factor, 1)*unit
-                        variations.append(new_val * param_valu)
+                        variations.append(new_val )
                     else:
                         variations.append(param_value * factor)
         
@@ -585,7 +585,7 @@ class Sensitivity:
                     if hasattr(param_value, 'magnitude'):  # Brian2 quantity
                         unit=param_value.get_best_unit()
                         new_val =round( param_value/unit * factor, 1)*unit
-                        variations.append(new_val * param_valu)
+                        variations.append(new_val)
                     else:
                         variations.append(param_value * factor)
         
