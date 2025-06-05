@@ -343,7 +343,7 @@ class EESAnalyzer:
                         if col_name in main_data:
                             ax.plot(time_data, main_data[col_name], label=muscle_name,
                                     color=muscle_colors[muscle_name])
-             axs[-1].set_xlabel("Time (s)")            
+            axs[-1].set_xlabel("Time (s)")            
             if muscles_names:
                 fig.legend(muscles_names, loc='upper right')
             fig.tight_layout()
