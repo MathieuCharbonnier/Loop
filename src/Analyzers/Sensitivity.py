@@ -369,12 +369,12 @@ class Sensitivity:
             if i < len(axs):
                 ax = axs[i]
                 #formatted_value = f"${param_value:.2e}$"
-                formatted_value=simulation_results['original_value']
-                #if isinstance(original_value, Quantity):
-                #    unit = original_value.get_best_unit()
-                #    formatted_value = round(float(original_value / unit), 1) * unit
-                #else:
-                #    formatted_value = round(original_value, 1)
+                original_value=simulation_results['original_value']
+                if isinstance(original_value, Quantity):
+                    unit = original_value.get_best_unit()
+                    formatted_value = round(float(original_value / unit), 1) * unit
+                else:
+                    formatted_value = round(original_value, 1)
      
                 ax.plot(simulation_results['Time'], simulation_results['Joint'])
                 ax.set_title(f"{param_name} = {formatted_value}")
@@ -438,12 +438,12 @@ class Sensitivity:
                     if spikes_muscle:
                         neuron_offset += len(spikes_muscle)
 
-                formatted_value=simulation_results['original_value']
-                #if isinstance(original_value, Quantity):
-                #    unit = original_value.get_best_unit()
-                #    formatted_value = round(float(original_value / unit), 1) * unit
-                #else:
-                #    formatted_value = round(original_value, 1)
+                original_value=simulation_results['original_value']
+                if isinstance(original_value, Quantity):
+                    unit = original_value.get_best_unit()
+                    formatted_value = round(float(original_value / unit), 1) * unit
+                else:
+                    formatted_value = round(original_value, 1)
 
                 #formatted_value = f"${param_value:.2e}$"
                 ax.set_title(f"{param_name} = {formatted_value}")
