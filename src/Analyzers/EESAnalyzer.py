@@ -331,7 +331,7 @@ class EESAnalyzer:
             for i, (value, main_data) in enumerate(zip(param_values, simulation_data)):
                 ax = axs[i]
                 ax.set_title(f"{param_label}: {value}")
-                ax.set_xlabel("Time (s)")
+               
                 ylabel = var.replace('_', ' ').title()
                 ax.set_ylabel(f"{ylabel} (Hz)" if "rate" in var else f"{ylabel} (dimless)")
     
@@ -343,7 +343,7 @@ class EESAnalyzer:
                         if col_name in main_data:
                             ax.plot(time_data, main_data[col_name], label=muscle_name,
                                     color=muscle_colors[muscle_name])
-                        
+             axs[-1].set_xlabel("Time (s)")            
             if muscles_names:
                 fig.legend(muscles_names, loc='upper right')
             fig.tight_layout()
@@ -357,7 +357,6 @@ class EESAnalyzer:
             for i, (value, main_data) in enumerate(zip(param_values, simulation_data)):
                 ax = axs_joint[i]
                 ax.set_title(f"{param_label}: {value}")
-                ax.set_xlabel("Time (s)")
                 ax.set_ylabel(f"{associated_joint} (deg)")
                 
                 joint_col = f'Joint_{associated_joint}'
@@ -365,6 +364,7 @@ class EESAnalyzer:
                     ax.plot(main_data['Time'], main_data[joint_col],
                             color='darkred', label='Joint Angle')
                     ax.legend()
+            axs_joint[-1].set_xlabel("Time (s)")
             fig_joint.tight_layout()
             fig_joint.savefig(os.path.join(save_dir, f"joint_angle_{timestamp}.png"))
 
@@ -375,7 +375,6 @@ class EESAnalyzer:
         for i, (value, spikes) in enumerate(zip(param_values, spikes_data)):
             ax = axs_raster[i]
             ax.set_title(f"MN Raster Plot — {param_label}: {value}")
-            ax.set_xlabel("Time (s)")
             ax.set_ylabel("Neuron ID")
 
             for idx, muscle_name in enumerate(muscles_names):
@@ -384,6 +383,7 @@ class EESAnalyzer:
                         if neuron_spikes:
                             ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id),
                                     '.', markersize=4, color=muscle_colors[muscle_name])
+        axs_raster[-1].set_xlabel("Time (s)")
         fig_raster.tight_layout()
         fig_raster.savefig(os.path.join(save_dir, f"mn_raster_{timestamp}.png"))
 
