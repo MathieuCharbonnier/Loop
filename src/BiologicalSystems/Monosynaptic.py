@@ -66,9 +66,9 @@ class Monosynaptic(BiologicalSystem):
         # Initialize base class first
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
                         muscles_names, associated_joint, fast_type_mu,
-                        neurons_population, connections, spindle_model, 
+                        neurons_population, connections, spindle_model,seed, 
                         initial_state_neurons, initial_condition_spike_activation, 
-                        initial_state_opensim, activation_func, seed)
+                        initial_state_opensim, activation_func)
 
         # Validate final configuration
         self.validate_input()
