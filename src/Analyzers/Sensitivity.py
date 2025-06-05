@@ -128,9 +128,11 @@ class Sensitivity:
         results_list = []
         
         for param_name, values_list in variations.items():
+            print("param name: ", param_name)
             for value in values_list:
                 #try:
                     # Create modified biophysical parameters
+                    print("value ", value)
                     modified_params = copy_brian_dict(self.biological_system.biophysical_params)
                     modified_params[param_name] = value
                     
