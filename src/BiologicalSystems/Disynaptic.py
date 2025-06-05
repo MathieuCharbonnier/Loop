@@ -70,8 +70,7 @@ class Disynaptic(BiologicalSystem):
                 "MN": {
                     'v': biophysical_params['Eleaky'],
                     'gIa': 0*nS,
-                    'gexc': 0*nS,
-                    'gi__': 0*nS
+                    'gexc': 0*nS
                 }
             }
             
