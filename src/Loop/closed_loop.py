@@ -157,7 +157,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
     for iteration in range(n_iterations):
         print(f"--- Iteration {iteration+1} of {n_iterations} ---")
-        start_opensim = time.time()
+        #start_opensim = time.time()
         
         # Prepare torque if provided
         current_torque = None
@@ -201,8 +201,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         delayed_end = (iteration + 1) * nb_points
         stretch_II = stretch_global_buffer[:, delayed_start:delayed_end]
         
-        end_opensim = time.time()
-        start_neuron = time.time()
+        #end_opensim = time.time()
+        #start_neuron = time.time()
       
         # Adjust EES frequency based on muscle spiking if phase-dependent or if ees frequency is time dependent
         ees_params_copy = None
@@ -287,8 +287,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     adjusted_spikes = spikes / second + iteration * reaction_time / second
                     spike_data[muscle_name][fiber_type][neuron_id].extend(adjusted_spikes)
         
-        end_neuron = time.time()
-        start_activation = time.time()
+        #end_neuron = time.time()
+        #start_activation = time.time()
         
         # Initialize arrays for mean values of all neurons per muscle
         mean_e, mean_u, mean_c, mean_P, mean_activation = [
@@ -327,7 +327,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 # Save final state for next iteration
                 initial_condition_spike_activation[muscle_idx] = final_values
                 
-                end_activation = time.time()
+                #end_activation = time.time()
               
                 
                 # Create batch data for current iteration
@@ -352,9 +352,9 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
                 
 
-        print(f"Opensim time: {end_opensim - start_opensim:.2f} s")
-        print(f"Neuron time: {end_neuron - start_neuron:.2f} s")
-        print(f"Activation time: {end_activation - start_activation:.2f} s")
+        #print(f"Opensim time: {end_opensim - start_opensim:.2f} s")
+        #print(f"Neuron time: {end_neuron - start_neuron:.2f} s")
+        #print(f"Activation time: {end_activation - start_activation:.2f} s")
   
 
     # =============================================================================
