@@ -317,7 +317,14 @@ def validate_ees(ees_stimulation_params, number_muscle):
                             issues["errors"].append(f"The frequency of EES for muscle {i+1} must have 'Hz' as unit.")
                         if not (0 * hertz <= f):
                             issues["errors"].append(f"EES frequency for muscle {i+1} must be positive, got {f}.")
-
+                
+                elif isinstance(frequency, list):
+                    for f in frequency:
+                        if not str(f).endswith('Hz'):
+                            issues["errors"].append(f"The frequency of EES must have 'Hz' as unit.")
+                        if not (0 * hertz <= f):
+                            issues["errors"].append(f"EES frequency  must be positive, got {f}.")
+        
                 else:
                     if not str(frequency).endswith('Hz'):
                         issues["errors"].append("The frequency of EES must have 'Hz' as unit.")
