@@ -844,7 +844,7 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
     """
 
 
-    start_build = time.time()
+    #start_build = time.time()
 
     # Set up random seeds for reproducibility
     np.random.seed(seed_run)
@@ -1039,17 +1039,17 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         mon_ees_MN = SpikeMonitor(ees_MN)
         net.add([ees_MN, mon_ees_MN])
 
-    end_build = time.time()
+    #end_build = time.time()
 
-    start_run=time.time()
+    #start_run=time.time()
     # Run simulation
     net.run(T)
     
-    end_run = time.time()
+    #end_run = time.time()
 
-    print(f"Network build time: {end_build - start_build:.2f} s")
-    print(f"Simulation run time: {end_run - start_run:.2f} s")
-    start_postprocessing = time.time()
+    #print(f"Network build time: {end_build - start_build:.2f} s")
+    #print(f"Simulation run time: {end_run - start_run:.2f} s")
+    #start_postprocessing = time.time()
 
     # Cache spike trains once
     all_mn_spikes = mon_MN.spike_trains()
@@ -1143,8 +1143,8 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
         "MN": MN_extensor_spikes
     }
 
-    end_postprocessing = time.time()
-    print(f"PostProcessing run time: {end_postprocessing - start_postprocessing:.2f} s")
+    #end_postprocessing = time.time()
+    #print(f"PostProcessing run time: {end_postprocessing - start_postprocessing:.2f} s")
 
    
     return [result_flexor, result_extensor], final_state_neurons, state_monitors
