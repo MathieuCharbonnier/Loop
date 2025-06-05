@@ -101,7 +101,7 @@ def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruit
             ees_recruitment_profile, 
             [muscle_name]
         )
-        print(f'The current current recruits: {fraction}'}
+        print(f'The current current recruits: {fraction}')
 
     ax.set_xlabel('Normalized Current Amplitude')
     ax.set_ylabel('Fraction of Fibers Recruited')
