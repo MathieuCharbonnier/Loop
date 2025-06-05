@@ -141,6 +141,10 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
            print("Phase specific EES modulation")
            print(f"frequency dorsiflexion phase: {freq[0]}")
            print(f"frequency plantarflexion phase: {freq[1]}")
+        elif isinstance(freq, np.ndarray):
+            if len(freq) != n_iterations:
+                raise ValueError(f"The length of the frequency array should match the number of iterations: n_iterations={n_iterations}, but len(freq)={len(freq)}")
+            print('Temporal EES modulation')
         else:
             print(f"EES frequency: {freq}")
 
@@ -192,16 +196,35 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         buffer_end = delay_points + (iteration + 1) * nb_points
         stretch_global_buffer[:, buffer_start:buffer_end] = stretch
         
-        # Extract delayed stretch for neural simulation (DIRECT INDEXING)
+        # Extract delayed stretch for neural simulation 
         delayed_start = iteration * nb_points
         delayed_end = (iteration + 1) * nb_points
         stretch_II = stretch_global_buffer[:, delayed_start:delayed_end]
         
         end_opensim = time.time()
         start_neuron = time.time()
+      
+        # Adjust EES frequency based on muscle spiking if phase-dependent or if ees frequency is time dependent
+        ees_params_copy = None
+        if ees_params is not None:
+            ees_params_copy = copy_brian_dict(ees_params)
+            freq = ees_params.get("frequency")
+            
+            if isinstance(freq, tuple) and len(freq) == 2:
+                if np.isclose(recruitment[0], recruitment[1], atol=1e-2):  
+                    ees_params_copy["frequency"] = (freq[0] + freq[1]) / 2
+                else:
+                    dominant = 0 if recruitment[0] >= recruitment[1] else 1
+                    ees_params_copy["frequency"] = freq[dominant]
         
+            elif isinstance(freq, np.ndarray): 
+                ees_params_copy["frequency"] = freq[iteration]
+        
+            print('ees_freq', ees_params_copy['frequency'])
+ 
         # Run neural simulation based on muscle count
         if num_muscles == 1:
+              
             # Determine if we need a II/excitatory pathway simulation
             has_II_pathway = (
                 'II' in spindle_model and 
@@ -219,36 +242,22 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                      all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation_with_ib(
                         stretch, stretch_velocity, stretch_II, normalized_force, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
-                        initial_state_neurons, **biophysical_params, ees_params=ees_params)
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params_copy)
                 else:
                     all_spikes, final_state_neurons, state_monitors = run_disynaptic_simulation(
                         stretch, stretch_velocity, stretch_II, neurons_population, connections, 
                         time_step, reaction_time, spindle_model, seed,
-                        initial_state_neurons, **biophysical_params, ees_params=ees_params)
+                        initial_state_neurons, **biophysical_params, ees_params=ees_params_copy)
                 
             else:
                 all_spikes, final_state_neurons, state_monitors = run_monosynaptic_simulation(
                     stretch, stretch_velocity, neurons_population, connections, 
                     time_step, reaction_time, spindle_model, seed,
-                    initial_state_neurons, **biophysical_params, ees_params=ees_params
+                    initial_state_neurons, **biophysical_params, ees_params=ees_params_copy
                 )
         
         else:  # num_muscles == 2
-            # Adjust EES frequency based on muscle activation if phase-dependent
-            ees_params_copy = None
-        
-            if ees_params is not None:
-                ees_params_copy = copy_brian_dict(ees_params)
-                freq = ees_params.get("frequency")
-                if isinstance(freq, tuple) and len(freq) == 2:
-                    
-                    if np.isclose(recruitment[0], recruitment[1], atol=1e-2):  
-                        ees_params_copy["frequency"] = (freq[0] + freq[1]) / 2
-                    else:
-                        dominant = 0 if recruitment[0] >= recruitment[1] else 1
-                        ees_params_copy["frequency"] = freq[dominant]
 
-                print('ees_freq ', ees_params_copy['frequency']) 
             if "Ib" in neurons_population:
                 all_spikes, final_state_neurons, state_monitors = run_spinal_circuit_with_Ib(
                     stretch, stretch_velocity, stretch_II, normalized_force, neurons_population, connections, time_step, reaction_time, 
