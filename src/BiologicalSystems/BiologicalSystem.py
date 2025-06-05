@@ -32,9 +32,9 @@ class BiologicalSystem(ABC):
     color_keys = list(colorblind_friendly_colors.keys())
     
     def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names,
-                 associated_joint, fast_type_mu, neurons_population, connections, spindle_model, 
+                 associated_joint, fast_type_mu, neurons_population, connections, spindle_model, seed,
                  initial_state_neurons, initial_condition_spike_activation, initial_state_opensim,
-                 activation_func, stretch_history_func=None, seed=42):
+                 activation_func, stretch_history_func=None):
         """
         Initialize the biological system with common parameters.
         
