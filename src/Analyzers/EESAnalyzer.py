@@ -162,8 +162,7 @@ class EESAnalyzer:
             vary_param,
             torque_profile,
             n_iterations,
-            time_step, 
-            seed
+            time_step
         )
         
         return results
@@ -189,7 +188,7 @@ class EESAnalyzer:
                 raise ValueError("No results to plot! Run an analysis method first or provide results.")
             results = self.results
         
-        self._plot_ees_analysis_results(results, save_dir, seed, show_plots)
+        self._plot_ees_analysis_results(results, save_dir, show_plots)
         
         # Store results for future plotting
         self.results = results
@@ -413,12 +412,12 @@ class EESAnalyzer:
 
         # Coactivation analysis for 2-muscle systems
         if num_muscles == 2: 
-            self._plot_coactivation_analysis(results, save_dir, timestamp, seed)
+            self._plot_coactivation_analysis(results, save_dir, timestamp)
         
         if show_plots:
             plt.show()
 
-    def _plot_coactivation_analysis(self, results, save_dir, timestamp, seed):
+    def _plot_coactivation_analysis(self, results, save_dir, timestamp):
         """
         Perform and plot coactivation analysis for 2-muscle systems.
         
