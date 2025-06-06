@@ -565,7 +565,7 @@ class BiologicalSystem(ABC):
         self.initial_condition_spike_activation = state['spikes_activations']
         self.initial_state_opensim = state['opensim']
         self.activation_function = state['last_activations']
-        self.stretch_history_func=self.final.get("stretch_history", None)
+        self.stretch_history_func=state['stretch_history']
         self.final_state=None
         
     def update_system_state(self):
@@ -580,7 +580,7 @@ class BiologicalSystem(ABC):
         self.initial_condition_spike_activation = self.final_state['spikes_activations']
         self.initial_state_opensim = self.final_state['opensim']
         self.activation_function = self.final_state['last_activations']
-        self.stretch_history_func=self.final.get("stretch_history", None)
+        self.stretch_history_func=self.final_state.get("stretch_history", None)
         self.final_state=None
 
 
