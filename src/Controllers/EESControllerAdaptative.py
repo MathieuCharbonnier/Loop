@@ -57,7 +57,7 @@ class EESControllerAdaptative:
         min_plantar_idx = np.argmin(self.desired_trajectory)
         
         self.event_times = np.array([0, self.time[max_dorsi_idx], self.time[min_plantar_idx], self.total_time])
-        self.site_stimulation = ['L4', 'S1', 'L4']
+        self.site_stimulation = ['L3', 'S2', 'L3']
         
         # Enhanced optimization parameters
         self.min_frequency = 10 * hertz
@@ -163,7 +163,7 @@ class EESControllerAdaptative:
                          self.kd * derivative_error)
             
             # Update frequency
-            freq += pid_output
+            freq += pid_output*hertz
             freq = max(self.min_frequency, min(self.max_frequency, freq))
             
             self.previous_error = amplitude_error
