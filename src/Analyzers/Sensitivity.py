@@ -9,6 +9,7 @@ from itertools import product
 from typing import Dict, List, Tuple, Any, Optional, Callable
 import warnings
 import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
 
 from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 from ..helpers.copy_brian_dict import copy_brian_dict
@@ -216,8 +217,7 @@ class Sensitivity:
                         metric_values = self._calculate_joint_metrics(time_series, metrics)
                         results_list.append({
                             'parameter_type': 'connection',
-                            'connection': f"{connection_tuple[0]}_to_{connection_tuple[1]}",
-                            'parameter_name': param_name,
+                            'parameter_name': f"{param_name}_{connection_tuple[0]}_{connection_tuple[1]}",
                             'parameter_value': float(value) if hasattr(value, 'magnitude') else value,
                             'original_value': value,
                             **metric_values
@@ -226,7 +226,7 @@ class Sensitivity:
                         # Store simulation data
                         if 'connection' not in self.simulation_data:
                             self.simulation_data['connection'] = {}
-                        connection_key = f"{param_name}_{connection_tuple[0]}_to_{connection_tuple[1]}"
+                        connection_key = f"{param_name}_{connection_tuple[0]}_{connection_tuple[1]}"
                         if connection_key not in self.simulation_data['connection']:
                             self.simulation_data['connection'][connection_key] = {}
                         
@@ -323,8 +323,16 @@ class Sensitivity:
             
         for metric in metrics:
             if metric == 'max_joint_angle':
-                metric_values[metric] = np.max(joint_angles)
-                
+                peaks, properties = find_peaks(joint_angles)
+
+                # Remove index 0 if it is included in peaks
+                peaks = peaks[peaks != 0]
+
+                if len(peaks) > 0:
+                    metric_values[metric] = joint_angles[peaks].max()
+                else:
+                    metric_values[metric] = np.min(joint_angles)
+
             elif metric == 'min_joint_angle':
                 metric_values[metric] = np.min(joint_angles)
                 
@@ -379,7 +387,7 @@ class Sensitivity:
                     unit = original_value.get_best_unit()
                     formatted_value = round(float(original_value / unit), 1) * unit
                 else:
-                    formatted_value = round(original_value, 1)
+                    formatted_value = round(original_value, 2)
      
                 ax.plot(simulation_results['Time'], simulation_results['Joint'])
                 ax.set_title(f"{param_name} = {formatted_value}")
@@ -448,7 +456,7 @@ class Sensitivity:
                     unit = original_value.get_best_unit()
                     formatted_value = round(float(original_value / unit), 1) * unit
                 else:
-                    formatted_value = round(original_value, 1)
+                    formatted_value = round(original_value, 2)
 
                 #formatted_value = f"${param_value:.2e}$"
                 ax.set_title(f"{param_name} = {formatted_value}")
@@ -816,21 +824,29 @@ class Sensitivity:
                     if metric in param_data.columns:
                         # Sort by parameter value for smooth plotting
                         param_data_sorted = param_data.sort_values('parameter_value')
-                        unit=param_data_sorted['original_value'].iloc[0].get_best_unit()
-                        ax.plot(param_data_sorted['original_value']/unit, 
+                        unit=None
+                        if hasattr(param_data_sorted['original_value'], 'dim'):
+                            unit=param_data_sorted['original_value'].iloc[0].get_best_unit()
+                       
+                        if unit is not None:
+                            ax.plot(param_data_sorted['original_value']/unit, 
                                param_data_sorted[metric], 
                                'o-', linewidth=2, markersize=6, alpha=0.8)
-                        
-                        ax.set_xlabel(f'{param} ({unit})')
+                            ax.set_xlabel(f'{param} ({unit})')
+                        else:
+                            ax.plot(param_data_sorted['original_value'], 
+                               param_data_sorted[metric], 
+                               'o-', linewidth=2, markersize=6, alpha=0.8)
+                            ax.set_xlabel(f'{param} (dimless)')
+
                         ax.set_ylabel(metric_labels[metric])
-                        ax.set_title(f'{metric_labels[metric]} vs {param}')
                         ax.grid(True, alpha=0.3)
                         
                         # Add some styling
                         ax.spines['top'].set_visible(False)
                         ax.spines['right'].set_visible(False)
                 
-                plt.suptitle(f'Sensitivity Analysis: {param} ({analysis.title()})', fontsize=16)
+                plt.suptitle(f'Sensitivity Analysis: {param} ({analysis.title()})')
                 plt.tight_layout()
                 
                 os.makedirs("metric_sensitivity", exist_ok=True)
@@ -903,10 +919,10 @@ class Sensitivity:
                                   f'{value:.2e}', ha='center', va='bottom',  rotation=90)
         
         # Add legend
-        #legend_elements = [plt.Rectangle((0,0),1,1, facecolor='#1f77b4', alpha=0.7, label='Biophysical'),
-        #                  plt.Rectangle((0,0),1,1, facecolor='#ff7f0e', alpha=0.7, label='Connection'),
-        #                  plt.Rectangle((0,0),1,1, facecolor='#2ca02c', alpha=0.7, label='Neuron Population')]
-        #fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.65, 0.5))
+        legend_elements = [plt.Rectangle((0,0),1,1, facecolor='#1f77b4', alpha=0.7, label='Biophysical'),
+                          plt.Rectangle((0,0),1,1, facecolor='#ff7f0e', alpha=0.7, label='Connection'),
+                          plt.Rectangle((0,0),1,1, facecolor='#2ca02c', alpha=0.7, label='Neuron Population')]
+        fig.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(0.65, 0.5))
         
         plt.suptitle('Global Parameter Impact Analysis - Top 15 Most Influential Parameters')
         plt.tight_layout(rect=[0, 0, 1, 0.93])  # Leave space at the top for suptitle
