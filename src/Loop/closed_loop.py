@@ -615,7 +615,7 @@ class LocalSimulator(SimulatorBase):
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
                               activation, torque, sto_path=None):
         """Run a single muscle simulation iteration using direct function call with in-memory state"""
-        from muscle_sim import run_simulation
+        from .muscle_sim import run_simulation
         # Run simulation directly with in-memory state
         fiber_lengths,normalized_force, joint, new_state = run_simulation(
             dt, T, muscle_names, joint_name, activation,
