@@ -2,39 +2,47 @@ from brian2 import *
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from itertools import product
 from copy import deepcopy
 import os
 from scipy.interpolate import interp1d
-from scipy.optimize import minimize_scalar, minimize, differential_evolution, basinhopping
+from scipy.optimize import minimize_scalar, minimize, differential_evolution
 from scipy.optimize import OptimizeResult
-from ..BiologicalSystems.BiologicalSystem import BiologicalSystem
 
 class EESControllerSciPy:
     """
-    Model Predictive Controller for EES parameters using SciPy optimization functions.
-    
-    This controller leverages established numerical optimization methods for robust convergence.
+    Simplified EES Controller using only RMS error with robust convergence handling.
     """
     
     def __init__(self, biological_system, ees_intensity=0.5, ees_frequency_guess=50*hertz, 
                  optimization_method='brent'):
         """
-        Initialize the EES controller.
+        Initialize the simplified EES controller.
         
         Parameters:
         -----------
         biological_system : BiologicalSystem
             The biological system to control
         optimization_method : str
-            SciPy optimization method: 'brent', 'bounded', 'nelder_mead', 'differential_evolution', 'basinhopping'
+            SciPy optimization method ('brent', 'nelder_mead', 'differential_evolution')
         """
         self.biological_system = biological_system.clone_with()
         self.ees_intensity = ees_intensity
         self.ees_frequency_guess = ees_frequency_guess
         self.optimization_method = optimization_method
         
-        # Load trajectory data (same as original)
+        # Convergence parameters
+        self.max_iterations = 10
+        self.rms_tolerance = 5.0  # RMS error tolerance
+        
+        # Load trajectory data
+        self._load_trajectory_data()
+        
+        # Storage for results
+        self._initialize_storage()
+        
+
+    def _load_trajectory_data(self):
+        """Load and process trajectory data."""
         mot_file = 'data/BothLegsWalk.mot'
         df = pd.read_csv(mot_file, sep='\t', skiprows=6)
         df.columns = df.columns.str.strip()
@@ -52,247 +60,195 @@ class EESControllerSciPy:
         self.time = df['time'].values
         self.desired_trajectory = df[self.biological_system.associated_joint].values
         self.total_time = self.time[-1]
-        self.desired_trajectory_function = interp1d(self.time, self.desired_trajectory, kind='cubic', fill_value="extrapolate")
+        self.desired_trajectory_function = interp1d(
+            self.time, self.desired_trajectory, kind='cubic', fill_value="extrapolate"
+        )
         
         max_dorsi_idx = np.argmax(self.desired_trajectory)
         min_plantar_idx = np.argmin(self.desired_trajectory)
         
         self.event_times = np.array([0, self.time[max_dorsi_idx], self.time[min_plantar_idx], self.total_time])
-        self.site_stimulation = ['L4', 'S1', 'L4']
+        self.site_stimulation = ['L3', 'S2', 'L3']
         
-        # Optimization parameters
+        # Frequency bounds
         self.min_frequency = 10 * hertz
         self.max_frequency = 100 * hertz
-        self.amplitude_tolerance = 0.1
-        
-        # Storage for results
+
+    def _initialize_storage(self):
+        """Initialize storage for results."""
         self.trajectory_history = []
         self.desired_trajectory_history = []
         self.ees_params_history = []
         self.time_history = []
         self.cost_history = []
         self.optimization_trajectories = []
-        self.optimization_results = []  # Store scipy optimization results
+        self.optimization_results = []
         
-        # For tracking function evaluations
+        # Enhanced storage for convergence information
+        self.convergence_info = []
+        self.intermediate_trajectories = []  # Store all intermediate trajectories
+        
+        # Current optimization context
         self.current_phase_data = []
         self.current_prediction_time = None
         self.current_site = None
         self.current_update_iterations = None
         self.current_time_step = None
-        self.desired_amplitude = None
+        self.current_desired_trajectory = None
+        self.current_phase_idx = None
 
-    def _get_trajectory_amplitude(self, trajectory):
-        """Calculate the amplitude (peak-to-peak) of a trajectory."""
-        return np.max(trajectory) - np.min(trajectory)
-    
+    def _compute_rms_error(self, actual_trajectory, desired_trajectory):
+        """
+        Compute RMS error between actual and desired trajectories.
+
+        """
+        squared_errors = (actual_trajectory - desired_trajectory) ** 2
+        rms_error = np.sqrt(np.mean(squared_errors))
+
+        return rms_error
+
     def _objective_function(self, freq_hz):
-        """
-        Objective function for scipy optimization.
-        
-        Parameters:
-        -----------
-        freq_hz : float or array-like
-            Frequency in Hz (scalar for 1D optimization, array for multi-dimensional)
-            
-        Returns:
-        --------
-        float
-            Amplitude error to minimize
-        """
-        # Handle both scalar and array inputs
-        if isinstance(freq_hz, (list, np.ndarray)):
-            freq = freq_hz[0] * hertz  # For multi-dimensional optimizers
-        else:
-            freq = freq_hz * hertz
         
         # Clamp frequency to valid range
-        freq = max(self.min_frequency, min(self.max_frequency, freq))
+        freq = max(self.min_frequency, min(self.max_frequency, freq_hz))
         
         # Run simulation
         ees_params = {
-            'frequency': freq,
+            'frequency': freq*hertz,
             'intensity': self.ees_intensity,
             'site': self.current_site
         }
-        
-        try:
-            spikes, time_series = self.biological_system.run_simulation(
+        spikes, time_series = self.biological_system.run_simulation(
                 n_iterations=self.current_update_iterations,
                 time_step=self.current_time_step,
                 ees_stimulation_params=ees_params
-            )
+        )
             
-            joint_col = f"Joint_{self.biological_system.associated_joint}"
-            actual_trajectory = time_series[joint_col].values
-            actual_amplitude = self._get_trajectory_amplitude(actual_trajectory)
+        joint_col = f"Joint_{self.biological_system.associated_joint}"
+        actual_trajectory = time_series[joint_col].values
             
-            amplitude_error = abs(actual_amplitude - self.desired_amplitude)
+        # Compute RMS error
+        rms_error = self._compute_rms_error(actual_trajectory, self.current_desired_trajectory)
             
-            # Store optimization data
-            optimization_data = {
-                'trajectory': actual_trajectory.copy(),
-                'time': self.current_prediction_time.copy(),
-                'params': ees_params.copy(),
-                'cost': amplitude_error,
-                'amplitude': actual_amplitude
-            }
-            self.current_phase_data.append(optimization_data)
-            self.cost_history.append(amplitude_error)
+        # Store optimization data
+        optimization_data = {
+            'trajectory': actual_trajectory.copy(),
+            'time': self.current_prediction_time.copy(),
+            'params': ees_params.copy(),
+            'rms_error': rms_error,
+            'frequency_hz': freq_hz,
+            'phase_idx': self.current_phase_idx,
+            'evaluation_count': len(self.current_phase_data) + 1
+        }
+        self.current_phase_data.append(optimization_data)
+        self.cost_history.append(rms_error)
+        
+        # Store intermediate trajectory for plotting
+        self.intermediate_trajectories.append({
+            'phase_idx': self.current_phase_idx,
+            'evaluation': len(self.current_phase_data),
+            'trajectory': actual_trajectory.copy(),
+            'time': self.current_prediction_time.copy(),
+            'frequency': freq_hz,
+            'rms_error': rms_error
+        })
             
-            return amplitude_error
-            
-        except Exception as e:
-            print(f"Simulation failed for freq={freq/hertz:.1f}Hz: {e}")
-            return 1e6  # Return large penalty for failed simulations
-    
-    def _optimize_frequency_scipy(self, desired_amplitude, site, update_iterations, 
-                                time_step, prediction_time):
+        return rms_error
+  
+
+    def _optimize_frequency(self):
         """
-        Optimize frequency using specified scipy method.
+        Optimize frequency with fallback handling and enhanced convergence tracking.
         """
-        # Set up current optimization context
+        # Set up optimization context
         self.current_phase_data = []
-        self.current_prediction_time = prediction_time
-        self.current_site = site
-        self.current_update_iterations = update_iterations
-        self.current_time_step = time_step
-        self.desired_amplitude = desired_amplitude
         
         freq_min = self.min_frequency / hertz
         freq_max = self.max_frequency / hertz
         freq_guess = self.ees_frequency_guess / hertz
         
-        print(f"    Optimizing with {self.optimization_method}...")
+        print(f"    Optimizing with {self.optimization_method} (RMS error)...")
+        
+        # Track optimization start time and initial error
+        start_function_evals = len(self.cost_history)
         
         if self.optimization_method == 'brent':
-            # Brent's method - good for unimodal functions
             result = minimize_scalar(
                 self._objective_function,
                 bounds=(freq_min, freq_max),
                 method='bounded',
-                options={'xatol': 0.5}  # Tolerance in Hz
+                options={'xatol': 0.5, 'maxfun': self.max_iterations}
             )
-            
-        elif self.optimization_method == 'golden':
-            # Golden section search
-            result = minimize_scalar(
+                
+        elif self.optimization_method == 'differential_evolution':
+            result = differential_evolution(
                 self._objective_function,
-                bounds=(freq_min, freq_max),
-                method='golden',
-                options={'xtol': 0.5}
+                bounds=[(freq_min, freq_max)],
+                seed=42,
+                maxiter=min(20, self.max_iterations//5),
+                popsize=5,
+                atol=self.rms_tolerance
             )
-            
+                
         elif self.optimization_method == 'nelder_mead':
-            # Nelder-Mead simplex - robust but can be slow
             result = minimize(
                 self._objective_function,
                 x0=[freq_guess],
                 method='Nelder-Mead',
-                options={'xatol': 0.5, 'fatol': self.amplitude_tolerance}
+                options={
+                    'maxiter': self.max_iterations,
+                    'xatol': 0.5,
+                    'fatol': self.rms_tolerance
+                }
             )
-            
-        elif self.optimization_method == 'powell':
-            # Powell's method - good for optimization without derivatives
-            result = minimize(
-                self._objective_function,
-                x0=[freq_guess],
-                method='Powell',
-                bounds=[(freq_min, freq_max)],
-                options={'xtol': 0.5, 'ftol': self.amplitude_tolerance}
-            )
-            
-        elif self.optimization_method == 'differential_evolution':
-            # Differential Evolution - global optimization, handles multimodal functions
-            result = differential_evolution(
-                self._objective_function,
-                bounds=[(freq_min, freq_max)],
-                seed=42,  # For reproducibility
-                atol=self.amplitude_tolerance,
-                tol=0.01,
-                maxiter=20,
-                popsize=5  # Small population for speed
-            )
-            
-        elif self.optimization_method == 'basinhopping':
-            # Basin hopping - global optimization with local refinement
-            minimizer_kwargs = {
-                'method': 'L-BFGS-B',
-                'bounds': [(freq_min, freq_max)]
-            }
-            result = basinhopping(
-                self._objective_function,
-                x0=[freq_guess],
-                minimizer_kwargs=minimizer_kwargs,
-                niter=10,
-                T=5.0,  # Temperature for acceptance
-                stepsize=5.0  # Step size in Hz
-            )
-            
-        elif self.optimization_method == 'ternary_search':
-            # Custom ternary search implementation
-            result = self._ternary_search(freq_min, freq_max)
-            
-        else:
-            raise ValueError(f"Unknown optimization method: {self.optimization_method}")
         
-        # Store optimization result
+        # Calculate convergence information
+        end_function_evals = len(self.cost_history)
+        total_function_evals = end_function_evals - start_function_evals
+        
+        # Get RMS errors for this phase
+        phase_rms_errors = [data['rms_error'] for data in self.current_phase_data]
+        
+        convergence_data = {
+            'phase_idx': self.current_phase_idx,
+            'optimization_method': self.optimization_method,
+            'function_evaluations': total_function_evals,
+            'initial_rms_error': phase_rms_errors[0] if phase_rms_errors else None,
+            'final_rms_error': phase_rms_errors[-1] if phase_rms_errors else None,
+            'best_rms_error': min(phase_rms_errors) if phase_rms_errors else None,
+            'rms_improvement': (phase_rms_errors[0] - min(phase_rms_errors)) if phase_rms_errors else 0,
+            'converged': result.success if hasattr(result, 'success') else True,
+            'convergence_reason': result.message if hasattr(result, 'message') else 'Completed',
+            'optimal_frequency': result.x if hasattr(result, 'x') else result.x[0] if hasattr(result, 'x') else None,
+            'rms_tolerance_met': min(phase_rms_errors) <= self.rms_tolerance if phase_rms_errors else False
+        }
+        
+
+        convergence_data['optimal_frequency'] = result.x
+        
+        self.convergence_info.append(convergence_data)
+        
+        # Store result
         self.optimization_results.append(result)
         
-        # Print results
-        if hasattr(result, 'x') and isinstance(result.x, (list, np.ndarray)):
-            optimal_freq = result.x[0]
-        else:
-            optimal_freq = result.x if hasattr(result, 'x') else result
-            
-        optimal_error = result.fun if hasattr(result, 'fun') else self._objective_function(optimal_freq)
-        n_evaluations = result.nfev if hasattr(result, 'nfev') else len(self.current_phase_data)
-        
-        print(f"    Converged: freq={optimal_freq:.1f}Hz, error={optimal_error:.3f}, "
-              f"evaluations={n_evaluations}")
+        # Print convergence information
+        print(f"    Convergence: {convergence_data['function_evaluations']} evals, "
+              f"RMS: {convergence_data['initial_rms_error']:.3f} → {convergence_data['final_rms_error']:.3f}, "
+              f"Best: {convergence_data['best_rms_error']:.3f}")
         
         return self.current_phase_data
-    
-    def _ternary_search(self, left, right, epsilon=0.5):
-        """
-        Custom ternary search implementation for comparison.
-        """
-        class TernaryResult:
-            def __init__(self, x, fun, nfev):
-                self.x = x
-                self.fun = fun
-                self.nfev = nfev
-        
-        nfev = 0
-        while abs(right - left) > epsilon:
-            m1 = left + (right - left) / 3
-            m2 = right - (right - left) / 3
-            
-            f1 = self._objective_function(m1)
-            f2 = self._objective_function(m2)
-            nfev += 2
-            
-            if f1 > f2:
-                left = m1
-            else:
-                right = m2
-        
-        optimal_x = (left + right) / 2
-        optimal_fun = self._objective_function(optimal_x)
-        nfev += 1
-        
-        return TernaryResult(optimal_x, optimal_fun, nfev)
 
     def run(self, time_step=0.1*ms):
         """
-        Run the complete control simulation with SciPy optimization.
+        Run the complete control simulation.
         """
         current_time = 0.0
         phase_idx = 0
-        
-        print(f"Starting EES control simulation with SciPy {self.optimization_method} optimization...")
-        print(f"Event times: {self.event_times}")
-        print(f"Stimulation sites: {self.site_stimulation}")
+        self.time_step = time_step
+
+        print(f"Starting EES control simulation with RMS error optimization...")
+        print(f"Optimization method: {self.optimization_method}")
+        print(f"RMS tolerance: {self.rms_tolerance}")
         
         while current_time < self.total_time and phase_idx < len(self.site_stimulation):
             next_event_time = self.event_times[phase_idx + 1] if phase_idx + 1 < len(self.event_times) else self.total_time
@@ -304,207 +260,241 @@ class EESControllerSciPy:
             print(f"\nPhase {phase_idx + 1}: {current_time:.3f}s to {next_event_time:.3f}s")
             print(f"Duration: {phase_duration:.3f}s, Iterations: {update_iterations}, Site: {site}")
             
-            simulation_time = np.arange(update_iterations) * time_step
-            prediction_time = simulation_time + current_time
+            prediction_time = np.linspace(self.event_times[phase_idx], self.event_times[phase_idx+1], update_iterations)
             desired_trajectory_segment = self.desired_trajectory_function(prediction_time)
-            desired_amplitude = self._get_trajectory_amplitude(desired_trajectory_segment)
-            
+
+            self.current_prediction_time = prediction_time
+            self.current_desired_trajectory = desired_trajectory_segment
+            self.current_site = site
+            self.current_update_iterations = update_iterations
+            self.current_phase_idx = phase_idx
             self.time_history.append(prediction_time)
             self.desired_trajectory_history.append(desired_trajectory_segment)
+ 
+        
+            # Optimize frequency
+            phase_optimization_data = self._optimize_frequency()
             
-            print(f"    Target amplitude: {desired_amplitude:.3f}")
-            
-            # Optimize using SciPy
-            phase_optimization_data = self._optimize_frequency_scipy(
-                desired_amplitude, site, update_iterations, time_step, prediction_time)
-            
-            # Store optimization data for this phase
             self.optimization_trajectories.append(phase_optimization_data)
             
             # Update biological system state
-            self.biological_system.update_state()
+            self.biological_system.update_system_state()
             
-            # Store results for this phase (best result)
-            best_result = min(phase_optimization_data, key=lambda x: x['cost'])
-            self.trajectory_history.append(best_result['trajectory'])
-            self.ees_params_history.append(best_result['params'])
+            # Store best result for this phase
+            if phase_optimization_data:
+                best_result = min(phase_optimization_data, key=lambda x: x['rms_error'])
+                self.trajectory_history.append(best_result['trajectory'])
+                self.ees_params_history.append(best_result['params'])
             
             current_time = next_event_time   
             phase_idx += 1
-        
-        print(f"\nControl simulation completed!")
+
         
         return (self.trajectory_history, self.desired_trajectory_history, 
                 self.ees_params_history, self.time_history)
 
+    def print_convergence_summary(self):
+        """Print a detailed convergence summary."""
+        print("\n" + "="*80)
+        print("CONVERGENCE SUMMARY")
+        print("="*80)
+        
+        for conv_info in self.convergence_info:
+            print(f"\nPhase {conv_info['phase_idx'] + 1}:")
+            print(f"  Method: {conv_info['optimization_method']}")
+            print(f"  Function Evaluations: {conv_info['function_evaluations']}")
+            print(f"  RMS Error: {conv_info['initial_rms_error']:.4f} → {conv_info['final_rms_error']:.4f}")
+            print(f"  Best RMS Error: {conv_info['best_rms_error']:.4f}")
+            print(f"  Improvement: {conv_info['rms_improvement']:.4f}")
+            print(f"  Optimal Frequency: {conv_info['optimal_frequency']:.2f} Hz")
+            print(f"  Tolerance Met: {'Yes' if conv_info['rms_tolerance_met'] else 'No'}")
+            print(f"  Converged: {'Yes' if conv_info['converged'] else 'No'}")
+            print(f"  Status: {conv_info['convergence_reason']}")
+        
+        # Overall statistics
+        total_evals = sum(conv['function_evaluations'] for conv in self.convergence_info)
+        avg_improvement = np.mean([conv['rms_improvement'] for conv in self.convergence_info])
+        tolerance_met_count = sum(1 for conv in self.convergence_info if conv['rms_tolerance_met'])
+        
+        print(f"\nOVERALL STATISTICS:")
+        print(f"  Total Function Evaluations: {total_evals}")
+        print(f"  Average RMS Improvement: {avg_improvement:.4f}")
+        print(f"  Phases Meeting Tolerance: {tolerance_met_count}/{len(self.convergence_info)}")
+        print("="*80)
+
     def plot(self, base_output_path=None):
         """
-        Plot the control results with SciPy optimization details.
+        Plot the control results focusing on RMS error performance with intermediate trajectories.
         """
         if not self.trajectory_history:
-            raise ValueError("No simulation results to plot. Run control simulation first.")
+            raise ValueError("No simulation results to plot. Run simulation first.")
         
-        # Convert lists to numpy arrays for easier handling
+        # Prepare data
         time_array = np.concatenate(self.time_history)
         actual_traj = np.concatenate(self.trajectory_history)
         desired_traj = np.concatenate(self.desired_trajectory_history)
         
-        # Extract EES parameters over time
         frequencies = [params['frequency'] / hertz for params in self.ees_params_history]
-        sites = [params['site'] for params in self.ees_params_history]
         
-        # Create subplots
-        fig, axes = plt.subplots(4, 1, figsize=(12, 18))
+        # Create plots - now with 4 subplots
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        axes = axes.flatten()
         
         # Plot 1: Trajectory comparison
-        axes[0].plot(time_array, desired_traj, color='#000000', linewidth=2, 
-                    label='Desired trajectory', zorder=10)
-        axes[0].plot(time_array, actual_traj, color='#E69F00', linestyle='--', linewidth=2, 
-                    label='Actual trajectory', zorder=9)
+        axes[0].plot(time_array, desired_traj, 'k-', linewidth=2, label='Desired trajectory')
+        axes[0].plot(time_array, actual_traj, 'r--', linewidth=2, label='Actual trajectory')
         
         # Add phase boundaries
         for i, event_time in enumerate(self.event_times[1:-1], 1):
-            axes[0].axvline(x=event_time, color='red', linestyle=':', alpha=0.7, 
-                          label=f'Phase {i} boundary' if i == 1 else "")
+            axes[0].axvline(x=event_time, color='gray', linestyle=':', alpha=0.7)
         
-        axes[0].set_xlabel('Time (s)', fontsize=12)
-        axes[0].set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)', fontsize=12)
-        axes[0].set_title(f'Trajectory Tracking Performance (SciPy {self.optimization_method})', 
-                         fontsize=14, fontweight='bold')
+        axes[0].set_xlabel('Time (s)')
+        axes[0].set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)')
+        axes[0].set_title(f'RMS-Optimized Trajectory Tracking ({self.optimization_method})')
         axes[0].legend()
         axes[0].grid(True, alpha=0.3)
         
-        # Plot 2: Optimization convergence per phase
+        # Plot 2: RMS error convergence per phase
         for phase_idx, phase_data in enumerate(self.optimization_trajectories):
-            costs = [data['cost'] for data in phase_data]
-            iterations = range(len(costs))
-            axes[1].semilogy(iterations, costs, 'o-', 
+            rms_errors = [data['rms_error'] for data in phase_data]
+            iterations = range(len(rms_errors))
+            axes[1].semilogy(iterations, rms_errors, 'o-', 
                            label=f'Phase {phase_idx + 1}', linewidth=2, markersize=4)
         
+        axes[1].axhline(y=self.rms_tolerance, color='red', linestyle='--', 
+                       alpha=0.7, label='RMS Tolerance')
         axes[1].set_xlabel('Function Evaluations')
-        axes[1].set_ylabel('Amplitude Error (log scale)')
-        axes[1].set_title('Optimization Convergence per Phase')
+        axes[1].set_ylabel('RMS Error (log scale)')
+        axes[1].set_title('RMS Error Convergence per Phase')
         axes[1].legend()
         axes[1].grid(True, alpha=0.3)
-        axes[1].axhline(y=self.amplitude_tolerance, color='red', linestyle='--', 
-                       alpha=0.7, label='Tolerance')
         
-        # Plot 3: Function evaluations and final errors
-        n_evaluations = [len(phase_data) for phase_data in self.optimization_trajectories]
-        final_errors = [min(data['cost'] for data in phase_data) for phase_data in self.optimization_trajectories]
-        
-        ax3_twin = axes[2].twinx()
-        bars1 = axes[2].bar([f'Phase {i+1}' for i in range(len(n_evaluations))], 
-                           n_evaluations, alpha=0.7, color='#56B4E9', label='Function Evaluations')
-        bars2 = ax3_twin.bar([f'Phase {i+1}' for i in range(len(final_errors))], 
-                            final_errors, alpha=0.7, color='#E69F00', width=0.6, label='Final Error')
-        
-        axes[2].set_ylabel('Function Evaluations', color='#56B4E9')
-        ax3_twin.set_ylabel('Final Amplitude Error', color='#E69F00')
-        axes[2].set_title('Optimization Efficiency per Phase')
-        
-        # Combined legend
-        lines1, labels1 = axes[2].get_legend_handles_labels()
-        lines2, labels2 = ax3_twin.get_legend_handles_labels()
-        axes[2].legend(lines1 + lines2, labels1 + labels2, loc='upper right')
-        
-        # Plot 4: Final frequency per phase
+        # Plot 3: Optimized frequencies
         freq_time_array = [time_segment[0] for time_segment in self.time_history]
-        axes[3].plot(freq_time_array, frequencies, color='#009E73', linewidth=2, marker='o', markersize=6)
+        axes[2].plot(freq_time_array, frequencies, 'go-', linewidth=2, markersize=8)
         for event_time in self.event_times[1:-1]:
-            axes[3].axvline(x=event_time, color='red', linestyle=':', alpha=0.7)
+            axes[2].axvline(x=event_time, color='gray', linestyle=':', alpha=0.7)
+        axes[2].set_xlabel('Time (s)')
+        axes[2].set_ylabel('Optimized EES Frequency (Hz)')
+        axes[2].set_title('RMS-Optimized Frequency Profile')
+        axes[2].grid(True, alpha=0.3)
+        
+        # Plot 4: Intermediate trajectories during optimization
+        colors = plt.cm.viridis(np.linspace(0, 1, len(self.convergence_info)))
+        
+        for phase_idx in range(len(self.convergence_info)):
+            # Get intermediate trajectories for this phase
+            phase_intermediates = [traj for traj in self.intermediate_trajectories 
+                                 if traj['phase_idx'] == phase_idx]
+            
+            if phase_intermediates:
+                # Plot desired trajectory for this phase
+                phase_time = phase_intermediates[0]['time']
+                phase_desired = self.desired_trajectory_function(phase_time)
+                axes[3].plot(phase_time, phase_desired, 'k-', linewidth=2, alpha=0.7)
+                
+                # Plot intermediate trajectories with increasing opacity
+                n_intermediates = len(phase_intermediates)
+                for i, intermediate in enumerate(phase_intermediates):
+                    alpha = 0.3 + 0.7 * (i / max(1, n_intermediates - 1))  # Increasing opacity
+                    linestyle = '-' if i == n_intermediates - 1 else '--'  # Solid line for final
+                    linewidth = 2 if i == n_intermediates - 1 else 1
+                    
+                    label = None
+                    if i == 0:
+                        label = f'Phase {phase_idx + 1} iterations'
+                    elif i == n_intermediates - 1:
+                        label = f'Phase {phase_idx + 1} final'
+                    
+                    axes[3].plot(intermediate['time'], intermediate['trajectory'], 
+                               color=colors[phase_idx], alpha=alpha, 
+                               linestyle=linestyle, linewidth=linewidth, label=label)
+        
+        # Add phase boundaries to intermediate plot
+        for event_time in self.event_times[1:-1]:
+            axes[3].axvline(x=event_time, color='gray', linestyle=':', alpha=0.7)
+        
         axes[3].set_xlabel('Time (s)')
-        axes[3].set_ylabel('Optimized EES Frequency (Hz)')
-        axes[3].set_title('Final Optimized Frequency Across Gait Phases')
+        axes[3].set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)')
+        axes[3].set_title('Intermediate Optimization Trajectories')
+        axes[3].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         axes[3].grid(True, alpha=0.3)
         
         plt.tight_layout()
         
-        # Save plot if path provided
+        # Save if requested
         if base_output_path:
             os.makedirs(base_output_path, exist_ok=True)
-            plt.savefig(os.path.join(base_output_path, f'ees_scipy_results_{self.optimization_method}.png'), 
+            plt.savefig(os.path.join(base_output_path, f'rms_ees_results_{self.optimization_method}.png'), 
                        dpi=300, bbox_inches='tight')
-            print(f"Control results plot saved to {base_output_path}")
+            print(f"Results plot saved to {base_output_path}")
         
         plt.show()
         
-        # Print optimization summary
-        self.print_optimization_summary()
-    
-    def print_optimization_summary(self):
-        """Print a summary of the optimization results."""
-        print(f"\n{'='*60}")
-        print(f"OPTIMIZATION SUMMARY ({self.optimization_method.upper()})")
-        print(f"{'='*60}")
-        
-        total_cost = sum(self.cost_history)
-        total_evaluations = len(self.cost_history)
-        final_errors = [min(data['cost'] for data in phase_data) for phase_data in self.optimization_trajectories]
-        avg_final_error = np.mean(final_errors)
-        
-        print(f"Total function evaluations: {total_evaluations}")
-        print(f"Total cumulative cost: {total_cost:.3f}")
-        print(f"Average final error per phase: {avg_final_error:.3f}")
-        print(f"Tolerance: {self.amplitude_tolerance}")
-        print(f"Phases achieving tolerance: {sum(1 for err in final_errors if err <= self.amplitude_tolerance)}/{len(final_errors)}")
-        
-        print(f"\nPer-phase results:")
-        for i, (phase_data, result) in enumerate(zip(self.optimization_trajectories, self.optimization_results)):
-            n_evals = len(phase_data)
-            final_error = min(data['cost'] for data in phase_data)
-            
-            if hasattr(result, 'x') and isinstance(result.x, (list, np.ndarray)):
-                optimal_freq = result.x[0]
-            else:
-                optimal_freq = result.x if hasattr(result, 'x') else 'N/A'
-            
-            success = "✓" if final_error <= self.amplitude_tolerance else "✗"
-            print(f"  Phase {i+1}: {n_evals:2d} evals, error={final_error:.3f}, freq={optimal_freq:.1f}Hz {success}")
+        # Print convergence summary
+        self.print_convergence_summary()
 
-# Example usage and comparison
-def compare_scipy_methods(biological_system, methods=['brent', 'differential_evolution', 'nelder_mead', 'powell']):
-    """
-    Compare different SciPy optimization methods.
-    """
-    results = {}
-    
-    for method in methods:
-        print(f"\n{'='*50}")
-        print(f"Testing SciPy {method.upper()} optimization")
-        print(f"{'='*50}")
+    def plot_intermediate_trajectories_detailed(self, base_output_path=None):
+        """
+        Create a detailed plot showing intermediate trajectories for each phase separately.
+        """
+        if not self.intermediate_trajectories:
+            print("No intermediate trajectories to plot.")
+            return
         
-        try:
-            controller = EESControllerSciPy(biological_system, optimization_method=method)
-            trajectory_history, desired_trajectory_history, ees_params_history, time_history = controller.run()
+        n_phases = len(self.convergence_info)
+        fig, axes = plt.subplots(n_phases, 1, figsize=(12, 4*n_phases))
+        
+        if n_phases == 1:
+            axes = [axes]
+        
+        for phase_idx in range(n_phases):
+            ax = axes[phase_idx]
             
-            results[method] = {
-                'controller': controller,
-                'total_cost': sum(controller.cost_history),
-                'total_evaluations': len(controller.cost_history),
-                'final_errors': [min([data['cost'] for data in phase_data]) 
-                               for phase_data in controller.optimization_trajectories],
-                'success': True
-            }
+            # Get intermediate trajectories for this phase
+            phase_intermediates = [traj for traj in self.intermediate_trajectories 
+                                 if traj['phase_idx'] == phase_idx]
             
-            controller.print_optimization_summary()
+            if not phase_intermediates:
+                continue
             
-        except Exception as e:
-            print(f"Method {method} failed: {e}")
-            results[method] = {'success': False, 'error': str(e)}
-    
-    # Print comparison
-    print(f"\n{'='*70}")
-    print(f"COMPARISON SUMMARY")
-    print(f"{'='*70}")
-    print(f"{'Method':<20} {'Evaluations':<12} {'Total Cost':<12} {'Avg Error':<12} {'Success':<8}")
-    print(f"{'-'*70}")
-    
-    for method, result in results.items():
-        if result.get('success', False):
-            avg_error = np.mean(result['final_errors'])
-            print(f"{method:<20} {result['total_evaluations']:<12} {result['total_cost']:<12.3f} {avg_error:<12.3f} {'Yes':<8}")
-        else:
-            print(f"{method:<20} {'N/A':<12} {'N/A':<12} {'N/A':<12} {'No':<8}")
-    
-    return results
+            # Plot desired trajectory
+            phase_time = phase_intermediates[0]['time']
+            phase_desired = self.desired_trajectory_function(phase_time)
+            ax.plot(phase_time, phase_desired, 'k-', linewidth=3, label='Desired', alpha=0.8)
+            
+            # Color map for iterations
+            n_intermediates = len(phase_intermediates)
+            colors = plt.cm.plasma(np.linspace(0, 1, n_intermediates))
+            
+            # Plot each intermediate trajectory
+            for i, intermediate in enumerate(phase_intermediates):
+                alpha = 0.4 + 0.6 * (i / max(1, n_intermediates - 1))
+                linewidth = 1.5 if i == n_intermediates - 1 else 1
+                
+                label = f"Eval {i+1} (f={intermediate['frequency']:.1f}Hz, RMS={intermediate['rms_error']:.3f})"
+                if i == n_intermediates - 1:
+                    label = f"FINAL: {label}"
+                
+                ax.plot(intermediate['time'], intermediate['trajectory'], 
+                       color=colors[i], alpha=alpha, linewidth=linewidth, 
+                       label=label if i < 5 or i == n_intermediates - 1 else None)
+            
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)')
+            ax.set_title(f'Phase {phase_idx + 1} - Optimization Trajectory Evolution\n'
+                        f'({self.convergence_info[phase_idx]["function_evaluations"]} evaluations, '
+                        f'RMS: {self.convergence_info[phase_idx]["initial_rms_error"]:.3f} → '
+                        f'{self.convergence_info[phase_idx]["best_rms_error"]:.3f})')
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+            ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        if base_output_path:
+            os.makedirs(base_output_path, exist_ok=True)
+            plt.savefig(os.path.join(base_output_path, f'intermediate_trajectories_{self.optimization_method}.png'), 
+                       dpi=300, bbox_inches='tight')
+            print(f"Intermediate trajectories plot saved to {base_output_path}")
+        
+        plt.show()
