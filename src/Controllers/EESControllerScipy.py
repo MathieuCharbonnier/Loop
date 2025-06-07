@@ -31,8 +31,8 @@ class EESControllerSciPy:
         self.optimization_method = optimization_method
         
         # Convergence parameters
-        self.max_iterations = 10
-        self.rms_tolerance = 5.0  # RMS error tolerance
+        self.max_iterations = 3
+        self.rms_tolerance = 10.0  # RMS error tolerance
         
         # Load trajectory data
         self._load_trajectory_data()
@@ -110,17 +110,17 @@ class EESControllerSciPy:
     def _objective_function(self, freq_hz):
         
         # Clamp frequency to valid range
-        freq = max(self.min_frequency, min(self.max_frequency, freq_hz))
+        freq = max(self.min_frequency/hertz, min(self.max_frequency/hertz, freq_hz))
         
         # Run simulation
         ees_params = {
-            'frequency': freq*hertz,
+            'frequency': freq * hertz,
             'intensity': self.ees_intensity,
             'site': self.current_site
         }
         spikes, time_series = self.biological_system.run_simulation(
                 n_iterations=self.current_update_iterations,
-                time_step=self.current_time_step,
+                time_step=self.time_step,
                 ees_stimulation_params=ees_params
         )
             
