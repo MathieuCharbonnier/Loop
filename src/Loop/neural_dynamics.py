@@ -1265,7 +1265,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     equation_Ib = spindle_model['Ib']  # Assumes Ib model is provided in spindle_model
     ib_eq = f'''
     is_flexor = (i < n_Ib_flexor) : boolean
-    normalized_force = force_flexor_array(t) * int(is_flexor) + force_extensor_array(t) * int(not is_flexor) : 1
+    force_normalized = force_flexor_array(t) * int(is_flexor) + force_extensor_array(t) * int(not is_flexor) : 1
     is_ees = ((is_flexor and i < Ib_flexor_recruited) or (not is_flexor and i < n_Ib_flexor + Ib_extensor_recruited)) : boolean
     rate = ({equation_Ib})*hertz + ees_freq * int(is_ees) : Hz
     '''
@@ -1300,12 +1300,12 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     # Motoneuron (MN) 
     mn_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v) + gexc*(E_ex - v)+ gi_*(E_inh - v)  + gi__*(E_inh - v) : amp
+    Isyn = gIa*(E_ex - v) + gexc*(E_ex - v)+ gi1*(E_inh - v)  + gi2*(E_inh - v) : amp
     dgIa/dt = -gIa / tau_e : siemens 
     dgexc/dt = -gexc / tau_e : siemens
-    dgi_/dt = (ginh-gi_)/tau_i : siemens
+    dgi1/dt = (ginh-gi1)/tau_i : siemens
     dginh/dt = -ginh / tau_i : siemens 
-    dgi__/dt = (ginhb-gi__)/tau_i : siemens
+    dgi2/dt = (ginhb-gi2)/tau_i : siemens
     dginhb/dt = -ginhb / tau_i : siemens
     '''
                                            
@@ -1336,18 +1336,18 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     # Create neuron groups
     MN = NeuronGroup(n_MN_flexor + n_MN_extensor, mn_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', method='euler')
-    inh = NeuronGroup(n_Ia_flexor + n_Ia_extensor, inh_eq, threshold='v > threshold_v', 
+    inh = NeuronGroup(n_inh_flexor + n_inh_extensor, inh_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky',  method='euler')
-    inhb = NeuronGroup(n_inhb_flexor + n_inh_extensor, inhb_eq, threshold='v > threshold_v', 
+    inhb = NeuronGroup(n_inhb_flexor + n_inhb_extensor, inhb_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', method='euler')
     exc = NeuronGroup(n_exc_flexor + n_exc_extensor, ex_eq, threshold='v > threshold_v', 
                      reset='v = Eleaky', method='euler')
 
     # Initialize membrane potentials
-    MN.v = initial_state_neurons['MN']
-    inh.v = initial_state_neurons['inh']
-    inhb.v = initial_state_neurons['inhb']
-    exc.v = initial_state_neurons['exc']
+    MN.v = initial_state_neurons['MN']['v']
+    inh.v = initial_state_neurons['inh']['v']
+    inhb.v = initial_state_neurons['inhb']['v']
+    exc.v = initial_state_neurons['exc']['v']
     #Initialize conductances
     inh.gIa = initial_state_neurons['inh']['gIa']
     inh.gII = initial_state_neurons['inh']['gII']
@@ -1358,9 +1358,9 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     exc.gII = initial_state_neurons['exc']['gII']
     MN.gIa = initial_state_neurons['MN']['gIa']
     MN.gexc = initial_state_neurons['MN']['gexc']
-    MN.gi_ = initial_state_neurons['MN']['gi_']
+    MN.gi1 = initial_state_neurons['MN']['gi1']
     MN.ginh = initial_state_neurons['MN']['ginh']
-    MN.gi__ = initial_state_neurons['MN']['gi__']
+    MN.gi2 = initial_state_neurons['MN']['gi2']
     MN.ginhb = initial_state_neurons['MN']['ginhb']
                                            
     # Add neuron groups to the network
@@ -1446,9 +1446,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     inh_spikes = mon_inh.spike_trains()
     inhb_spikes = mon_inhb.spike_trains()
     exc_spikes = mon_exc.spike_trains()
-    inh_ext_spikes = mon_IA.spike_trains()
-    inhb_ext_spikes = mon_IN.spike_trains()
-    exc_ext_spikes = mon_EX.spike_trains()
+
     ees_spikes = mon_ees_MN.spike_trains() if ees_freq > 0 else None
 
     # Extract motoneuron spikes
@@ -1504,10 +1502,10 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
             'v': MN.v[:],
             'gIa': MN.gIa[:],
             'gexc': MN.gexc[:],
-            'gi_': Mn.gi_[:],
-            'ginh': Mn.ginh[:],
-            'gi__': Mn.gi__[:],
-            'ginhb': Mn.ginhb[:]
+            'gi1': MN.gi1[:],
+            'ginh': MN.ginh[:],
+            'gi2': MN.gi2[:],
+            'ginhb': MN.ginhb[:]
         }
     }
 
@@ -1533,9 +1531,9 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         "Ib": {i % n_Ib_flexor: ib_spikes[i] for i in range(n_Ib_flexor, n_Ib_flexor + n_Ib_extensor)},
         "II": {i % n_II_flexor: ii_spikes[i] for i in range(n_II_flexor, n_II_flexor + n_II_extensor)},
         "MN": MN_extensor_spikes,
-        "inh": {i % n_inh_flexor: inh_ext_spikes[i] for i in range(n_inh_flexor, n_inh_flexor + n_inh_extensor)},
-        "inhb": {i % n_inhb_flexor: inhb_ext_spikes[i] for i in range(n_inhb_flexor, n_inhb_flexor + n_inhb_extensor)},
-        "exc": {i % n_exc_flexor: exc_ext_spikes[i] for i in range(n_exc_flexor, n_exc_flexor + n_exc_extensor)}
+        "inh": {i % n_inh_flexor: inh_spikes[i] for i in range(n_inh_flexor, n_inh_flexor + n_inh_extensor)},
+        "inhb": {i % n_inhb_flexor: inhb_spikes[i] for i in range(n_inhb_flexor, n_inhb_flexor + n_inhb_extensor)},
+        "exc": {i % n_exc_flexor: exc_spikes[i] for i in range(n_exc_flexor, n_exc_flexor + n_exc_extensor)}
     }
 
     return [result_flexor, result_extensor], final_state_neurons, state_monitors
