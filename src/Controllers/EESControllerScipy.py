@@ -13,7 +13,8 @@ class EESControllerSciPy:
     Simplified EES Controller using only RMS error with robust convergence handling.
     """
     
-    def __init__(self, biological_system, ees_intensity=0.5, ees_frequency_guess=50*hertz):
+    def __init__(self, biological_system, ees_intensity=0.5,
+        sites=["L3", "S2", "L3"], gait_times=[0, 0.39, 0.56, 1]*second):
         """
         Initialize the simplified EES controller.
         
@@ -23,12 +24,13 @@ class EESControllerSciPy:
             The biological system to control
         """
         self.biological_system = biological_system.clone_with()
-        self.ees_intensity = ees_intensity
-        self.ees_frequency_guess = ees_frequency_guess
+        self.ees_intensity = ees_intensity    
+        self.event_times = gait_times
+        self.site_stimulation = sites
         
         # Convergence parameters
-        self.max_iterations = 1
-        self.rms_tolerance = 10.0  # RMS error tolerance
+        self.max_iterations = 10
+        self.rms_tolerance = 5.0  # RMS error tolerance
         
         # Load trajectory data
         self._load_trajectory_data()
@@ -55,16 +57,16 @@ class EESControllerSciPy:
 
         self.time = df['time'].values
         self.desired_trajectory = df[self.biological_system.associated_joint].values
-        self.total_time = self.time[-1]
+        self.total_time = self.time[-1]*second
         self.desired_trajectory_function = interp1d(
             self.time, self.desired_trajectory, kind='cubic', fill_value="extrapolate"
         )
         
-        max_dorsi_idx = np.argmax(self.desired_trajectory)
-        min_plantar_idx = np.argmin(self.desired_trajectory)
+        #max_dorsi_idx = np.argmax(self.desired_trajectory)
+        #min_plantar_idx = np.argmin(self.desired_trajectory)
         
-        self.event_times = np.array([0, self.time[max_dorsi_idx], self.time[min_plantar_idx], self.total_time])
-        self.site_stimulation = ['L3', 'S2', 'L3']
+        #self.event_times = np.array([0, self.time[max_dorsi_idx], self.time[min_plantar_idx], self.total_time])
+        #self.site_stimulation = ['L3', 'S2', 'L3']
         
         # Frequency bounds
         self.min_frequency = 10 * hertz
@@ -160,7 +162,6 @@ class EESControllerSciPy:
         
         freq_min = self.min_frequency / hertz
         freq_max = self.max_frequency / hertz
-        freq_guess = self.ees_frequency_guess / hertz
         
         result = minimize_scalar(
                 self._objective_function,
@@ -275,7 +276,7 @@ class EESControllerSciPy:
         
         # Add phase boundaries
         for i, event_time in enumerate(self.event_times[1:-1], 1):
-            axes[0].axvline(x=event_time, color='gray', linestyle=':', alpha=0.7)
+            axes[0].axvline(x=event_time/second, color='gray', linestyle=':', alpha=0.7)
         
         axes[0].set_xlabel('Time (s)')
         axes[0].set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)')
@@ -304,7 +305,7 @@ class EESControllerSciPy:
         freq_time_array = [time_segment[0] for time_segment in self.time_history]
         axes[2].plot(freq_time_array, frequencies, 'go-', linewidth=2, markersize=8)
         for event_time in self.event_times[1:-1]:
-            axes[2].axvline(x=event_time, color='gray', linestyle=':', alpha=0.7)
+            axes[2].axvline(x=event_time/second, color='gray', linestyle=':', alpha=0.7)
         axes[2].set_xlabel('Time (s)')
         axes[2].set_ylabel('Optimized EES Frequency (Hz)')
         axes[2].set_title('RMS-Optimized Frequency Profile')
@@ -317,7 +318,7 @@ class EESControllerSciPy:
             plt.savefig(os.path.join(base_output_path, f'rms_ees_results.png'), 
                        dpi=300, bbox_inches='tight')
             print(f"Results plot saved to {base_output_path}")
-        
+        plt.tight_layout()
         plt.show()
         
         # Print convergence summary
