@@ -92,8 +92,8 @@ class BiMusclesIb(BiologicalSystem):
                 # Ia inhibition pathways
                 ("Ia_flexor", "inh_flexor"): {"w": 3.64*nS, "p": 0.7},
                 ("Ia_extensor", "inh_extensor"): {"w": 3.64*nS, "p": 0.7},
-                ("Ia_flexor", "inhb_flexor"): {"w": 3.0*nS, "p": 0.6},  # e14
-                ("Ia_extensor", "inhb_extensor"): {"w": 3.0*nS, "p": 0.6},  # e14
+                ("Ia_flexor", "inhb_flexor"): {"w": 0.5*nS, "p": 0.6},  # e14
+                ("Ia_extensor", "inhb_extensor"): {"w": 0.5*nS, "p": 0.6},  # e14
                 
                 # Type II excitation pathways
                 ("II_flexor", "exc_flexor"): {"w": 1.65*nS, "p": 0.7},
@@ -104,16 +104,16 @@ class BiMusclesIb(BiologicalSystem):
                 ("II_extensor", "inh_extensor"): {"w": 2.19*nS, "p": 0.7},
                 
                 # Type Ib pathways e21 → IN i3 → MN (negative, within population)
-                ("Ib_flexor", "inhb_flexor"): {"w": 2.0*nS, "p": 0.6},  # e21
-                ("Ib_extensor", "inhb_extensor"): {"w": 2.0*nS, "p": 0.6},  # e21
+                ("Ib_flexor", "inhb_flexor"): {"w": 1.65*nS, "p": 0.6},  # e21
+                ("Ib_extensor", "inhb_extensor"): {"w": 1.65*nS, "p": 0.6},  # e21
                                     
                 # Excitatory interneuron to motoneuron pathways
                 ("exc_flexor", "MN_flexor"): {"w": 0.7*nS, "p": 0.5},
                 ("exc_extensor", "MN_extensor"): {"w": 0.7*nS, "p": 0.5},
                                     
                 # inhb interneuron to motoneuron pathways (Ib inhibition)
-                ("inhb_flexor", "MN_flexor"): {"w": 1.5*nS, "p": 0.6},  # i3 (inhibitory)
-                ("inhb_extensor", "MN_extensor"): {"w": 1.5*nS, "p": 0.6},  # i3 (inhibitory)
+                ("inhb_flexor", "MN_flexor"): {"w": 0.2*nS, "p": 0.6},  # i3 (inhibitory)
+                ("inhb_extensor", "MN_extensor"): {"w": 0.2*nS, "p": 0.6},  # i3 (inhibitory)
                 
                 # Reciprocal inhibition pathways
                 ("inh_flexor", "MN_extensor"): {"w": 0.2*nS, "p": 0.6},
@@ -127,8 +127,8 @@ class BiMusclesIb(BiologicalSystem):
               spindle_model = {
                   "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
                   "II": "20 + 13.5*stretch_delay",
-                  "Ib": "10 + 1*force_normalized**0.2",
-                  "Ia_II_delta_delay": 15*ms
+                  "Ib": "20*force_normalized**0.2",
+                  "Ia_II_delta_delay": 20*ms
               }
      
         if initial_state_neurons is None:
