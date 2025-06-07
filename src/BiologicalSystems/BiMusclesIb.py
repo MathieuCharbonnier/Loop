@@ -149,9 +149,9 @@ class BiMusclesIb(BiologicalSystem):
                 "MN": {'v':biophysical_params['Eleaky'],
                         'gIa':0*nS,
                         'gexc':0*nS,
-                        'gi_':0*nS,
+                        'gi1':0*nS,
                         'ginh':0*nS,
-                        'gi__':0*nS,
+                        'gi2':0*nS,
                         'ginhb': 0*nS
                       }           
             }
