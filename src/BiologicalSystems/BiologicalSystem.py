@@ -552,11 +552,11 @@ class BiologicalSystem(ABC):
         if self.final_state is not None:
             return copy_brian_dict(self.final_state)
         else:
-            return {'neurons': copy_brian_dict(self.nitial_state_neurons),
+            return {'neurons': copy_brian_dict(self.initial_state_neurons),
                     'spikes_activations':self.initial_condition_spike_activation,
                     'opensim': self.initial_state_opensim ,
                     'last_activations': self.activation_function,
-                    'stretch_history' : self.stretch_history}
+                    'stretch_history' : self.stretch_history_function}
                     
         
     def set_system_state(self, state):
@@ -565,7 +565,7 @@ class BiologicalSystem(ABC):
         self.initial_condition_spike_activation = state['spikes_activations']
         self.initial_state_opensim = state['opensim']
         self.activation_function = state['last_activations']
-        self.stretch_history_func=state['stretch_history']
+        self.stretch_history_function=state['stretch_history']
         self.final_state=None
         
     def update_system_state(self):
