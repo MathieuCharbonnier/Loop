@@ -10,7 +10,7 @@ class BiMuscles(BiologicalSystem):
     muscle systems, with both excitatory and inhibitory connections.
     """
     
-    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None,
+    def __init__(self, reaction_time=150*ms, biophysical_params=None, muscles_names=None,
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -21,7 +21,7 @@ class BiMuscles(BiologicalSystem):
         Parameters:
         -----------
         reaction_time : brian2.units.fundamentalunits.Quantity, optional
-            Reaction time of the system (default: 50ms)
+            Reaction time of the system (default: 150ms)
         biophysical_params : dict, optional
             Custom biophysical parameters for neurons (if None, use defaults)
         muscles_names : list, optional
@@ -52,7 +52,7 @@ class BiMuscles(BiologicalSystem):
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
                 'E_inh': -75*mV,
-                'tau_i': 2.5*ms,
+                'tau_i': 2.8*ms,
                 'threshold_v': -50*mV
             }
             
@@ -115,7 +115,7 @@ class BiMuscles(BiologicalSystem):
             spindle_model = {
                 "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
                 "II": "20 + 13.5*stretch_delay",
-                "Ia_II_delta_delay": 15*ms
+                "Ia_II_delta_delay": 20*ms
             }
             
         if initial_state_neurons is None:
