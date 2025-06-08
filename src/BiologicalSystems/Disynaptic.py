@@ -22,7 +22,7 @@ class Disynaptic(BiologicalSystem):
         """
         # Set default parameters if not provided
         if muscles_names is None:
-            muscles_names = ["tib_ant_r"]
+            muscles_names = ["soleus_r"]
             
         if biophysical_params is None:
             biophysical_params = {
@@ -42,10 +42,10 @@ class Disynaptic(BiologicalSystem):
         if neurons_population is None:
             # Exclude Ib and inhb neurons
             neurons_population = {
-                "Ia": 200,       # Type Ia afferent neurons
-                "II": 200,       # Type II afferent neurons
-                "exc": 400,      # Excitatory interneurons
-                "MN": 300        # Motor neurons
+                "Ia": 400,       # Type Ia afferent neurons
+                "II": 400,       # Type II afferent neurons
+                "exc": 500,      # Excitatory interneurons
+                "MN": 500        # Motor neurons
             }
         
         if connections is None:
