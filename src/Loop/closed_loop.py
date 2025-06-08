@@ -401,7 +401,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         # Extract stretch and calculate the all velocity values for this muscle
         stretch_values = df[f'Stretch_{muscle_name}'].values         
         stretch_velocity_values=np.gradient(stretch_values, time_values)
-        df[f'Stretch_Velocity_{muscles_names[muscle_idx]}']: stretch_velocity_values
+        print('stretch_velocity', stretch_velocity)
+        df[f'Stretch_Velocity_{muscle_name}']: stretch_velocity_values
         force_normalized_values=df[f'Force_{muscle_name}'].values
         stretch_delay_values = stretch_global_buffer[muscle_idx, :len(time_values)]
            
