@@ -35,7 +35,7 @@ class Monosynaptic(BiologicalSystem):
 
         if neurons_population is None:
             neurons_population = {
-                "Ia": 410,
+                "Ia": 400,
                 "MN": 500
             }
         if connections is None:
