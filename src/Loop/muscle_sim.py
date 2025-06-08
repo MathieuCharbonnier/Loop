@@ -7,7 +7,7 @@ import json
 import opensim as osim
 
 def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_values=None, output_all=None, 
-                  state_storage={}):
+                  state_storage={}, damping=None):
     """
     Run an OpenSim simulation with muscle activations and/or direct joint torques.
     
@@ -37,6 +37,12 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     model = osim.Model("data/gait2392_millard2012_pelvislocked.osim")
     nb_points=int(T/dt)
     time_array = np.linspace(0, T, nb_points)
+    if damping is not None:
+        coordinate = model.getCoordinateSet().get(joint_name)
+        if coordinate is not None:
+            add_joint_damping_with_spring(model, joint_name, damping)
+  
+
     # Add muscle controller if activation provided
     if activation_array is not None:
         
@@ -90,7 +96,6 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     reporter = osim.TableReporter()
     reporter.setName("MuscleReporter")
     reporter.set_report_time_interval(dt)
-    # Add this debugging code to see available outputs
 
 
     for muscle_name in muscles:
@@ -163,6 +168,49 @@ def run_simulation(dt, T, muscles, joint_name, activation_array=None, torque_val
     return fiber_length, normalized_force, joint_angles, json_
 
 
+def add_joint_damping_with_spring(model, joint_name, damping_coefficient=0.1, stiffness=0.0):
+    """
+    Add biological-like damping to a joint using SpringGeneralizedForce
+    
+    Parameters:
+    -----------
+    model : osim.Model
+        The OpenSim model
+    joint_name : str
+        Name of the joint coordinate to add damping to
+    damping_coefficient : float
+        Viscosity/damping coefficient (N⋅m⋅s/rad for rotational joints)
+    stiffness : float
+        Stiffness coefficient (N⋅m/rad for rotational joints)
+        Usually set to 0 for pure damping
+    """
+    
+    # Create the SpringGeneralizedForce
+    spring_damper = osim.SpringGeneralizedForce()
+    spring_damper.setName(f"Damper_{joint_name}")
+    
+    # Set the coordinate this force applies to
+    spring_damper.set_coordinate(joint_name)
+    
+    # Set damping (viscosity) - this is the key parameter
+    spring_damper.setViscosity(damping_coefficient)
+    
+    # Set stiffness (usually 0 for pure damping)
+    spring_damper.setStiffness(stiffness)
+    
+    # Set rest position (usually 0 - the position around which stiffness acts)
+    spring_damper.setRestLength(0.0)
+    
+    # Add to model
+    model.addForce(spring_damper)
+    
+    print(f"Added SpringGeneralizedForce damping to '{joint_name}' with viscosity={damping_coefficient}")
+    
+    return spring_damper
+
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Muscle and direct coordinate actuation simulation in OpenSim')
     parser.add_argument('--dt', type=float, required=True, help='Time step')
@@ -176,6 +224,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_stretch', type=str, help='Path to save output numpy array of fiber lengths')
     parser.add_argument('--output_force', type=str, help='Path to save output numpy array of normalized muscle forces')
     parser.add_argument('--output_joint', type=str, help='Path to save output numpy array of joint angles')
+    parser.add_argument('--damping', type=float, help='damping coefficient of the joint')
 
 
     args = parser.parse_args()
@@ -216,7 +265,8 @@ if __name__ == "__main__":
         activation_array=activation_array,
         torque_values=torque_values,
         output_all=args.output_all,
-        state_storage=state
+        state_storage=state,
+        damping=args.damping
     )
     
     # Save outputs if requested
@@ -232,3 +282,4 @@ if __name__ == "__main__":
     
     with open(args.state, "w") as f:
         json.dump(json_, f, indent=4)
+
