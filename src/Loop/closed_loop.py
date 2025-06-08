@@ -346,7 +346,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                 
                 # Add state monitor data with muscle name as suffix
                 for key, value in state_monitors[muscle_idx].items():
-                    batch_data[f'{key}_{muscles_names[muscle_idx]}'] = value
+                    batch_data[f'{key}_{muscles_names[muscle_idx]}'] = value[:nb_points]
 
                 # Store batch data for this muscle
                 muscle_data[muscle_idx].append(pd.DataFrame(batch_data))
