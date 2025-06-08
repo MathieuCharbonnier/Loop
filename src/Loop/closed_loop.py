@@ -335,7 +335,6 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
                     'Time': time_points[iteration * nb_points:(iteration + 1) * nb_points],
                     f'Fiber_length_{muscles_names[muscle_idx]}': fiber_lengths[muscle_idx],
                     f'Stretch_{muscles_names[muscle_idx]}': stretch[muscle_idx],
-                    f'Stretch_Velocity_{muscles_names[muscle_idx]}': stretch_velocity[muscle_idx],
                     f'Force_{muscles_names[muscle_idx]}': normalized_force[muscle_idx],
                     f'mean_e_{muscles_names[muscle_idx]}': mean_e[muscle_idx],
                     f'mean_u_{muscles_names[muscle_idx]}': mean_u[muscle_idx],
@@ -399,9 +398,10 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
 
         # Compute firing rate for this muscle
         time_values = df['Time'].values
-        # Extract stretch and velocity values for this muscle
-        stretch_values = df[f'Stretch_{muscle_name}'].values
-        stretch_velocity_values = df[f'Stretch_Velocity_{muscle_name}'].values
+        # Extract stretch and calculate the all velocity values for this muscle
+        stretch_values = df[f'Stretch_{muscle_name}'].values         
+        stretch_velocity_values=np.gradient(stretch_values, time_value)
+        df[f'Stretch_Velocity_{muscles_names[muscle_idx]}']: stretch_velocity_values
         force_normalized_values=df[f'Force_{muscle_name}'].values
         stretch_delay_values = stretch_global_buffer[muscle_idx, :len(time_values)]
            
