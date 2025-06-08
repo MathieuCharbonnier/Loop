@@ -59,8 +59,9 @@ class DisynapticIb(BiologicalSystem):
                 ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7},      # Direct excitation
                 ("II", "exc"): {"w": 1.65*nS, "p": 0.7},    # Stretch feedback
                 ("exc", "MN"): {"w": 0.7*nS, "p": 0.5},     # Excitatory interneuron
-                ("Ib", "inhb"): {"w": 1.65*nS, "p": 0.7},   # Force feedback
-                ("inhb", "MN"): {"w": 0.2*nS, "p": 0.6}     # Inhibitory interneuron
+                ("Ib", "inhb"): {"w": 1.65*nS, "p": 0.5},   # Force feedback
+                ("inhb", "MN"): {"w": 0.2*nS, "p": 0.5},     # Inhibitory interneuron
+                ("Ia", "inhb"): {"w": 1.65*nS, "p": 0.5}
             }
 
         if spindle_model is None:
@@ -76,7 +77,7 @@ class DisynapticIb(BiologicalSystem):
             # Include all neuron types in initial states
             initial_state_neurons = {
                 "exc": {'v': biophysical_params['Eleaky'], 'gII': 0*nS},
-                "inhb": {'v': biophysical_params['Eleaky'], 'gIb': 0*nS},
+                "inhb": {'v': biophysical_params['Eleaky'], 'gIb': 0*nS, 'gIa':0*nS},
                 "MN": {
                     'v': biophysical_params['Eleaky'],
                     'gIa': 0*nS,
@@ -127,7 +128,7 @@ class DisynapticIb(BiologicalSystem):
         # Check required connections (including Ib pathway)
         required_connections = {
             ("Ia", "MN"), ("II", "exc"), ("exc", "MN"),
-            ("Ib", "inhb"), ("inhb", "MN")
+            ("Ib", "inhb"), ("inhb", "MN"), ("Ia", "inhb")
         }
         defined_connections = set(self.connections.keys())
         missing_connections = required_connections - defined_connections
