@@ -120,7 +120,7 @@ class ReflexAnalyzer:
             print(f"Saved {filename}")
           
     def run_delay(self, torque_profile=None, delay_values=None, 
-                  duration=1*second, time_step=0.1*ms):
+                  duration=2*second, time_step=0.1*ms):
         """
         Analyze reflex behavior by varying delay parameter.
         
@@ -150,7 +150,7 @@ class ReflexAnalyzer:
                 "t_peak": 100 * ms,
                 "sigma": 50 * ms,
                 "max_amplitude": 25,
-                "sustained_amplitude": 10
+                "sustained_amplitude": 5
             }
         if delay_values is None:
             delay_values = [10, 50, 100] * ms  
