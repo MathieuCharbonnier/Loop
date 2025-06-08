@@ -26,8 +26,8 @@ class PhaseController:
         self.site_stimulation = site
         
         # Convergence parameters
-        self.max_iterations = 1
-        self.rms_tolerance = 5.0  # RMS error tolerance
+        self.max_iterations = 7
+        self.rms_tolerance = 0.2 # RMS error tolerance
         
         # Load trajectory data
         self._load_trajectory_data()
@@ -419,7 +419,7 @@ class PhaseController:
         axes[3].axhline(y=self.rms_tolerance, color='red', linestyle='--', 
                        alpha=0.7, label='RMS Tolerance')
         axes[3].set_xlabel('Function Evaluations')
-        axes[3].set_ylabel('RMS Error')
+        axes[3].set_ylabel('RMS Error ')
         axes[3].set_title('RMS Error Convergence per Phase')
         axes[3].legend()
         axes[3].grid(True, alpha=0.3)
@@ -452,7 +452,27 @@ class PhaseController:
         # Print convergence summary
         self.print_convergence_summary()
     
-  
+    def print_convergence_summary(self):
+        """Print a summary of convergence results."""
+        if not self.convergence_info:
+            print("No convergence information available.")
+            return
+        
+        print("\n=== CONVERGENCE SUMMARY ===")
+        total_evaluations = sum(info['function_evaluations'] for info in self.convergence_info)
+        
+        for i, info in enumerate(self.convergence_info):
+            muscle_type = "extensor" if i < len(self.phase_types) and self.phase_types[i] == 1 else "flexor"
+            print(f"Phase {i+1} ({muscle_type}):")
+            print(f"  Evaluations: {info['function_evaluations']}")
+            print(f"  RMS Error: {info['initial_rms_error']:.3f} → {info['best_rms_error']:.3f}")
+            print(f"  Improvement: {info['rms_improvement']:.3f}")
+            print(f"  Optimal freq: {info['optimal_frequency']:.1f} Hz")
+            print(f"  Tolerance met: {info['rms_tolerance_met']}")
+        
+        print(f"\nTotal function evaluations: {total_evaluations}")
+        avg_rms = np.mean([info['best_rms_error'] for info in self.convergence_info])
+        print(f"Average best RMS error: {avg_rms:.3f}")
 
     def plot_intermediate_trajectories_detailed(self, base_output_path=None):
         """
