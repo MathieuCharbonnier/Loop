@@ -66,8 +66,8 @@ class DisynapticIb(BiologicalSystem):
         if spindle_model is None:
             # Include Ib equation for force feedback
              spindle_model = {
-                "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
-                "II": "20 + 13.5*stretch_delay",
+                "Ia": "10+ 0.4*stretch + 0.86*sign(stretch_velocity)*abs(stretch_velocity)**0.6",
+                "II": "20 + 3.375*stretch_delay",
                 "Ib": " 57*force_normalized**0.2",
                 "Ia_II_delta_delay": 20*ms
             }
