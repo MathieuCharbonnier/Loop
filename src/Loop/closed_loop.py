@@ -17,7 +17,8 @@ from ..helpers.copy_brian_dict import copy_brian_dict
 
 
 def closed_loop(n_iterations, reaction_time, time_step, neurons_population, connections,
-              spindle_model, biophysical_params, muscles_names, num_muscles, resting_lengths, associated_joint, fast,
+              spindle_model, biophysical_params, muscles_names, num_muscles, resting_lengths, 
+              associated_joint, fast, damping,
               initial_state_neurons, initial_condition_spike_activation, initial_state_opensim, 
                 activation_function=None, stretch_history_function=None,
               ees_params=None, torque_array=None, seed=42, base_output_path=None):
@@ -173,7 +174,8 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             muscles_names,
             associated_joint,
             activation=activation_history,
-            torque=current_torque
+            torque=current_torque,
+            damping=damping
         )
             
         # Process muscle simulation results
@@ -555,7 +557,7 @@ class CoLabSimulator(SimulatorBase):
 
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
-                              activation, torque=None, initial_state=None, sto_path=None):
+                              activation, torque=None, initial_state=None, sto_path=None, damping=None):
         """Run a single muscle simulation iteration using conda subprocess"""
         
         # Save activation to temp file
@@ -573,7 +575,8 @@ class CoLabSimulator(SimulatorBase):
             '--output_stretch', self.output_stretch_path,
             '--output_force', self.output_force_path,
             '--output_joint', self.output_joint_path,
-            '--state', self.state_path
+            '--state', self.state_path,
+            '--damping', str(damping)
         ]
         
         # Add torque if provided
@@ -614,13 +617,13 @@ class LocalSimulator(SimulatorBase):
         return self.current_state   
     
     def run_muscle_simulation(self, dt, T, muscle_names, joint_name, 
-                              activation, torque, sto_path=None):
+                              activation, torque, sto_path=None, damping=None):
         """Run a single muscle simulation iteration using direct function call with in-memory state"""
         from .muscle_sim import run_simulation
         # Run simulation directly with in-memory state
         fiber_lengths,normalized_force, joint, new_state = run_simulation(
             dt, T, muscle_names, joint_name, activation,
-            state_storage=self.current_state, output_all=sto_path
+            state_storage=self.current_state, output_all=sto_path, damping=damping
         )
         # Update in-memory state
         self.current_state = new_state
