@@ -263,7 +263,7 @@ class ReflexAnalyzer:
                 "sustained_amplitude": 10
             }
         if threshold_values is None:
-            threshold_values = [-45, -50, -55] * mV
+            threshold_values = [-50, -52, -54, -56, -58] * mV
         
         n_iterations = int(duration / self.original_system.reaction_time)
         
