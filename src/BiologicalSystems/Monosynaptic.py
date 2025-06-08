@@ -44,7 +44,7 @@ class Monosynaptic(BiologicalSystem):
             }
         if spindle_model is None:
             spindle_model = {
-                "Ia": "10+ 2*stretch + 4.3*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
+                "Ia": "10+ 0.4*stretch + 0.86*sign(stretch_velocity)*abs(stretch_velocity)**0.6"
             }
         if initial_state_neurons is None:
             initial_state_neurons = {
