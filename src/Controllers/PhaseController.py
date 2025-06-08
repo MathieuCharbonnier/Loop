@@ -26,7 +26,7 @@ class PhaseController:
         self.site_stimulation = site
         
         # Convergence parameters
-        self.max_iterations = 10
+        self.max_iterations = 1
         self.rms_tolerance = 5.0  # RMS error tolerance
         
         # Load trajectory data
@@ -38,18 +38,15 @@ class PhaseController:
 
     def _load_trajectory_data(self):
         """Load and process activations and trajectory data."""
-        mot_file = 'data/data/tib_gas_activations_ankle_joint.csv'
+        mot_file = 'data/tib_gas_activations_ankle_joint.csv'
         df = pd.read_csv(mot_file)
         self.time = df['time'].values
-        self.desired_trajectory = df[self.biological_system.associated_joint].values
+        self.desired_trajectory = df['joint'].values
         self.total_time = self.time[-1]*second
         self.desired_trajectory_function = interp1d(
             self.time, self.desired_trajectory, kind='cubic', fill_value="extrapolate"
         )
-        muscles_names = self.biological_system.muscles_name
-        for muscle_name in muscles_names:
-            if not muscle_name in df:
-                raise ValueError(f"{muscle_name} activations not found in the {mot_file} file")
+        muscles_names = self.biological_system.muscles_names
         
         # Store muscle activations
         flexor_col = f'activations_{muscles_names[0]}'  # assuming first muscle is flexor
@@ -168,8 +165,8 @@ class PhaseController:
         )
             
         # Get activations for both muscles
-        flexor_col = f"Activation_{self.biological_system.muscles_name[0]}"
-        extensor_col = f"Activation_{self.biological_system.muscles_name[1]}"
+        flexor_col = f"Activation_{self.biological_system.muscles_names[0]}"
+        extensor_col = f"Activation_{self.biological_system.muscles_names[1]}"
         
         actual_flexor = time_series[flexor_col].values if flexor_col in time_series else np.zeros(len(time_series))
         actual_extensor = time_series[extensor_col].values if extensor_col in time_series else np.zeros(len(time_series))
@@ -260,7 +257,7 @@ class PhaseController:
         """
         Run the complete control simulation.
         """
-        current_time = 0.0
+        current_time = 0.0*second
         phase_idx = 0
         self.time_step = time_step
 
@@ -268,7 +265,7 @@ class PhaseController:
         print(f"RMS tolerance: {self.rms_tolerance}")
         
         while current_time < self.total_time and phase_idx < len(self.phase_types):
-            next_event_time = self.event_times[phase_idx + 1] if phase_idx + 1 < len(self.event_times) else self.total_time
+            next_event_time = self.event_times[phase_idx + 1]*second if phase_idx + 1 < len(self.event_times) else self.total_time
             phase_duration = next_event_time - current_time
             
             # Determine current phase type and site
