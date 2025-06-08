@@ -15,7 +15,7 @@ class DisynapticIb(BiologicalSystem):
     
     def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
-                 spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
+                 spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, damping=0.05,
                  initial_state_neurons=None, initial_condition_spike_activation=None, 
                  initial_state_opensim=None, activation_funct=None, stretch_history_func=None, seed=41):
         """
@@ -34,7 +34,7 @@ class DisynapticIb(BiologicalSystem):
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
                 'E_inh': -75*mV,
-                'tau_i': 2.8*ms,
+                'tau_i': 2.5*ms,
                 'threshold_v': -50*mV
             }
             
@@ -60,7 +60,7 @@ class DisynapticIb(BiologicalSystem):
                 ("II", "exc"): {"w": 1.65*nS, "p": 0.7},    # Stretch feedback
                 ("exc", "MN"): {"w": 0.7*nS, "p": 0.5},     # Excitatory interneuron
                 ("Ib", "inhb"): {"w": 1.65*nS, "p": 0.5},   # Force feedback
-                ("inhb", "MN"): {"w": 0.2*nS, "p": 0.5},     # Inhibitory interneuron
+                ("inhb", "MN"): {"w": 0.2*nS, "p": 0.4},     # Inhibitory interneuron
                 ("Ia", "inhb"): {"w": 1.65*nS, "p": 0.5}
             }
 
@@ -98,7 +98,7 @@ class DisynapticIb(BiologicalSystem):
             ]
             
         super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
-                        muscles_names, associated_joint, fast_type_mu,
+                        muscles_names, associated_joint, fast_type_mu, damping,
                         neurons_population, connections, spindle_model, seed,
                         initial_state_neurons, initial_condition_spike_activation, 
                         initial_state_opensim, activation_funct, stretch_history_func)
