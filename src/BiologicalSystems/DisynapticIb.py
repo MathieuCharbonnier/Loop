@@ -13,7 +13,7 @@ class DisynapticIb(BiologicalSystem):
     - Ib afferents → Inhibitory interneurons → Motor neurons (disynaptic inhibition)
     """
     
-    def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
                  spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
                  initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -23,7 +23,7 @@ class DisynapticIb(BiologicalSystem):
         """
         # Set default parameters if not provided
         if muscles_names is None:
-            muscles_names = ["tib_ant_r"]
+            muscles_names = ["soleus_r"]
             
         if biophysical_params is None:
             biophysical_params = {
@@ -34,7 +34,7 @@ class DisynapticIb(BiologicalSystem):
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
                 'E_inh': -75*mV,
-                'tau_i': 2.5*ms,
+                'tau_i': 2.8*ms,
                 'threshold_v': -50*mV
             }
             
@@ -45,12 +45,12 @@ class DisynapticIb(BiologicalSystem):
         if neurons_population is None:
             # Include all neuron types including Ib pathway
             neurons_population = {
-                "Ia": 200,       # Type Ia afferent neurons
-                "II": 200,       # Type II afferent neurons
-                "Ib": 200,       # Type Ib afferent neurons (force feedback)
-                "exc": 400,      # Excitatory interneurons
-                "inhb": 400,     # Inhibitory interneurons
-                "MN": 300        # Motor neurons
+                "Ia": 400,       # Type Ia afferent neurons
+                "II": 400,       # Type II afferent neurons
+                "Ib": 400,       # Type Ib afferent neurons (force feedback)
+                "exc": 500,      # Excitatory interneurons
+                "inhb": 500,     # Inhibitory interneurons
+                "MN": 500        # Motor neurons
             }
         
         if connections is None:
