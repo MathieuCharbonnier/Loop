@@ -70,7 +70,7 @@ class EESAnalyzer:
         vary_param = {
             'param_name': 'frequency',
             'values': freq_range,
-            'label': 'EES Frequency (Hz)'
+            'label': 'EES Frequency '
         }
 
         # Compute parameter sweep
