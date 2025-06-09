@@ -12,7 +12,7 @@ class Disynaptic(BiologicalSystem):
     - II afferents → Excitatory interneurons → Motor neurons (disynaptic excitation)
     """
     
-    def __init__(self, reaction_time=50*ms, biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=80*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
                  spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True,damping=0.05, 
                  initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -22,7 +22,7 @@ class Disynaptic(BiologicalSystem):
         """
         # Set default parameters if not provided
         if muscles_names is None:
-            muscles_names = ["soleus_r"]
+            muscles_names = ["tib_ant_r"]
             
         if biophysical_params is None:
             biophysical_params = {
