@@ -42,10 +42,10 @@ class Disynaptic(BiologicalSystem):
         if neurons_population is None:
             # Exclude Ib and inhb neurons
             neurons_population = {
-                "Ia": 400,       # Type Ia afferent neurons
-                "II": 400,       # Type II afferent neurons
-                "exc": 500,      # Excitatory interneurons
-                "MN": 500        # Motor neurons
+                "Ia": 200,       # Type Ia afferent neurons
+                "II": 200,       # Type II afferent neurons
+                "exc": 400,      # Excitatory interneurons
+                "MN": 300        # Motor neurons
             }
         
         if connections is None:
