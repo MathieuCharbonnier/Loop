@@ -579,7 +579,7 @@ class EESAnalyzer:
         # Save figures
         for fig, name in zip([fig_scatter, fig_coact, fig_time], 
                             ["flexor_vs_extensor", "coactivation_metrics", "activation_time"]):
-            filename = f"{name}_{param_name}_{min(param_values)}to{max(param_values)}_{timestamp}_{seed}.png"
+            filename = f"{name}_{param_name}_{min(param_values)}to{max(param_values)}.png"
             filepath = os.path.join(save_dir, filename)
             fig.savefig(filepath, bbox_inches='tight')
             print(f"Saved analysis plot: {filename}")
