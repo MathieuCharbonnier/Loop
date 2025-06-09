@@ -476,66 +476,127 @@ class PhaseController:
 
     def plot_intermediate_trajectories_detailed(self, base_output_path=None):
         """
-        Create a detailed plot showing intermediate trajectories for each phase separately.
+        Create a detailed plot showing intermediate muscle activations for each phase separately.
         """
         if not self.intermediate_trajectories:
             print("No intermediate trajectories to plot.")
             return
         
         n_phases = len(self.convergence_info)
-        fig, axes = plt.subplots(n_phases, 1, figsize=(12, 4*n_phases))
+        # Create 2 columns (flexor and extensor) and n_phases rows
+        fig, axes = plt.subplots(n_phases, 2, figsize=(16, 4*n_phases))
         
+        # Handle single phase case
         if n_phases == 1:
-            axes = [axes]
+            axes = axes.reshape(1, -1)
         
         for phase_idx in range(n_phases):
-            ax = axes[phase_idx]
-            
             # Get intermediate trajectories for this phase
             phase_intermediates = [traj for traj in self.intermediate_trajectories 
-                                 if traj['phase_idx'] == phase_idx]
+                                if traj['phase_idx'] == phase_idx]
             
             if not phase_intermediates:
                 continue
             
-            # Plot desired trajectory
+            # Get desired activations for this phase
             phase_time = phase_intermediates[0]['time']
-            phase_desired = self.desired_trajectory_function(phase_time)
-            ax.plot(phase_time, phase_desired, 'k-', linewidth=3, label='Desired', alpha=0.8)
+            phase_desired_flexor = self.flexor_activation_function(phase_time)
+            phase_desired_extensor = self.extensor_activation_function(phase_time)
             
-            # Color map for iterations
+            # Color map for iterations - using a vibrant colormap
             n_intermediates = len(phase_intermediates)
-            colors = plt.cm.viridis(np.linspace(0, 1, n_intermediates))
+            colors = plt.cm.plasma(np.linspace(0, 1, n_intermediates))
             
-            # Plot each intermediate trajectory
+            # Get corresponding activation data from current_phase_data for this phase
+            phase_data = [data for data in self.current_phase_data if data.get('phase_idx') == phase_idx]
+            if not phase_data:
+                # Fallback: try to match by evaluation count
+                phase_data = self.current_phase_data[-n_intermediates:] if hasattr(self, 'current_phase_data') else []
+            
+            # Plot flexor activations (left column)
+            ax_flexor = axes[phase_idx, 0]
+            ax_flexor.plot(phase_time, phase_desired_flexor, 'k-', linewidth=3, 
+                        label='Desired Flexor', alpha=0.9, zorder=10)
+            
+            # Plot extensor activations (right column)
+            ax_extensor = axes[phase_idx, 1]
+            ax_extensor.plot(phase_time, phase_desired_extensor, 'k-', linewidth=3, 
+                            label='Desired Extensor', alpha=0.9, zorder=10)
+            
+            # Plot each intermediate activation
             for i, intermediate in enumerate(phase_intermediates):
-                alpha = 0.4 + 0.6 * (i / max(1, n_intermediates - 1))
-                linewidth = 1.5 if i == n_intermediates - 1 else 1
+                alpha = 0.5 + 0.5 * (i / max(1, n_intermediates - 1))
+                linewidth = 2.5 if i == n_intermediates - 1 else 1.5
                 
-                label = f"Eval {i+1} (f={intermediate['frequency']:.1f}Hz, RMS={intermediate['rms_error']:.3f})"
+                # Get activation data if available
+                if i < len(phase_data):
+                    flexor_activation = phase_data[i]['flexor_activation']
+                    extensor_activation = phase_data[i]['extensor_activation']
+                else:
+                    # Fallback to zeros if data not available
+                    flexor_activation = np.zeros(len(phase_time))
+                    extensor_activation = np.zeros(len(phase_time))
+                
+                label_base = f"Eval {i+1} (f={intermediate['frequency']:.1f}Hz, RMS={intermediate['rms_error']:.3f})"
                 if i == n_intermediates - 1:
-                    label = f"FINAL: {label}"
+                    label_base = f"FINAL: {label_base}"
                 
-                ax.plot(intermediate['time'], intermediate['trajectory'], 
-                       color=colors[i], alpha=alpha, linewidth=linewidth, 
-                       label=label if i < 5 or i == n_intermediates - 1 else None)
+                # Only show labels for first few and final iteration to avoid clutter
+                show_label = (i < 3 or i == n_intermediates - 1)
+                
+                # Plot flexor activation
+                ax_flexor.plot(phase_time, flexor_activation, 
+                            color=colors[i], alpha=alpha, linewidth=linewidth,
+                            label=label_base if show_label else None,
+                            linestyle='-' if i == n_intermediates - 1 else '--')
+                
+                # Plot extensor activation
+                ax_extensor.plot(phase_time, extensor_activation, 
+                                color=colors[i], alpha=alpha, linewidth=linewidth,
+                                label=label_base if show_label else None,
+                                linestyle='-' if i == n_intermediates - 1 else '--')
             
+            # Configure flexor plot
             muscle_type = "extensor" if phase_idx < len(self.phase_types) and self.phase_types[phase_idx] == 1 else "flexor"
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel(f'Joint {self.biological_system.associated_joint} (deg)')
-            ax.set_title(f'Phase {phase_idx + 1} ({muscle_type}) - Optimization Trajectory Evolution\n'
-                        f'({self.convergence_info[phase_idx]["function_evaluations"]} evaluations, '
-                        f'RMS: {self.convergence_info[phase_idx]["initial_rms_error"]:.3f} → '
-                        f'{self.convergence_info[phase_idx]["best_rms_error"]:.3f})')
-            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
-            ax.grid(True, alpha=0.3)
+            dominant_marker = " (DOMINANT)" if muscle_type == "flexor" else ""
+            
+            ax_flexor.set_xlabel('Time (s)', fontsize=12)
+            ax_flexor.set_ylabel('Flexor Activation', fontsize=12)
+            ax_flexor.set_title(f'Phase {phase_idx + 1} - Flexor Muscle{dominant_marker}\n'
+                            f'({self.convergence_info[phase_idx]["function_evaluations"]} evaluations, '
+                            f'RMS: {self.convergence_info[phase_idx]["initial_rms_error"]:.3f} → '
+                            f'{self.convergence_info[phase_idx]["best_rms_error"]:.3f})', 
+                            fontsize=11, fontweight='bold')
+            ax_flexor.legend(loc='upper right', fontsize=9)
+            ax_flexor.grid(True, alpha=0.3)
+            ax_flexor.set_ylim(bottom=0)  # Activations should start from 0
+            
+            # Configure extensor plot
+            dominant_marker = " (DOMINANT)" if muscle_type == "extensor" else ""
+            
+            ax_extensor.set_xlabel('Time (s)', fontsize=12)
+            ax_extensor.set_ylabel('Extensor Activation', fontsize=12)
+            ax_extensor.set_title(f'Phase {phase_idx + 1} - Extensor Muscle{dominant_marker}\n'
+                                f'({self.convergence_info[phase_idx]["function_evaluations"]} evaluations, '
+                                f'RMS: {self.convergence_info[phase_idx]["initial_rms_error"]:.3f} → '
+                                f'{self.convergence_info[phase_idx]["best_rms_error"]:.3f})', 
+                                fontsize=11, fontweight='bold')
+            ax_extensor.legend(loc='upper right', fontsize=9)
+            ax_extensor.grid(True, alpha=0.3)
+            ax_extensor.set_ylim(bottom=0)  # Activations should start from 0
+            
+            # Add background shading to highlight the dominant muscle
+            if muscle_type == "flexor":
+                ax_flexor.set_facecolor('#f0f8ff')  # Light blue background for dominant
+            else:
+                ax_extensor.set_facecolor('#f0fff0')  # Light green background for dominant
         
-        plt.tight_layout()
+        plt.tight_layout(pad=3.0)
         
         if base_output_path:
             os.makedirs(base_output_path, exist_ok=True)
-            plt.savefig(os.path.join(base_output_path, f'intermediate_trajectories.png'), 
-                       dpi=300, bbox_inches='tight')
-            print(f"Intermediate trajectories plot saved to {base_output_path}")
+            plt.savefig(os.path.join(base_output_path, f'intermediate_muscle_activations.png'), 
+                    dpi=300, bbox_inches='tight')
+            print(f"Intermediate muscle activations plot saved to {base_output_path}")
         
         plt.show()
