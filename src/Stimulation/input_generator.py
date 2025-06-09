@@ -101,7 +101,7 @@ def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruit
             ees_recruitment_profile, 
             [muscle_name]
         )
-        print(f'The current current recruits: {fraction}')
+        print(f'The current current recruits: {fractions}')
 
     ax.set_xlabel('Normalized Current Amplitude')
     ax.set_ylabel('Fraction of Fibers Recruited')
@@ -118,10 +118,12 @@ def plot_recruitment_curves(site, muscle_name, current_current=None, ees_recruit
     filename = f'Recruitment_Curve_{site}_{muscle_name}.png'
     
     if base_output_path:
+        os.makedirs(base_output_path, exist_ok=True)
         fig_path = os.path.join(base_output_path, filename)
     else:
         os.makedirs("Results", exist_ok=True)
         fig_path = os.path.join("Results", filename)
+    plt.tight_layout()
 
     fig.savefig(fig_path)
     plt.show()
