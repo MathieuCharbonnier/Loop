@@ -403,7 +403,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
         # Extract stretch and calculate the all velocity values for this muscle
         stretch_values = df[f'Stretch_{muscle_name}'].values         
         stretch_velocity_values=np.gradient(stretch_values, time_values)
-        print('stretch_velocity', stretch_velocity)
+       
         df[f'Stretch_Velocity_{muscle_name}']: stretch_velocity_values
         force_normalized_values=df[f'Force_{muscle_name}'].values
         stretch_delay_values = stretch_global_buffer[muscle_idx, :len(time_values)]
@@ -622,7 +622,7 @@ class LocalSimulator(SimulatorBase):
         from .muscle_sim import run_simulation
         # Run simulation directly with in-memory state
         fiber_lengths,normalized_force, joint, new_state = run_simulation(
-            dt, T, muscle_names, joint_name, activation,
+            dt, T, muscle_names, joint_name, activation,torque_values=torque,
             state_storage=self.current_state, output_all=sto_path, damping=damping
         )
         # Update in-memory state
