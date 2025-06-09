@@ -9,7 +9,7 @@ class Monosynaptic(BiologicalSystem):
     Monosynaptic reflexes involve a direct connection from afferent (Ia) neurons
     to motor neurons (MN) without intermediate interneurons.
     """
-    def __init__(self, reaction_time=25*ms, biophysical_params=None, muscles_names=None,
+    def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None,
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, damping=0.05,
              initial_state_neurons=None, initial_condition_spike_activation=None, 
