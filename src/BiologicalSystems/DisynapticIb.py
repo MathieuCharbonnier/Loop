@@ -13,7 +13,7 @@ class DisynapticIb(BiologicalSystem):
     - Ib afferents → Inhibitory interneurons → Motor neurons (disynaptic inhibition)
     """
     
-    def __init__(self, reaction_time=40*ms, biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=80*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
                  spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, damping=None,
                  initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -23,7 +23,7 @@ class DisynapticIb(BiologicalSystem):
         """
         # Set default parameters if not provided
         if muscles_names is None:
-            muscles_names = ["soleus_r"]
+            muscles_names = ["tib_ant_r"]
             
         if biophysical_params is None:
             biophysical_params = {
@@ -45,24 +45,25 @@ class DisynapticIb(BiologicalSystem):
         if neurons_population is None:
             # Include all neuron types including Ib pathway
             neurons_population = {
-                "Ia": 400,       # Type Ia afferent neurons
-                "II": 400,       # Type II afferent neurons
-                "Ib": 400,       # Type Ib afferent neurons (force feedback)
-                "exc": 500,      # Excitatory interneurons
-                "inhb": 500,     # Inhibitory interneurons
-                "MN": 500        # Motor neurons
+                "Ia": 200,       # Type Ia afferent neurons
+                "II": 200,       # Type II afferent neurons
+                "Ib": 200,       # Type Ib afferent neurons (force feedback)
+                "exc": 400,      # Excitatory interneurons
+                "inhb": 400,     # Inhibitory interneurons
+                "MN": 300        # Motor neurons
             }
         
         if connections is None:
             # Include all connections including Ib pathway
-            connections = {
-                ("Ia", "MN"): {"w": 2.1*nS, "p": 0.7},      # Direct excitation
-                ("II", "exc"): {"w": 1.65*nS, "p": 0.7},    # Stretch feedback
-                ("exc", "MN"): {"w": 0.7*nS, "p": 0.5},     # Excitatory interneuron
-                ("Ib", "inhb"): {"w": 1.65*nS, "p": 0.5},   # Force feedback
-                ("inhb", "MN"): {"w": 0.2*nS, "p": 0.4},     # Inhibitory interneuron
-                ("Ia", "inhb"): {"w": 1.65*nS, "p": 0.5}
-            }
+            connections = { 
+                ("Ia", "MN"):     {"w": 2.1*nS, "p": 0.7},  # Strong enough for clonus
+                ("II", "exc"):    {"w": 1.65*nS, "p": 0.7},  # Strong stretch feedback
+                ("exc", "MN"):    {"w": 0.7*nS, "p": 0.5},  # Medium interneuron excitation
+                ("Ib", "inhb"):   {"w": 1.65*nS, "p": 0.5},  # Strong inhibition potential
+                ("inhb", "MN"):   {"w": 0.2*nS, "p": 0.5},  # Moderate inhibition
+                ("Ia", "inhb"):   {"w": 0.2*nS, "p": 0.5}   # Decent cross inhibition
+        }
+
 
         if spindle_model is None:
             # Include Ib equation for force feedback
