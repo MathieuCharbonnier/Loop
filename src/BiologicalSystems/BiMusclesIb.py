@@ -50,7 +50,7 @@ class BiMusclesIb(BiologicalSystem):
                 'E_ex': 0*mV,
                 'tau_e': 0.5*ms,
                 'E_inh': -75*mV,
-                'tau_i': 2.8*ms,
+                'tau_i': 2.5*ms,
                 'threshold_v': -50*mV
             }
             
