@@ -825,7 +825,7 @@ class Sensitivity:
                         # Sort by parameter value for smooth plotting
                         param_data_sorted = param_data.sort_values('parameter_value')
                         unit=None
-                        if hasattr(param_data_sorted['original_value'], 'dim'):
+                        if hasattr(param_data_sorted['original_value'].iloc[0], 'dim'):
                             unit=param_data_sorted['original_value'].iloc[0].get_best_unit()
                        
                         if unit is not None:
