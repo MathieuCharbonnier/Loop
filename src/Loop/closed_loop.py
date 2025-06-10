@@ -574,7 +574,7 @@ class CoLabSimulator(SimulatorBase):
             '--output_stretch', self.output_stretch_path,
             '--output_force', self.output_force_path,
             '--output_joint', self.output_joint_path,
-            '--state', self.state_path)
+            '--state', self.state_path
         ]
         
         # Add torque if provided
