@@ -32,7 +32,7 @@ class BiologicalSystem(ABC):
     color_keys = list(colorblind_friendly_colors.keys())
     
     def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names,
-                 associated_joint, fast_type_mu,damping, neurons_population, connections, spindle_model, seed,
+                 associated_joint, fast_type_mu, neurons_population, connections, spindle_model, seed,
                  initial_state_neurons, initial_condition_spike_activation, initial_state_opensim,
                  activation_func, stretch_history_func=None):
         """
@@ -85,7 +85,6 @@ class BiologicalSystem(ABC):
       
         self.associated_joint = associated_joint
         self.fast_type_mu = fast_type_mu
-        self.damping=damping
         self.neurons_population = neurons_population
         self.connections = connections
         self.spindle_model = spindle_model
@@ -193,7 +192,6 @@ class BiologicalSystem(ABC):
             self.resting_lengths,
             self.associated_joint, 
             self.fast_type_mu,
-            self.damping,
             copy_brian_dict(self.initial_state_neurons), 
             deepcopy(self.initial_condition_spike_activation), 
             deepcopy(self.initial_state_opensim),
