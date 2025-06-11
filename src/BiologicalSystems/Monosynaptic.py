@@ -20,7 +20,7 @@ class Monosynaptic(BiologicalSystem):
 
         if biophysical_params is None:
             biophysical_params = {
-                'T_refr': 10 * ms,
+                'T_refr': 2 * ms,
                 'Eleaky': -70*mV,
                 'gL': 10*nS,
                 'Cm': 0.3*nF,  
