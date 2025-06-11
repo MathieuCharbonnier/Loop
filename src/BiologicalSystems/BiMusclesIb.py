@@ -8,7 +8,7 @@ class BiMusclesIb(BiologicalSystem):
     between two antagonistic muscle systems. We only consider known di-synaptic pathways.
     """
     
-    def __init__(self, reaction_time=150*ms, biophysical_params=None, muscles_names=None,
+    def __init__(self, reaction_time=100*ms, biophysical_params=None, muscles_names=None,
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -19,7 +19,7 @@ class BiMusclesIb(BiologicalSystem):
         Parameters:
         -----------
         reaction_time : brian2.units.fundamentalunits.Quantity, optional
-            Reaction time of the system (default: 50ms)
+            Reaction time of the system (default:100ms)
         biophysical_params : dict, optional
             Custom biophysical parameters for neurons (if None, use defaults)
         muscles_names : list, optional
@@ -43,7 +43,7 @@ class BiMusclesIb(BiologicalSystem):
             
         if biophysical_params is None:
             biophysical_params = {
-                'T_refr': 10 * ms,
+                'T_refr': 2 * ms,
                 'Eleaky': -70*mV,
                 'gL': 10*nS,
                 'Cm': 0.3*nF,
