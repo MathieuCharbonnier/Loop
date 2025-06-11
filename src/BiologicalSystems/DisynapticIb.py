@@ -13,7 +13,7 @@ class DisynapticIb(BiologicalSystem):
     - Ib afferents → Inhibitory interneurons → Motor neurons (disynaptic inhibition)
     """
     
-    def __init__(self, reaction_time=80*ms, biophysical_params=None, muscles_names=None, 
+    def __init__(self, reaction_time=100*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
                  spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
                  initial_state_neurons=None, initial_condition_spike_activation=None, 
@@ -27,7 +27,7 @@ class DisynapticIb(BiologicalSystem):
             
         if biophysical_params is None:
             biophysical_params = {
-                'T_refr': 10 * ms,
+                'T_refr': 2 * ms,
                 'Eleaky': -70*mV,
                 'gL': 10*nS,
                 'Cm': 0.3*nF,
