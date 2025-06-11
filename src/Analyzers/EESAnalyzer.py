@@ -379,9 +379,10 @@ class EESAnalyzer:
 
             for idx, muscle_name in enumerate(muscles_names):
                 if muscle_name in spikes and 'MN' in spikes[muscle_name]:
+                    shift=len(spikes[muscle_name]['MN'])
                     for neuron_id, neuron_spikes in spikes[muscle_name]['MN'].items():
                         if neuron_spikes:
-                            ax.plot(neuron_spikes, np.ones_like(neuron_spikes) * int(neuron_id),
+                            ax.plot(neuron_spikes, shift*idx+np.ones_like(neuron_spikes) * int(neuron_id),
                                     '.', markersize=4, color=muscle_colors[muscle_name])
         axs_raster[-1].set_xlabel("Time (s)")
         fig_raster.tight_layout()
