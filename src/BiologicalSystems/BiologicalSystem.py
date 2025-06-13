@@ -364,7 +364,7 @@ class BiologicalSystem(ABC):
         #base_labels.extend(ia_cols + ipsp_cols + v_cols + mn_cols)
         base_labels.extend(ia_cols + mn_cols)
         # Create subplots
-        fig, axs = plt.subplots(len(base_labels), 1, figsize=(12, 3.5 * len(base_labels)), sharex=True)
+        fig, axs = plt.subplots(len(base_labels), 1, figsize=(10, 3.5 * len(base_labels)), sharex=True)
         if len(base_labels) == 1:
             axs = [axs]
     
@@ -427,7 +427,7 @@ class BiologicalSystem(ABC):
         df = self.time_series
         muscle_names = self.muscles_names
         
-        fig, axs = plt.subplots(5, 1, figsize=(12, 12), sharex=True)
+        fig, axs = plt.subplots(5, 1, figsize=(10, 12), sharex=True)
         labels = ['mean_e', 'mean_u', 'mean_c', 'mean_P', 'Activation']
         time = df['Time'].values
         
@@ -499,7 +499,7 @@ class BiologicalSystem(ABC):
         has_torque = torque_column in df.columns
     
         # ---------- JOINT PLOT ----------
-        fig_joint, axs_joint = plt.subplots(3 if has_torque else 2, 1, figsize=(12, 9), sharex=True)
+        fig_joint, axs_joint = plt.subplots(3 if has_torque else 2, 1, figsize=(10, 9), sharex=True)
         axs_joint = axs_joint if isinstance(axs_joint, (list, np.ndarray)) else [axs_joint]
     
         axis_idx = 0
@@ -528,7 +528,7 @@ class BiologicalSystem(ABC):
         props = ['Stretch', 'Stretch_Velocity', 'Force']
         ylabels = [ 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)', 'Force (dimless)']
     
-        fig_muscle, axs_muscle = plt.subplots(len(props), 1, figsize=(12, 3 * len(props)), sharex=True)
+        fig_muscle, axs_muscle = plt.subplots(len(props), 1, figsize=(10, 3 * len(props)), sharex=True)
     
         for i, (prop, ylabel) in enumerate(zip(props, ylabels)):
             for j, muscle_name in enumerate(muscle_names):
