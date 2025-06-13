@@ -353,7 +353,7 @@ class BiologicalSystem(ABC):
         # Take the first muscle and recover the variables to plot:
         muscle = muscle_names[0]
         # Ia/II rate
-        ia_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "rate" in col.lower() and "I" in col and muscle in col]
+        ia_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "rate_baseline" in col.lower() and "I" in col and muscle in col]
         # IPSP
         #ipsp_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "IPSP" in col and muscle in col]
         # Membrane potential
@@ -361,8 +361,8 @@ class BiologicalSystem(ABC):
         # Motoneuron rate
         mn_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "MN_rate" in col and muscle in col]
     
-        base_labels.extend(ia_cols + ipsp_cols + v_cols + mn_cols)
-    
+        #base_labels.extend(ia_cols + ipsp_cols + v_cols + mn_cols)
+        base_labels.extend(ia_cols + mn_cols)
         # Create subplots
         fig, axs = plt.subplots(len(base_labels), 1, figsize=(12, 3.5 * len(base_labels)), sharex=True)
         if len(base_labels) == 1:
