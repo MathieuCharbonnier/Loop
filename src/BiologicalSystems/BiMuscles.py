@@ -12,7 +12,7 @@ class BiMuscles(BiologicalSystem):
     
     def __init__(self, reaction_time=100*ms, biophysical_params=None, muscles_names=None,
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
-             spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
+             spindle_model=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
              initial_state_opensim=None, activation_funct=None, stretch_history_func=None, seed=42):
         """
@@ -34,8 +34,7 @@ class BiMuscles(BiologicalSystem):
             Custom neural connections (if None, use defaults)
         custom_spindle : dict, optional
             Custom spindle model equations (if None, use defaults)
-        ees_recruitment_profile : dict, optional
-            Custom EES recruitment parameters (if None, use defaults)
+
         """
         # Set default parameters if not provided
         if muscles_names is None:
@@ -56,9 +55,6 @@ class BiMuscles(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if ees_recruitment_profile is None:
-            with open('data/ees_recruitment.json', 'r') as f:
-                ees_recruitment_profile = json.load(f)
                 
         if neurons_population is None:
         
@@ -147,7 +143,7 @@ class BiMuscles(BiologicalSystem):
                 for i in range(2)  # two muscles
             ]
 
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
+        super().__init__(reaction_time, biophysical_params, 
                         muscles_names, associated_joint, fast_type_mu,
                         neurons_population, connections, spindle_model,seed, 
                         initial_state_neurons, initial_condition_spike_activation, 
