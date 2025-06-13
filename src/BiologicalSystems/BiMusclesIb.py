@@ -12,7 +12,7 @@ class BiMusclesIb(BiologicalSystem):
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
              spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
-             initial_state_opensim=None, activation_funct=None, stretch_history_func=None, seed=42):
+             initial_state_opensim=None, activation_funct=None, stretch_history_func=None, seed=40):
         """
         Initialize a reciprocal inhibition system with Ib fibers with default or custom parameters.
         
@@ -96,8 +96,8 @@ class BiMusclesIb(BiologicalSystem):
                 ("Ia_extensor", "inhb_extensor"): {"w": 0.5*nS, "p": 0.6},  # e14
                 
                 # Type II excitation pathways
-                ("II_flexor", "exc_flexor"): {"w": 1.65*nS, "p": 0.7},
-                ("II_extensor", "exc_extensor"): {"w": 1.65*nS, "p": 0.7},
+                ("II_flexor", "exc_flexor"): {"w": 1.65*nS, "p": 0.8},
+                ("II_extensor", "exc_extensor"): {"w": 1.65*nS, "p": 0.8},
                 
                 # Type II inhibition pathways
                 ("II_flexor", "inh_flexor"): {"w": 2.19*nS, "p": 0.7},
