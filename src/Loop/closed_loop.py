@@ -426,7 +426,7 @@ def closed_loop(n_iterations, reaction_time, time_step, neurons_population, conn
             df[f'II_rate_baseline_{muscle_name}'] = II_rate
 
         # Compute Ib firing rate if applicable
-        if "Ib" in neurons_population and "Ib" in spindle_model:
+        if "Ib" in spindle_model:
             Ib_rate = eval(spindle_model['Ib'], 
                           {"__builtins__": {}}, 
                           {"force_normalized": force_normalized_values}
