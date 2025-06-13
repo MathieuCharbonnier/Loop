@@ -63,7 +63,7 @@ class EESAnalyzer:
             Analysis results containing simulation data and computed metrics
         """
         if freq_range is None:
-            freq_range = [0,40,80] * hertz
+            freq_range = [20,30,40,50,60,70] * hertz
         
         if base_ees_params is None:
             base_ees_params = self._default_ees_params.copy()
@@ -107,7 +107,7 @@ class EESAnalyzer:
             Analysis results containing simulation data and computed metrics
         """
         if freq_range is None:
-            freq_range = [(40*hertz,60*hertz), (40*hertz,60*hertz)] 
+            freq_range = [(30*hertz,70*hertz), (70*hertz,30*hertz)] 
         
         if base_ees_params is None:
             base_ees_params = self._default_ees_params.copy()
@@ -392,7 +392,7 @@ class EESAnalyzer:
             if muscles_names:
                 fig.legend(muscles_names, loc='upper right')
             fig.tight_layout()
-            fig.savefig(os.path.join(save_dir, f"{var}.png"))
+            fig.savefig(os.path.join(save_dir, f"{param_name}_{var}.png"))
 
         # --- Plot joint angle ---
         if associated_joint != 'Unknown':
@@ -411,7 +411,7 @@ class EESAnalyzer:
                     ax.legend()
             axs_joint[-1].set_xlabel("Time (s)")
             fig_joint.tight_layout()
-            fig_joint.savefig(os.path.join(save_dir, f"joint_angle.png"))
+            fig_joint.savefig(os.path.join(save_dir, f"{param_name}_joint_angle.png"))
 
         # --- Raster plot for MN spikes ---
         fig_raster, axs_raster = plt.subplots(n_rows, 1, figsize=(12, 3 * n_rows), sharex=True)
@@ -450,7 +450,7 @@ class EESAnalyzer:
 
         axs_raster[-1].set_xlabel("Time (s)")
         fig_raster.tight_layout()
-        fig_raster.savefig(os.path.join(save_dir, f"mn_raster.png"), bbox_inches='tight')
+        fig_raster.savefig(os.path.join(save_dir, f"{param_name}_mn_raster.png"), bbox_inches='tight')
 
         # --- Plot MN Recruitment Fraction ---
         recruitment_fractions = []
@@ -471,7 +471,7 @@ class EESAnalyzer:
         ax_recruit.set_ylabel("Fraction of Recruited Motoneurons")
         ax_recruit.grid(True, linestyle='--', alpha=0.3)
         fig_recruit.tight_layout()
-        fig_recruit.savefig(os.path.join(save_dir, f"mn_recruitment_fraction_{timestamp}.png"))
+        fig_recruit.savefig(os.path.join(save_dir, f"{param_name}_mn_recruitment_fraction_.png"))
 
         print(f"All plots saved to '{save_dir}' directory.")
 
@@ -644,7 +644,7 @@ class EESAnalyzer:
         # Save figures
         for fig, name in zip([fig_scatter, fig_coact, fig_time], 
                             ["flexor_vs_extensor", "coactivation_metrics", "activation_time"]):
-            filename = f"{name}_{param_name}_{min(param_values)}to{max(param_values)}.png"
+            filename = f"{name}_{param_name}.png"
             filepath = os.path.join(save_dir, filename)
             fig.savefig(filepath, bbox_inches='tight')
             print(f"Saved analysis plot: {filename}")
