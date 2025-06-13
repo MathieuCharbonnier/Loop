@@ -45,58 +45,93 @@ def bump(time_array, t_peak, sigma, max_amplitude, sustained_amplitude=0):
     return torque
     
 def plot_recruitment_curves(site, muscle_name, current_current=None, 
-                           base_output_path=None):
+                                   base_output_path=None):
     """
-    Plot recruitment curves for all fiber types using the threshold-based sigmoid.
-    Only shows fractions of population, not absolute counts.
-
+    Plot recruitment curves for multiple muscles on the same axes for comparison.
+    
     Parameters:
     -----------
     site : str
         Electrode position 
-    muscle_name: str
-        Muscle to consider
+    muscle_name: str or list
+        Muscle(s) to consider - can be a single muscle name or list of muscle names
     current_current : float, optional
         Current intensity value to highlight
-    ees_recruitment_profile : dict, optional
-        Dictionary with threshold and saturation values
     base_output_path : str, optional
         Path to save the plot
-    """  
-    df = pd.read_csv(f"data/Human_{site}.csv")  # Fixed: added pd.read_csv
-
-    fig, ax = plt.subplots(figsize=(10, 6))
+    """
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import os
     
-    style_map = {'Ia': 'g-', 'II': 'b-', 'Ib': 'c-', 'MN': 'r-'}
-    muscle_col = [col for col in df.columns if muscle_name in col]
-    for col in muscle_col:
-        style = style_map.get(col, '-')  # default to '-' if fiber type not in map
-        ax.plot(df['current_uA'].values, df[col].values, style, label=col)
-        fraction = np.interp(current_current/uA, df['current_uA'], df[col], left=0, right=0)
-        print(f'The current current recruits: {fraction} {col}')
+    # Convert single muscle to list for uniform handling
+    if isinstance(muscle_name, str):
+        muscle_names = [muscle_name]
+    else:
+        muscle_names = muscle_name
+    
+    df = pd.read_csv(f"data/Human_{site}.csv")
+    
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    style_map = {'Ia': '-', 'II': '--', 'Ib': '-.', 'MN': ':'}
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+    
+    for i, muscle in enumerate(muscle_names):
+        muscle_cols = [col for col in df.columns if muscle in col]
+        muscle_color = colors[i % len(colors)]
+        
+        for col in muscle_cols:
+            fiber_type = col.replace(muscle, '').strip('_')
+            line_style = style_map.get(fiber_type, '-')
+            
+            ax.plot(df['current_uA'].values, df[col].values, 
+                   line_style, color=muscle_color, label=f'{muscle} - {fiber_type}', 
+                   linewidth=2, alpha=0.8)
+            
+            # Print recruitment fraction
+            if current_current is not None:
+                try:
+                    fraction = np.interp(current_current/uA, df['current_uA'], df[col], left=0, right=0)
+                    print(f'[{muscle}] Current {current_current} uA recruits: {fraction:.3f} of {col}')
+                except:
+                    fraction = np.interp(current_current, df['current_uA'], df[col], left=0, right=0)
+                    print(f'[{muscle}] Current {current_current} recruits: {fraction:.3f} of {col}')
 
-    if current_current is not None:  
-        ax.axvline(x=current_current/uA, color='r', linestyle='--', label='Current')
-
+    # Add vertical line for current_current
+    if current_current is not None:
+        try:
+            ax.axvline(x=current_current/uA, color='red', linestyle='--', 
+                      label='Current', alpha=0.7, linewidth=2)
+        except:
+            ax.axvline(x=current_current, color='red', linestyle='--', 
+                      label='Current', alpha=0.7, linewidth=2)
 
     ax.set_xlabel('Current Amplitude (uA)')
     ax.set_ylabel('Fraction of Fibers Recruited')
-    ax.set_title(f'Fiber Recruitment at {site} - {muscle_name}')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-
-    filename = f'Recruitment_Curve_{site}_{muscle_name}.png'
     
+    muscle_str = ' vs '.join(muscle_names)
+    ax.set_title(f'Fiber Recruitment  at {site} - {muscle_str}')
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.grid(True, alpha=0.3)
+    ax.set_ylim(0, 1.05)
+    
+    plt.tight_layout()
+
+    # Generate filename
+    muscle_str = '_vs_'.join(muscle_names)
+    filename = f'Recruitment_Curve_Comparison_{site}_{muscle_str}.png'
+    
+    # Save figure
     if base_output_path:
         os.makedirs(base_output_path, exist_ok=True)
         fig_path = os.path.join(base_output_path, filename)
     else:
         os.makedirs("Results", exist_ok=True)
         fig_path = os.path.join("Results", filename)
-    plt.tight_layout()
-
-    fig.savefig(fig_path)
+    
+    fig.savefig(fig_path, dpi=300, bbox_inches='tight')
     plt.show()
 
 def transform_intensity_site_in_recruitment(ees_stimulation_params, neuron_population, muscle_names):
@@ -251,13 +286,8 @@ def validate_ees(ees_stimulation_params, number_muscle):
                 unit= current.dim 
                 if unit != 'A':
                     issues["errors"].append(f"EES current must have 'A' as unit, got {unit}.")
-                else:
-                    if (current>570*uA):
-                        issues["errors"].append(f"EES current must be smaller than 570 uA, recruitement curve not defined for higher current.")
             else:
                     issues["errors"].append("EES current must be a Quantity with 'A' as unit.")
-
-                
         else:
             issues["errors"].append("EES parameters must contain 'intensity' parameter")
 
