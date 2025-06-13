@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import math
+from matplotlib.lines import Line2D 
 from datetime import datetime
 from itertools import product
 from typing import Dict, List, Tuple, Any, Optional, Callable
@@ -347,7 +348,7 @@ class EESAnalyzer:
             if muscles_names:
                 fig.legend(muscles_names, loc='upper right')
             fig.tight_layout()
-            fig.savefig(os.path.join(save_dir, f"{var}_{timestamp}.png"))
+            fig.savefig(os.path.join(save_dir, f"{var}.png"))
 
         # --- Plot joint angle ---
         if associated_joint != 'Unknown':
@@ -366,7 +367,7 @@ class EESAnalyzer:
                     ax.legend()
             axs_joint[-1].set_xlabel("Time (s)")
             fig_joint.tight_layout()
-            fig_joint.savefig(os.path.join(save_dir, f"joint_angle_{timestamp}.png"))
+            fig_joint.savefig(os.path.join(save_dir, f"joint_angle.png"))
 
         # --- Raster plot for MN spikes ---
         fig_raster, axs_raster = plt.subplots(n_rows, 1, figsize=(12, 3 * n_rows), sharex=True)
@@ -384,9 +385,28 @@ class EESAnalyzer:
                         if neuron_spikes:
                             ax.plot(neuron_spikes, shift*idx+np.ones_like(neuron_spikes) * int(neuron_id),
                                     '.', markersize=4, color=muscle_colors[muscle_name])
+         
+
+        # Create legend handles for each muscle
+        legend_elements = [
+            Line2D([0], [0], marker='o', color='w', label=muscle_name,
+                   markerfacecolor=muscle_colors[muscle_name], markersize=6)
+            for muscle_name in muscles_names
+        ]
+        
+        # Add legend to the last subplot
+        axs_raster[-1].legend(
+            handles=legend_elements,
+            title="Muscles",
+            loc="upper left",
+            bbox_to_anchor=(1.05, 1),  # Move legend outside the plot to the right
+            borderaxespad=0.,
+            frameon=False  # Optional: removes the box around the legend
+        )
+
         axs_raster[-1].set_xlabel("Time (s)")
         fig_raster.tight_layout()
-        fig_raster.savefig(os.path.join(save_dir, f"mn_raster_{timestamp}.png"))
+        fig_raster.savefig(os.path.join(save_dir, f"mn_raster.png"), bbox_inches='tight')
 
         # --- Plot MN Recruitment Fraction ---
         recruitment_fractions = []
