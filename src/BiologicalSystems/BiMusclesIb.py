@@ -10,7 +10,7 @@ class BiMusclesIb(BiologicalSystem):
     
     def __init__(self, reaction_time=100*ms, biophysical_params=None, muscles_names=None,
              associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
-             spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
+             spindle_model=None, fast_type_mu=True, 
              initial_state_neurons=None, initial_condition_spike_activation=None, 
              initial_state_opensim=None, activation_funct=None, stretch_history_func=None, seed=40):
         """
@@ -54,9 +54,6 @@ class BiMusclesIb(BiologicalSystem):
                 'threshold_v': -50*mV
             }
             
-        if ees_recruitment_profile is None:
-            with open('data/ees_recruitment.json', 'r') as f:
-                ees_recruitment_profile = json.load(f)
         
         # Override with custom values if provided
         if neurons_population is None:
@@ -167,7 +164,7 @@ class BiMusclesIb(BiologicalSystem):
                 } for _ in range(neurons_population['MN_flexor' if i == 0 else 'MN_extensor'])] 
                 for i in range(2)  # two muscles
             ]
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
+        super().__init__(reaction_time, biophysical_params, 
                         muscles_names, associated_joint, fast_type_mu,
                         neurons_population, connections, spindle_model, seed,
                         initial_state_neurons, initial_condition_spike_activation, 
