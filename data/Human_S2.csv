@@ -1,4 +1,4 @@
-current_uA,Ia_tib_ant,II_tib_ant,Ib_tib_ant,MN_tib_ant,Ia_med_gas,II_med_gas,Ib_med_gas,MN_med_gas
+current_uA,Ia_med_gas,II_med_gas,Ib_med_gas,MN_med_gas,Ia_tib_ant,II_tib_ant,Ib_tib_ant,MN_tib_ant
 0,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000
 30,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000
 60,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000
