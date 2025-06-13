@@ -118,7 +118,7 @@ def run_monosynaptic_simulation(stretch_input, stretch_velocity_input,
     
     MN = NeuronGroup(n_MN, mn_eq, 
                    threshold='v > threshold_v', 
-                   reset='v = Eleaky', method='euler')
+                   reset='v = Eleaky', refractory=T_refr, method='euler')
     
     MN.v = initial_state_neurons['MN']['v']
     MN.gIa=initial_state_neurons['MN']['gIa']
@@ -395,7 +395,8 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
     '''
     inhb_neurons = NeuronGroup(n_inhb, inhb_eq, 
                         threshold='v > threshold_v', 
-                        reset='v = Eleaky', method='euler')
+                        reset='v = Eleaky',refractory=T_refr,
+                               method='euler')
 
     inhb_neurons.v = initial_state_neurons['inhb']['v']
     inhb_neurons.gIb = initial_state_neurons['inhb']['gIb']
@@ -415,7 +416,7 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
     
     exc_neurons = NeuronGroup(n_exc, exc_eq, 
                             threshold='v > threshold_v', 
-                            reset='v = Eleaky', method='euler')
+                            reset='v = Eleaky',refractory=T_refr, method='euler')
     
     exc_neurons.v = initial_state_neurons['exc']['v']
     exc_neurons.gII = initial_state_neurons['exc']['gII']
@@ -437,7 +438,7 @@ def run_disynaptic_simulation_with_ib(stretch_input, stretch_velocity_input, str
     
     MN = NeuronGroup(n_MN, mn_eq, 
                    threshold='v > threshold_v', 
-                   reset='v = Eleaky', method='euler')
+                   reset='v = Eleaky',refractory=T_refr, method='euler')
     
     MN.v = initial_state_neurons['MN']['v']
     MN.gIa = initial_state_neurons['MN']['gIa']
@@ -687,7 +688,8 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     
     exc_neurons = NeuronGroup(n_exc, exc_eq, 
                             threshold='v > threshold_v', 
-                            reset='v = Eleaky', method='euler')
+                            reset='v = Eleaky', refractory=T_refr,
+                              method='euler')
     
     exc_neurons.v = initial_state_neurons['exc']['v']
     exc_neurons.gII = initial_state_neurons['exc']['gII']
@@ -707,7 +709,8 @@ def run_disynaptic_simulation(stretch_input, stretch_velocity_input, stretch_del
     
     MN = NeuronGroup(n_MN, mn_eq, 
                    threshold='v > threshold_v', 
-                   reset='v = Eleaky', method='euler')
+                   reset='v = Eleaky',refractory=T_refr,
+                     method='euler')
     
     MN.v = initial_state_neurons['MN']['v']
     MN.gIa = initial_state_neurons['MN']['gIa']
@@ -953,13 +956,13 @@ def run_flexor_extensor_neuron_simulation(stretch_input, stretch_velocity_input,
   
     # Create neuron groups
     inh = NeuronGroup(n_inh_flexor+ n_inh_extensor, inh_eq, threshold='v > threshold_v', 
-                      reset='v = Eleaky', method='euler')
+                      reset='v = Eleaky',refractory=T_refr, method='euler')
   
     exc = NeuronGroup(n_exc_flexor+n_exc_extensor, ex_eq, threshold='v > threshold_v', 
-                      reset='v = Eleaky', method='euler')
+                      reset='v = Eleaky', refractory=T_refr, method='euler')
                                          
     MN = NeuronGroup(n_MN_flexor+n_MN_extensor, mn_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', method='euler')
+                     reset='v = Eleaky', refractory=T_refr, method='euler')
                        
     # Initialize membrane potentials
     inh.v = initial_state_neurons['inh']['v']
@@ -1335,34 +1338,25 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     exc_eq = '''
     dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
     Isyn = gII*(E_ex - v)+gibexc*(E_ex - v) : amp
-    dgibexc/dt= -gibexc/tau_e : siemens
     dgII/dt = -gII / tau_e : siemens
     '''
 
-    ibexc_eq = '''
-    dv/dt = (gL*(Eleaky - v) + Isyn) / Cm : volt
-    Isyn = gIa*(E_ex - v)+ gIb*(E_ex - v) : amp
-    dgIb/dt= -gIb/tau_e : siemens
-    dgIa/dt = -gIa / tau_e : siemens
-    '''
 
     # Create neuron groups
-    MN = NeuronGroup(n_MN_flexor + n_MN_extensor, mn_eq, threshold='v > threshold_v', 
+    MN = NeuronGroup(n_MN_flexor + n_MN_extensor, mn_eq, threshold='v > threshold_v', refractory=T_refr
                      reset='v = Eleaky', method='euler')
-    inh = NeuronGroup(n_inh_flexor + n_inh_extensor, inh_eq, threshold='v > threshold_v', 
+    inh = NeuronGroup(n_inh_flexor + n_inh_extensor, inh_eq, threshold='v > threshold_v',refractory=T_refr 
                      reset='v = Eleaky',  method='euler')
-    inhb = NeuronGroup(n_inhb_flexor + n_inhb_extensor, inhb_eq, threshold='v > threshold_v', 
+    inhb = NeuronGroup(n_inhb_flexor + n_inhb_extensor, inhb_eq, threshold='v > threshold_v', refractory=T_refr
                      reset='v = Eleaky', method='euler')
-    exc = NeuronGroup(n_exc_flexor + n_exc_extensor, exc_eq, threshold='v > threshold_v', 
+    exc = NeuronGroup(n_exc_flexor + n_exc_extensor, exc_eq, threshold='v > threshold_v', refractory=T_refr
                      reset='v = Eleaky', method='euler')
-    ibexc = NeuronGroup(n_ibexc_flexor + n_ibexc_extensor, ibexc_eq, threshold='v > threshold_v', 
-                     reset='v = Eleaky', method='euler')
+
     # Initialize membrane potentials
     MN.v = initial_state_neurons['MN']['v']
     inh.v = initial_state_neurons['inh']['v']
     inhb.v = initial_state_neurons['inhb']['v']
     exc.v = initial_state_neurons['exc']['v']
-    ibexc.v=initial_state_neurons['ibexc']['v']
                                            
     #Initialize conductances
     inh.gIa = initial_state_neurons['inh']['gIa']
@@ -1373,8 +1367,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     inhb.gIb = initial_state_neurons['inhb']['gIb']
     exc.gibexc=initial_state_neurons['exc']['gibexc']
     exc.gII = initial_state_neurons['exc']['gII']
-    ibexc.gIb=initial_state_neurons['ibexc']['gIb']
-    ibexc.gIa=initial_state_neurons['ibexc']['gIa']
+
     MN.gIa = initial_state_neurons['MN']['gIa']
     MN.gexc = initial_state_neurons['MN']['gexc']
     MN.gi1 = initial_state_neurons['MN']['gi1']
@@ -1400,9 +1393,8 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         "inhb_flexor": inhb[:n_inhb_flexor],
         "inhb_extensor": inhb[n_inhb_flexor:],
         "exc_flexor": exc[:n_exc_flexor],
-        "exc_extensor": exc[n_exc_flexor:],
-        "ibexc_flexor": exc[:n_ibexc_flexor],
-        "ibexc_extensor": exc[n_ibexc_flexor:],
+        "exc_extensor": exc[n_exc_flexor:]
+
     }
     
     # Create synaptic connections based on the network architecture
@@ -1439,7 +1431,6 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     mon_inh = SpikeMonitor(inh)
     mon_inhb = SpikeMonitor(inhb)
     mon_exc = SpikeMonitor(exc)
-    mon_ibexc=SpikeMonitor(ibexc)
     
     # State monitors for key neurons
     mon_MN_flexor = StateMonitor(MN, ['Isyn'], n_MN_flexor//2)
@@ -1468,7 +1459,6 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
     inh_spikes = mon_inh.spike_trains()
     inhb_spikes = mon_inhb.spike_trains()
     exc_spikes = mon_exc.spike_trains()
-    ibexc=mon_ibexc.spike_trains()
 
     ees_spikes = mon_ees_MN.spike_trains() if ees_freq > 0 else None
 
@@ -1520,13 +1510,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         'exc': {
             'v': exc.v[:],
             'gII': exc.gII[:],
-            'gibexc': exc.gibexc[:]
         },
-      'ibexc': {
-            'v': ibexc.v[:],
-            'gIb': ibexc.gIb[:],
-            'gIa': ibexc.gIa[:]
-      },
         'MN': {
             'v': MN.v[:],
             'gIa': MN.gIa[:],
@@ -1552,8 +1536,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         "MN": MN_flexor_spikes,
         "inh": {i: inh_spikes[i] for i in range(n_inh_flexor)},
         "inhb": {i: inhb_spikes[i] for i in range(n_inhb_flexor)},
-        "exc": {i: exc_spikes[i] for i in range(n_exc_flexor)},
-        "ibexc": {i: exc_spikes[i] for i in range(n_ibexc_flexor)}
+        "exc": {i: exc_spikes[i] for i in range(n_exc_flexor)}
     }
 
     result_extensor = {
@@ -1563,8 +1546,7 @@ def run_spinal_circuit_with_Ib(stretch_input, stretch_velocity_input,stretch_del
         "MN": MN_extensor_spikes,
         "inh": {i % n_inh_flexor: inh_spikes[i] for i in range(n_inh_flexor, n_inh_flexor + n_inh_extensor)},
         "inhb": {i % n_inhb_flexor: inhb_spikes[i] for i in range(n_inhb_flexor, n_inhb_flexor + n_inhb_extensor)},
-        "exc": {i % n_exc_flexor: exc_spikes[i] for i in range(n_exc_flexor, n_exc_flexor + n_exc_extensor)},
-        "ibexc": {i % n_exc_flexor: ibexc_spikes[i] for i in range(n_ibexc_flexor, n_ibexc_flexor + n_ibexc_extensor)}
+        "exc": {i % n_exc_flexor: exc_spikes[i] for i in range(n_exc_flexor, n_exc_flexor + n_exc_extensor)}
     }
 
     return [result_flexor, result_extensor], final_state_neurons, state_monitors
