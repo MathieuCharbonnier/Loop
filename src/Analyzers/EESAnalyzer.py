@@ -107,7 +107,7 @@ class EESAnalyzer:
             Analysis results containing simulation data and computed metrics
         """
         if freq_range is None:
-            freq_range = [50*hertz,(30*hertz,70*hertz), (70*hertz,30*hertz)] 
+            freq_range = [(40*hertz,60*hertz), (40*hertz,60*hertz)] 
         
         if base_ees_params is None:
             base_ees_params = self._default_ees_params.copy()
