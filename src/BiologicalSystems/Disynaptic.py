@@ -14,7 +14,7 @@ class Disynaptic(BiologicalSystem):
     
     def __init__(self, reaction_time=100*ms, biophysical_params=None, muscles_names=None, 
                  associated_joint="ankle_angle_r", neurons_population=None, connections=None, 
-                 spindle_model=None, ees_recruitment_profile=None, fast_type_mu=True, 
+                 spindle_model=None, fast_type_mu=True, 
                  initial_state_neurons=None, initial_condition_spike_activation=None, 
                  initial_state_opensim=None, activation_funct=None, stretch_history_func=None, seed=41):
         """
@@ -84,7 +84,7 @@ class Disynaptic(BiologicalSystem):
                 } for _ in range(neurons_population['MN'])]
             ]
             
-        super().__init__(reaction_time, ees_recruitment_profile, biophysical_params, 
+        super().__init__(reaction_time, biophysical_params, 
                         muscles_names, associated_joint, fast_type_mu,
                         neurons_population, connections, spindle_model, seed,
                         initial_state_neurons, initial_condition_spike_activation, 
