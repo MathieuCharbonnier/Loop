@@ -11,7 +11,7 @@ from scipy.signal import find_peaks
 from datetime import datetime
 
 from ..Loop.closed_loop import closed_loop, get_sto_file
-from ..Stimulation.input_generator import transform_intensity_balance_in_recruitment, transform_torque_params_in_array
+from ..Stimulation.input_generator import transform_intensity_site_in_recruitment, transform_torque_params_in_array
 from ..helpers.copy_brian_dict import copy_brian_dict
 
 class BiologicalSystem(ABC):
@@ -175,8 +175,8 @@ class BiologicalSystem(ABC):
   
         self.ees_params = None
         if ees_stimulation_params is not None:
-            self.ees_params = transform_intensity_balance_in_recruitment(
-                self.ees_recruitment_profile, ees_stimulation_params, 
+            self.ees_params = transform_intensity_site_in_recruitment(
+                 ees_stimulation_params, 
                 self.neurons_population, self.muscles_names)
         
         self.spikes, self.time_series, self.final_state = closed_loop(
@@ -355,9 +355,9 @@ class BiologicalSystem(ABC):
         # Ia/II rate
         ia_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "rate" in col.lower() and "I" in col and muscle in col]
         # IPSP
-        ipsp_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "IPSP" in col and muscle in col]
+        #ipsp_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "IPSP" in col and muscle in col]
         # Membrane potential
-        v_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "potential" in col and muscle in col]
+        #v_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "potential" in col and muscle in col]
         # Motoneuron rate
         mn_cols = [col.replace(f"_{muscle}", "") for col in df.columns if "MN_rate" in col and muscle in col]
     
@@ -525,8 +525,8 @@ class BiologicalSystem(ABC):
         save_figure(fig_joint, f'Joint_{joint_name}', prefix)
     
         # ---------- MUSCLE DYNAMICS PLOT ----------
-        props = ['Fiber_length', 'Stretch', 'Stretch_Velocity', 'Force']
-        ylabels = ['Fiber length (m)', 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)', 'Force (dimless)']
+        props = ['Stretch', 'Stretch_Velocity', 'Force']
+        ylabels = [ 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)', 'Force (dimless)']
     
         fig_muscle, axs_muscle = plt.subplots(len(props), 1, figsize=(12, 3 * len(props)), sharex=True)
     
