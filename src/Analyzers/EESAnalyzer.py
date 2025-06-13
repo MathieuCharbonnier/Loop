@@ -84,6 +84,50 @@ class EESAnalyzer:
         )
         
         return results
+    
+    def analyze_bifrequency_effects(self, freq_range=None, base_ees_params=None, torque_profile=None,
+                                n_iterations=20, time_step=0.1*ms):
+        """
+        Analyze the effects of varying EES frequency with fixed afferent and efferent recruitment.
+        
+        Parameters:
+        -----------
+        freq_range : array-like, optional
+            Range of frequencies to analyze (default: [0, 40, 80] Hz)
+        base_ees_params : dict, optional
+            Base parameters for EES (uses defaults if None)
+        n_iterations : int
+            Number of iterations for each simulation
+        time_step : Quantity
+            Time step for simulations (in ms, will be converted to brian2 units)
+        
+        Returns:
+        --------
+        dict
+            Analysis results containing simulation data and computed metrics
+        """
+        if freq_range is None:
+            freq_range = [50*hertz,(30*hertz,70*hertz), (70*hertz,30*hertz)] 
+        
+        if base_ees_params is None:
+            base_ees_params = self._default_ees_params.copy()
+        
+        vary_param = {
+            'param_name': 'frequency',
+            'values': freq_range,
+            'label': 'EES BiFrequencies '
+        }
+
+        # Compute parameter sweep
+        results = self._compute_ees_parameter_sweep(
+            base_ees_params,
+            vary_param,
+            torque_profile,
+            n_iterations,
+            time_step
+        )
+        
+        return results
 
     def analyze_intensity_effects(self, intensity_range, base_ees_params=None, torque_profile=None, 
                                 n_iterations=20, time_step=0.1*ms):
@@ -150,7 +194,7 @@ class EESAnalyzer:
         if base_ees_params is None:
             base_ees_params = self._default_ees_params.copy()
         if different_sites is None:
-            different_sites=['L3', 'L4','L5','S1', 'S2']
+            different_sites=['L4','L5','S1', 'S2']
         vary_param = {
             'param_name': 'site',
             'values': different_sites,
