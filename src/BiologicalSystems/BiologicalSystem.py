@@ -31,7 +31,7 @@ class BiologicalSystem(ABC):
     }
     color_keys = list(colorblind_friendly_colors.keys())
     
-    def __init__(self, reaction_time, ees_recruitment_profile, biophysical_params, muscles_names,
+    def __init__(self, reaction_time, biophysical_params, muscles_names,
                  associated_joint, fast_type_mu, neurons_population, connections, spindle_model, seed,
                  initial_state_neurons, initial_condition_spike_activation, initial_state_opensim,
                  activation_func, stretch_history_func=None):
@@ -68,7 +68,6 @@ class BiologicalSystem(ABC):
             Activation function
         """
         self.reaction_time = reaction_time
-        self.ees_recruitment_profile = ees_recruitment_profile
         self.biophysical_params = biophysical_params
         self.muscles_names = muscles_names
         self.number_muscles = len(muscles_names)
@@ -113,7 +112,6 @@ class BiologicalSystem(ABC):
             "neurons_population": (dict, "Neuron population must be a dict."),
             "connections": (dict, "Connections should be a dict."),
             "spindle_model": (dict, "Spindle model should be a dict."),
-            "ees_recruitment_profile": (dict, "EES recruitment parameters should be a dict."),
             "fast_type_mu": (bool, "The 'fast_type_mu' flag must be a boolean (True for fast, False for slow)."),
             "initial_state_neurons": (dict, "Initial state of neurons should be a dict."),
             "initial_condition_spike_activation": (list, "Initial conditions for activation dynamics should be a list."),
