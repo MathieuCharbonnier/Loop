@@ -524,7 +524,7 @@ class BiologicalSystem(ABC):
     
         # ---------- MUSCLE DYNAMICS PLOT ----------
         props = ['Stretch', 'Stretch_Velocity', 'Force']
-        ylabels = [ 'Stretch (dimless)', 'Stretch Velocity (s⁻¹)', 'Force (dimless)']
+        ylabels = [ 'Stretch (dimless)', 'Velocity (s⁻¹)', 'Force (dimless)']
     
         fig_muscle, axs_muscle = plt.subplots(len(props), 1, figsize=(10, 3 * len(props)), sharex=True)
     
