@@ -5,7 +5,7 @@ from functools import partial
 import joblib
 from joblib import Parallel, delayed
 
-def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, f1_l=1.0, f2_l=1.0, f3_l=0.54, f4_l=1.34, f5_l=0.87, n_jobs=-1):
+def decode_spikes_to_activation(spikes_times, dt, T, initial_params, fast=True, f1_l=0.8, f2_l=1.0, f3_l=1.0, f4_l=1.0, f5_l=1.0, n_jobs=-1):
     """
     Decode spike times to muscle activation signals using a biophysical model.
     
